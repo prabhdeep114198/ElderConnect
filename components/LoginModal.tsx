@@ -1,42 +1,54 @@
-// components/LoginModal.tsx
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
-import { account } from "../appwriteConfig";
 import { Colors } from "../constants/colors";
 
-export default function LoginModal({ onClose }: { onClose: () => void }) {
+interface LoginModalProps {
+  onClose: () => void;
+}
+
+export default function LoginModal({ onClose }: LoginModalProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
     try {
-      await account.createEmailPasswordSession(email, password);
-      Alert.alert("Success", "You are logged in!");
-      onClose();
+      // Mock login logic - replace with actual authentication
+      if (email && password) {
+        Alert.alert("Success", "Logged in successfully!");
+        onClose();
+        router.push("/(tabs)/home");
+      } else {
+        Alert.alert("Error", "Please enter email and password");
+      }
     } catch (err: any) {
-      Alert.alert("Login Failed", err?.message || "Something went wrong");
+      Alert.alert("Login Failed", err.message);
     }
   };
 
   return (
-    <View style={styles.modalBackground}>
-      <View style={styles.modalContent}>
-        <Text style={styles.title}>Login Required</Text>
+    <View style={styles.overlay}>
+      <View style={styles.modal}>
+        <Text style={styles.title}>Login to ElderConnect</Text>
+        
         <TextInput
           style={styles.input}
           placeholder="Email"
           placeholderTextColor={Colors.mutedText}
           value={email}
           onChangeText={setEmail}
+          keyboardType="email-address"
           autoCapitalize="none"
         />
+        
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -45,13 +57,25 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
           value={password}
           onChangeText={setPassword}
         />
+
         <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Log in</Text>
+          <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onClose}>
-          <Text style={{ color: Colors.primary, textAlign: "center" }}>
-            Cancel
+
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => {
+            onClose();
+            router.push("/signup");
+          }}
+        >
+          <Text style={[styles.buttonText, { color: Colors.primary }]}>
+            Create Account
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>Close</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -59,24 +83,25 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  modalBackground: {
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalContent: {
-    width: "85%",
+  modal: {
     backgroundColor: Colors.card,
     padding: 24,
     borderRadius: 12,
+    width: "90%",
+    maxWidth: 400,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     color: Colors.primary,
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 24,
   },
   input: {
     backgroundColor: Colors.background,
@@ -84,7 +109,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
+    marginBottom: 16,
+    fontSize: 16,
   },
   button: {
     backgroundColor: Colors.primary,
@@ -92,9 +118,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
   },
+  secondaryButton: {
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
   buttonText: {
     color: Colors.buttonText,
-    textAlign: "center",
     fontWeight: "bold",
+    textAlign: "center",
+    fontSize: 16,
+  },
+  closeButton: {
+    marginTop: 12,
+  },
+  closeButtonText: {
+    color: Colors.mutedText,
+    textAlign: "center",
+    fontSize: 14,
   },
 });
+

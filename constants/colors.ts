@@ -8,4 +8,8 @@ export const Colors = {
   card: "#FFFFFF",
   border: "#E0E0E0",
   buttonText: "#FFFFFF",
+  success: "#10B981",     // Green
+  warning: "#F59E0B",     // Amber / Orange
+  error: "#EF4444", 
+  info: "#FFFFFF",
 };
