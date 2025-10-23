@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -14,13 +16,13 @@ import { Colors } from "../../constants/colors";
 const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good Morning");
@@ -41,7 +43,7 @@ export default function HomeScreen() {
       title: "Call Family",
       icon: "call",
       color: Colors.primary,
-      action: () => Alert.alert("Calling", "Calling emergency contact..."),
+      action: () => router.push("/VideoCallScreen"), 
     },
     {
       title: "Health Check",
@@ -167,7 +169,7 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* AI Companion Section */}
+      {/* AI Companion */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your AI Companion</Text>
         <View style={styles.companionCard}>
@@ -187,69 +189,25 @@ export default function HomeScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
-
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-    paddingVertical: 20,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: 8,
-  },
-  time: {
-    fontSize: 36,
-    fontWeight: '300',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  date: {
-    fontSize: 16,
-    color: Colors.mutedText,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 16,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  contentContainer: { padding: 20 },
+  header: { alignItems: "center", marginBottom: 30, paddingVertical: 20 },
+  greeting: { fontSize: 28, fontWeight: "bold", color: Colors.primary, marginBottom: 8 },
+  time: { fontSize: 36, fontWeight: "300", color: Colors.text, marginBottom: 4 },
+  date: { fontSize: 16, color: Colors.mutedText },
+  section: { marginBottom: 30 },
+  sectionTitle: { fontSize: 20, fontWeight: "bold", color: Colors.text, marginBottom: 16 },
+  quickActionsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   quickActionCard: {
     width: (width - 60) / 2,
     padding: 20,
     borderRadius: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 12,
   },
-  quickActionText: {
-    color: Colors.buttonText,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
+  quickActionText: { color: Colors.buttonText, fontWeight: "600", marginTop: 8, textAlign: "center" },
+  metricsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   metricCard: {
     width: (width - 60) / 2,
     backgroundColor: Colors.card,
@@ -259,29 +217,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  metricHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  metricLabel: {
-    fontSize: 12,
-    color: Colors.mutedText,
-  },
+  metricHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  metricValue: { fontSize: 20, fontWeight: "bold", color: Colors.text, marginBottom: 4 },
+  metricLabel: { fontSize: 12, color: Colors.mutedText },
   eventCard: {
     backgroundColor: Colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -292,65 +237,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 16,
   },
-  eventTimeText: {
-    color: Colors.buttonText,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  eventContent: {
-    flex: 1,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  eventType: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  eventTypeText: {
-    fontSize: 12,
-    color: Colors.primary,
-    marginLeft: 4,
-    textTransform: 'capitalize',
-  },
+  eventTimeText: { color: Colors.buttonText, fontWeight: "600", fontSize: 12 },
+  eventContent: { flex: 1 },
+  eventTitle: { fontSize: 16, fontWeight: "600", color: Colors.text, marginBottom: 4 },
+  eventType: { flexDirection: "row", alignItems: "center" },
+  eventTypeText: { fontSize: 12, color: Colors.primary, marginLeft: 4, textTransform: "capitalize" },
   companionCard: {
     backgroundColor: Colors.card,
     padding: 20,
     borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  companionContent: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  companionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  companionMessage: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
-  },
-  chatButton: {
-    backgroundColor: Colors.secondary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  chatButtonText: {
-    color: Colors.buttonText,
-    fontWeight: '600',
-    fontSize: 16,
-  },
+  companionContent: { flex: 1, marginLeft: 16 },
+  companionTitle: { fontSize: 16, fontWeight: "600", color: Colors.text, marginBottom: 8 },
+  companionMessage: { fontSize: 14, color: Colors.mutedText, lineHeight: 20 },
+  chatButton: { backgroundColor: Colors.secondary, padding: 16, borderRadius: 12, alignItems: "center" },
+  chatButtonText: { color: Colors.buttonText, fontWeight: "600", fontSize: 16 },
 });
-
