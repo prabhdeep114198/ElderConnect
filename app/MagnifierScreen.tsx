@@ -1,21 +1,48 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// Type definition for dynamic controls
+interface ControlConfig {
+  type: 'zoom' | 'torch';
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconOn?: keyof typeof Ionicons.glyphMap;
+  iconOff?: keyof typeof Ionicons.glyphMap;
+  delta?: number;
+}
+
+// Mock: Dynamic controls fetched from backend (replace this with API call)
+const fetchControlsFromBackend = async (): Promise<ControlConfig[]> => {
+  return [
+    { type: 'zoom', icon: 'remove-circle-outline', delta: -0.1 },
+    { type: 'torch', iconOn: 'flash', iconOff: 'flash-outline' },
+    { type: 'zoom', icon: 'add-circle-outline', delta: 0.1 },
+  ];
+};
 
 export default function MagnifierScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [torchOn, setTorchOn] = useState(false);
   const [zoom, setZoom] = useState(0);
+  const [controls, setControls] = useState<ControlConfig[]>([]);
 
   const cameraRef = useRef<CameraView>(null);
 
+  // Fetch dynamic controls from backend
+  useEffect(() => {
+    const getControls = async () => {
+      const backendControls = await fetchControlsFromBackend();
+      setControls(backendControls);
+    };
+    getControls();
+  }, []);
+
   const changeZoom = (delta: number) => {
-    setZoom((prev) => Math.min(1, Math.max(0, +(prev + delta).toFixed(2))));
+    setZoom(prev => Math.min(1, Math.max(0, +(prev + delta).toFixed(2))));
   };
 
   if (!permission) return <View />;
-  
   if (!permission.granted)
     return (
       <View style={styles.center}>
@@ -41,19 +68,29 @@ export default function MagnifierScreen() {
         <Text style={styles.zoomText}>{Math.round(zoom * 100)}%</Text>
       </View>
 
-      {/* Controls */}
+      {/* Dynamic Controls */}
       <View style={styles.controls}>
-        <TouchableOpacity onPress={() => changeZoom(-0.1)}>
-          <Ionicons name="remove-circle-outline" size={40} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setTorchOn((v) => !v)}>
-          <Ionicons name={torchOn ? 'flash' : 'flash-outline'} size={36} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => changeZoom(0.1)}>
-          <Ionicons name="add-circle-outline" size={40} color="white" />
-        </TouchableOpacity>
+        {controls.map((ctrl, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => {
+              if (ctrl.type === 'zoom' && ctrl.delta !== undefined) changeZoom(ctrl.delta);
+              if (ctrl.type === 'torch') setTorchOn(v => !v);
+            }}
+          >
+            <Ionicons
+              name={
+                ctrl.type === 'torch'
+                  ? torchOn
+                    ? ctrl.iconOn!
+                    : ctrl.iconOff!
+                  : ctrl.icon!
+              }
+              size={ctrl.type === 'torch' ? 36 : 40}
+              color="white"
+            />
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );

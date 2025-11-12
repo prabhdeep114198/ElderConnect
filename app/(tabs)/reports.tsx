@@ -1,6 +1,5 @@
-// app/(tabs)/reports.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   Dimensions,
@@ -10,6 +9,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Linking,
 } from "react-native";
 import { Colors } from "../../constants/colors";
 
@@ -32,63 +33,28 @@ interface HealthReport {
 
 export default function ReportsScreen() {
   const [selectedReport, setSelectedReport] = useState<HealthReport | null>(null);
+  const [healthReports, setHealthReports] = useState<HealthReport[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [healthReports, setHealthReports] = useState<HealthReport[]>([
-    {
-      id: "1",
-      title: "Weekly Health Summary - Dec 1st-7th",
-      date: "2024-12-08",
-      type: "weekly",
-      summary:
-        "Overall health metrics remained stable this week. Noted a slight increase in daily steps and consistent medication adherence.",
-      keyMetrics: [
-        { name: "Steps", value: "35,000", trend: "up" },
-        { name: "Sleep", value: "7.2 hrs", trend: "stable" },
-        { name: "Medication Adherence", value: "95%", trend: "up" },
-      ],
-      recommendations: [
-        "Continue daily walks and aim for 8,000 steps.",
-        "Ensure consistent sleep schedule, targeting 7-8 hours.",
-      ],
-      downloadLink: "https://example.com/report-dec1-7.pdf",
-    },
-    {
-      id: "2",
-      title: "Monthly Health Overview - November",
-      date: "2024-12-01",
-      type: "monthly",
-      summary:
-        "November showed good progress in managing blood pressure. Exercise consistency improved significantly.",
-      keyMetrics: [
-        { name: "Blood Pressure", value: "125/80 mmHg", trend: "down" },
-        { name: "Exercise Minutes", value: "200 min", trend: "up" },
-        { name: "Water Intake", value: "7 glasses/day", trend: "stable" },
-      ],
-      recommendations: [
-        "Maintain current exercise routine.",
-        "Monitor blood pressure regularly and report any significant changes.",
-      ],
-      downloadLink: "https://example.com/report-nov.pdf",
-    },
-    {
-      id: "3",
-      title: "Quarterly Health Review - Q3 2024",
-      date: "2024-10-05",
-      type: "quarterly",
-      summary:
-        "Q3 saw a focus on dietary improvements and weight management. Achieved target weight loss of 2kg.",
-      keyMetrics: [
-        { name: "Weight", value: "68 kg", trend: "down" },
-        { name: "BMI", value: "24.5", trend: "down" },
-        { name: "Cholesterol", value: "Normal", trend: "stable" },
-      ],
-      recommendations: [
-        "Continue healthy eating habits.",
-        "Schedule follow-up with nutritionist next quarter.",
-      ],
-      downloadLink: "https://example.com/report-q3.pdf",
-    },
-  ]);
+  // ✅ Fetch reports dynamically from backend
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("https://your-backend.com/api/reports");
+      if (!response.ok) throw new Error("Failed to fetch reports");
+      const data: HealthReport[] = await response.json();
+      setHealthReports(data);
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Error", error.message || "Failed to load reports. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
@@ -127,11 +93,30 @@ export default function ReportsScreen() {
     }
   };
 
-  const downloadReport = (link: string) => {
-    Alert.alert("Download Report", `Attempting to download report from: ${link}`);
-    // In a real app, you would use a library like expo-linking or react-native-fs
-    // to handle file downloads.
+  const downloadReport = async (link: string) => {
+    try {
+      const supported = await Linking.canOpenURL(link);
+      if (supported) {
+        await Linking.openURL(link);
+      } else {
+        Alert.alert("Error", "Cannot open this link.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to open report link.");
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={{ color: Colors.text, marginTop: 10 }}>
+          Loading reports...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -140,7 +125,9 @@ export default function ReportsScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>Health Reports</Text>
-            <Text style={styles.headerSubtitle}>View and manage your health summaries</Text>
+            <Text style={styles.headerSubtitle}>
+              View and manage your health summaries
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.addButton}
@@ -150,7 +137,7 @@ export default function ReportsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Report Overview */}
+        {/* Overview */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Overview</Text>
           <View style={styles.overviewGrid}>
@@ -159,32 +146,16 @@ export default function ReportsScreen() {
               <Text style={styles.overviewValue}>{healthReports.length}</Text>
               <Text style={styles.overviewLabel}>Total Reports</Text>
             </View>
-            <View style={styles.overviewCard}>
-              <Ionicons name="trending-up" size={28} color={Colors.success} />
-              <Text style={styles.overviewValue}>Good</Text>
-              <Text style={styles.overviewLabel}>Overall Trend</Text>
-            </View>
-            <View style={styles.overviewCard}>
-              <Ionicons name="alert-circle" size={28} color={Colors.warning} />
-              <Text style={styles.overviewValue}>2</Text>
-              <Text style={styles.overviewLabel}>Pending Actions</Text>
-            </View>
           </View>
         </View>
 
-        {/* All Reports */}
+        {/* Reports List */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>All Reports</Text>
           {healthReports.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-outline" size={48} color={Colors.mutedText} />
-              <Text style={styles.emptyStateText}>No health reports available yet.</Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => Alert.alert("Generate Report", "Feature coming soon!")}
-              >
-                <Text style={styles.emptyStateButtonText}>Generate New Report</Text>
-              </TouchableOpacity>
+              <Text style={styles.emptyStateText}>No reports found.</Text>
             </View>
           ) : (
             healthReports.map((report) => (
@@ -195,7 +166,12 @@ export default function ReportsScreen() {
               >
                 <View style={styles.reportHeader}>
                   <View style={styles.reportTypeBadge}>
-                    <Text style={[styles.reportTypeText, { color: getReportTypeColor(report.type) }]}>
+                    <Text
+                      style={[
+                        styles.reportTypeText,
+                        { color: getReportTypeColor(report.type) },
+                      ]}
+                    >
                       {report.type}
                     </Text>
                   </View>
@@ -226,7 +202,7 @@ export default function ReportsScreen() {
       </ScrollView>
 
       {/* Report Details Modal */}
-      <Modal visible={!!selectedReport} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={!!selectedReport} animationType="slide">
         {selectedReport && (
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
@@ -235,55 +211,41 @@ export default function ReportsScreen() {
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
-
             <ScrollView style={styles.modalContent}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>{selectedReport.title}</Text>
-                <Text style={styles.detailDate}>{selectedReport.date}</Text>
-                <View style={[styles.reportTypeBadgeLarge, { backgroundColor: getReportTypeColor(selectedReport.type) + "20" }]}>
-                  <Text style={[styles.reportTypeTextLarge, { color: getReportTypeColor(selectedReport.type) }]}>
-                    {selectedReport.type}
+              <Text style={styles.detailTitle}>{selectedReport.title}</Text>
+              <Text style={styles.detailDate}>{selectedReport.date}</Text>
+
+              <Text style={styles.detailLabel}>Summary</Text>
+              <Text style={styles.detailText}>{selectedReport.summary}</Text>
+
+              <Text style={[styles.detailLabel, { marginTop: 12 }]}>Key Metrics</Text>
+              {selectedReport.keyMetrics.map((metric, index) => (
+                <View key={index} style={styles.detailMetricItem}>
+                  <Ionicons
+                    name={getTrendIcon(metric.trend) as any}
+                    size={16}
+                    color={getTrendColor(metric.trend)}
+                  />
+                  <Text style={styles.detailMetricText}>
+                    {metric.name}: {metric.value}
                   </Text>
                 </View>
-              </View>
+              ))}
 
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Summary</Text>
-                <Text style={styles.detailText}>{selectedReport.summary}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Key Metrics</Text>
-                {selectedReport.keyMetrics.map((metric, index) => (
-                  <View key={index} style={styles.detailMetricItem}>
-                    <Ionicons
-                      name={getTrendIcon(metric.trend) as any}
-                      size={16}
-                      color={getTrendColor(metric.trend)}
-                    />
-                    <Text style={styles.detailMetricText}>
-                      {metric.name}: {metric.value}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Recommendations</Text>
-                {selectedReport.recommendations.map((rec, index) => (
-                  <View key={index} style={styles.recommendationItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                    <Text style={styles.recommendationText}>{rec}</Text>
-                  </View>
-                ))}
-              </View>
+              <Text style={[styles.detailLabel, { marginTop: 12 }]}>Recommendations</Text>
+              {selectedReport.recommendations.map((rec, i) => (
+                <View key={i} style={styles.recommendationItem}>
+                  <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                  <Text style={styles.recommendationText}>{rec}</Text>
+                </View>
+              ))}
 
               <TouchableOpacity
                 style={styles.downloadButton}
                 onPress={() => downloadReport(selectedReport.downloadLink)}
               >
                 <Ionicons name="download" size={20} color={Colors.buttonText} />
-                <Text style={styles.downloadButtonText}>Download Full Report</Text>
+                <Text style={styles.downloadButtonText}>Download Report</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -294,30 +256,17 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { flex: 1, paddingHorizontal: 20 },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 20,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.text,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    marginTop: 2,
-  },
+  headerTitle: { fontSize: 24, fontWeight: "bold", color: Colors.text },
+  headerSubtitle: { fontSize: 14, color: Colors.mutedText, marginTop: 2 },
   addButton: {
     backgroundColor: Colors.primary,
     width: 44,
@@ -326,19 +275,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 16,
-  },
-  overviewGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  section: { marginBottom: 30 },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", color: Colors.text, marginBottom: 16 },
+  overviewGrid: { flexDirection: "row", justifyContent: "space-between" },
   overviewCard: {
     flex: 1,
     backgroundColor: Colors.card,
@@ -346,42 +285,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  overviewValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginTop: 8,
-  },
-  overviewLabel: {
-    fontSize: 12,
-    color: Colors.mutedText,
-    textAlign: "center",
-  },
+  overviewValue: { fontSize: 20, fontWeight: "bold", color: Colors.text, marginTop: 8 },
+  overviewLabel: { fontSize: 12, color: Colors.mutedText },
   emptyState: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 32,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
+    justifyContent: "center",
+    paddingVertical: 40,
   },
   emptyStateText: {
-    fontSize: 16,
     color: Colors.mutedText,
-    marginVertical: 16,
-  },
-  emptyStateButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: Colors.buttonText,
-    fontWeight: "600",
+    fontSize: 16,
+    marginTop: 10,
   },
   reportCard: {
     backgroundColor: Colors.card,
@@ -391,131 +306,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  reportHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  reportTypeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    backgroundColor: Colors.background,
-  },
-  reportTypeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  reportDate: {
-    fontSize: 12,
-    color: Colors.mutedText,
-  },
-  reportTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  reportSummary: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  reportMetrics: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  metricItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metricText: {
-    fontSize: 12,
-    color: Colors.text,
-    marginLeft: 4,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  reportHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  reportTypeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 },
+  reportTypeText: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
+  reportDate: { fontSize: 12, color: Colors.mutedText },
+  reportTitle: { fontSize: 16, fontWeight: "bold", color: Colors.text },
+  reportSummary: { fontSize: 14, color: Colors.mutedText, marginVertical: 6 },
+  reportMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  metricItem: { flexDirection: "row", alignItems: "center" },
+  metricText: { fontSize: 12, color: Colors.text, marginLeft: 4 },
+  modalContainer: { flex: 1, backgroundColor: Colors.background },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.text,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  detailSection: {
-    marginBottom: 20,
-  },
-  detailTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  detailDate: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    marginBottom: 8,
-  },
-  reportTypeBadgeLarge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: "flex-start",
-  },
-  reportTypeTextLarge: {
-    fontSize: 14,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
-  },
-  detailMetricItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  detailMetricText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginLeft: 8,
-  },
-  recommendationItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-  recommendationText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginLeft: 8,
-    flex: 1,
-  },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: Colors.text },
+  modalContent: { flex: 1, padding: 20 },
+  detailTitle: { fontSize: 20, fontWeight: "bold", color: Colors.text },
+  detailDate: { fontSize: 14, color: Colors.mutedText, marginBottom: 10 },
+  detailLabel: { fontSize: 14, fontWeight: "600", color: Colors.text },
+  detailText: { fontSize: 14, color: Colors.mutedText, marginTop: 4 },
+  detailMetricItem: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
+  detailMetricText: { fontSize: 14, color: Colors.text, marginLeft: 8 },
+  recommendationItem: { flexDirection: "row", alignItems: "flex-start", marginVertical: 4 },
+  recommendationText: { fontSize: 14, color: Colors.text, marginLeft: 8, flex: 1 },
   downloadButton: {
     backgroundColor: Colors.primary,
     padding: 16,
@@ -525,12 +342,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 20,
   },
-  downloadButtonText: {
-    color: Colors.buttonText,
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 10,
-  },
+  downloadButtonText: { color: Colors.buttonText, fontSize: 16, marginLeft: 10 },
 });
-
-

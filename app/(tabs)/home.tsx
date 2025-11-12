@@ -109,7 +109,7 @@ export default function HomeScreen() {
 
       {/* Health Metrics */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Health Summary</Text>
+        <Text style={styles.sectionTitle}>Today&apos;s Health Summary</Text>
         <View style={styles.metricsGrid}>
           {healthMetrics.map((metric, index) => (
             <View key={index} style={styles.metricCard}>
@@ -142,7 +142,7 @@ export default function HomeScreen() {
 
       {/* Upcoming Events */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Schedule</Text>
+        <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
         {upcomingEvents.map((event, index) => (
           <View key={index} style={styles.eventCard}>
             <View style={styles.eventTime}>
@@ -177,7 +177,7 @@ export default function HomeScreen() {
           <View style={styles.companionContent}>
             <Text style={styles.companionTitle}>ElderBot is here to help!</Text>
             <Text style={styles.companionMessage}>
-              "Remember to take your afternoon medication in 2 hours. Would you like me to set a reminder?"
+              &quot;Remember to take your afternoon medication in 2 hours. Would you like me to set a reminder?&quot;
             </Text>
           </View>
         </View>

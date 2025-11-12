@@ -14,69 +14,121 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
+interface FormField {
+  key: string;
+  placeholder: string;
+  secure?: boolean;
+  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+}
+
+interface ButtonConfig {
+  text: string;
+  onPress: () => void;
+  primary?: boolean;
+  textColor?: string;
+}
+
 export default function LoginModal({ onClose }: LoginModalProps) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
+  // Dynamic form fields
+  const formFields: FormField[] = [
+    {
+      key: "email",
+      placeholder: "Email",
+      keyboardType: "email-address",
+      autoCapitalize: "none",
+    },
+    {
+      key: "password",
+      placeholder: "Password",
+      secure: true,
+    },
+  ];
+
+  const [formValues, setFormValues] = useState<Record<string, string>>(
+    formFields.reduce((acc, field) => ({ ...acc, [field.key]: "" }), {})
+  );
+
+  const handleChange = (key: string, value: string) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleLogin = async () => {
     try {
-      // Mock login logic - replace with actual authentication
-      if (email && password) {
+      const allFilled = Object.values(formValues).every((v) => v.trim() !== "");
+      if (allFilled) {
         Alert.alert("Success", "Logged in successfully!");
         onClose();
         router.push("/(tabs)/home");
       } else {
-        Alert.alert("Error", "Please enter email and password");
+        Alert.alert("Error", "Please fill in all fields");
       }
     } catch (err: any) {
       Alert.alert("Login Failed", err.message);
     }
   };
 
+  // Dynamic buttons
+  const buttons: ButtonConfig[] = [
+    { text: "Login", onPress: handleLogin, primary: true },
+    {
+      text: "Create Account",
+      onPress: () => {
+        onClose();
+        router.push("/signup");
+      },
+      primary: false,
+      textColor: Colors.primary,
+    },
+    {
+      text: "Close",
+      onPress: onClose,
+      primary: false,
+      textColor: Colors.mutedText,
+    },
+  ];
+
   return (
     <View style={styles.overlay}>
       <View style={styles.modal}>
         <Text style={styles.title}>Login to ElderConnect</Text>
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={Colors.mutedText}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={Colors.mutedText}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Login</Text>
-        </TouchableOpacity>
+        {formFields.map((field) => (
+          <TextInput
+            key={field.key}
+            style={styles.input}
+            placeholder={field.placeholder}
+            placeholderTextColor={Colors.mutedText}
+            value={formValues[field.key]}
+            onChangeText={(val) => handleChange(field.key, val)}
+            secureTextEntry={field.secure}
+            keyboardType={field.keyboardType}
+            autoCapitalize={field.autoCapitalize}
+          />
+        ))}
 
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={() => {
-            onClose();
-            router.push("/signup");
-          }}
-        >
-          <Text style={[styles.buttonText, { color: Colors.primary }]}>
-            Create Account
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
+        {buttons.map((btn, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.button,
+              !btn.primary && styles.secondaryButton,
+              btn.primary && { backgroundColor: Colors.primary },
+            ]}
+            onPress={btn.onPress}
+          >
+            <Text
+              style={[
+                styles.buttonText,
+                !btn.primary && { color: btn.textColor || Colors.primary },
+              ]}
+            >
+              {btn.text}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -113,10 +165,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
+    alignItems: "center",
   },
   secondaryButton: {
     backgroundColor: Colors.card,
@@ -124,18 +176,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   buttonText: {
-    color: Colors.buttonText,
     fontWeight: "bold",
-    textAlign: "center",
     fontSize: 16,
   },
-  closeButton: {
-    marginTop: 12,
-  },
-  closeButtonText: {
-    color: Colors.mutedText,
-    textAlign: "center",
-    fontSize: 14,
-  },
+  titleText: {},
 });
-

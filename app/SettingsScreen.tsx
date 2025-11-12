@@ -1,18 +1,87 @@
-// app/settings.tsx
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { account } from "../appwriteConfig";
 import { Colors } from "../constants/colors";
 
+// Define Types
+interface SettingItemType {
+  type: "item" | "toggle";
+  title: string;
+  subtitle?: string;
+  key?: string; // for toggle
+  action?: string; // for item
+}
+
+interface SettingsSectionType {
+  title: string;
+  data: SettingItemType[];
+}
+
+// Mock function to fetch settings from backend
+const fetchSettings = async (): Promise<SettingsSectionType[]> => [
+  {
+    title: "Account",
+    data: [
+      { type: "item", title: "Profile", subtitle: "Update your personal information", action: "profile" },
+      { type: "item", title: "Change Password", subtitle: "Update your password", action: "changePassword" },
+      { type: "item", title: "Email Preferences", subtitle: "Manage your email settings", action: "emailPreferences" },
+    ],
+  },
+  {
+    title: "Subscription",
+    data: [
+      { type: "item", title: "Manage Subscription", subtitle: "View and manage your plan", action: "manageSubscription" },
+      { type: "item", title: "Billing History", subtitle: "View past transactions", action: "billingHistory" },
+      { type: "item", title: "Upgrade Plan", subtitle: "Explore premium features", action: "upgradePlan" },
+    ],
+  },
+  {
+    title: "Preferences",
+    data: [
+      { type: "toggle", title: "Push Notifications", key: "notifications", subtitle: "Receive app notifications" },
+      { type: "toggle", title: "Dark Mode", key: "darkMode", subtitle: "Switch to dark theme" },
+      { type: "item", title: "Language", subtitle: "English (US)", action: "language" },
+    ],
+  },
+  {
+    title: "Support",
+    data: [
+      { type: "item", title: "Help Center", action: "helpCenter", subtitle: "Get help and support" },
+      { type: "item", title: "Contact Us", action: "contactUs", subtitle: "Reach out to our team" },
+      { type: "item", title: "Privacy Policy", action: "privacyPolicy" },
+      { type: "item", title: "Terms of Service", action: "termsOfService" },
+    ],
+  },
+];
+
 export default function SettingsScreen() {
   const router = useRouter();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [settingsSections, setSettingsSections] = useState<SettingsSectionType[]>([]);
+  const [toggles, setToggles] = useState<{ [key: string]: boolean }>({
+    notifications: true,
+    darkMode: false,
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const data = await fetchSettings();
+      setSettingsSections(data);
+    };
+    loadSettings();
+  }, []);
+
+  const handleToggleChange = (key: string, value: boolean) =>
+    setToggles((prev) => ({ ...prev, [key]: value }));
+
+  const handleItemAction = (action?: string) => {
+    if (!action) return;
+    Alert.alert("Action", `Perform ${action}`);
+  };
 
   const handleLogout = async () => {
     try {
-      await account.deleteSession('current');
+      await account.deleteSession("current");
       Alert.alert("Success", "Logged out successfully");
       router.replace("/");
     } catch (err: any) {
@@ -21,35 +90,26 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Add your account deletion logic here
-              Alert.alert("Success", "Account deleted");
-              router.replace("/");
-            } catch (err: any) {
-              Alert.alert("Error", err.message);
-            }
-          },
+    Alert.alert("Delete Account", "Are you sure? This action cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert("Success", "Account deleted");
+          router.replace("/");
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const SettingItem = ({ title, subtitle, onPress, showArrow = true }: any) => (
+  const SettingItem = ({ title, subtitle, onPress }: any) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingTextContainer}>
         <Text style={styles.settingTitle}>{title}</Text>
         {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
       </View>
-      {showArrow && <Text style={styles.arrow}>›</Text>}
+      <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
   );
 
@@ -72,110 +132,39 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Settings</Text>
 
-      {/* Account Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        
-        <SettingItem
-          title="Profile"
-          subtitle="Update your personal information"
-          onPress={() => Alert.alert("Profile", "Navigate to profile editing")}
-        />
-        
-        <SettingItem
-          title="Change Password"
-          subtitle="Update your account password"
-          onPress={() => Alert.alert("Change Password", "Navigate to password change")}
-        />
-        
-        <SettingItem
-          title="Email Preferences"
-          subtitle="Manage your email settings"
-          onPress={() => Alert.alert("Email", "Navigate to email preferences")}
-        />
-      </View>
+      {settingsSections.map((section, index) => (
+        <View key={index} style={styles.section}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
 
-      {/* Subscription Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Subscription</Text>
-        
-        <SettingItem
-          title="Manage Subscription"
-          subtitle="View and manage your plan"
-          onPress={() => Alert.alert("Subscription", "Navigate to subscription management")}
-        />
-        
-        <SettingItem
-          title="Billing History"
-          subtitle="View past transactions"
-          onPress={() => Alert.alert("Billing", "Navigate to billing history")}
-        />
-        
-        <SettingItem
-          title="Upgrade Plan"
-          subtitle="Explore premium features"
-          onPress={() => Alert.alert("Upgrade", "Navigate to upgrade options")}
-        />
-      </View>
+          {section.data.map((item: SettingItemType, idx: number) => {
+            if (item.type === "item") {
+              return (
+                <SettingItem
+                  key={idx}
+                  title={item.title}
+                  subtitle={item.subtitle}
+                  onPress={() => handleItemAction(item.action)}
+                />
+              );
+            } else if (item.type === "toggle") {
+              return (
+                <SettingToggle
+                  key={idx}
+                  title={item.title}
+                  subtitle={item.subtitle}
+                  value={item.key ? toggles[item.key] : false}
+                  onValueChange={(val: boolean) => item.key && handleToggleChange(item.key, val)}
+                />
+              );
+            }
+          })}
+        </View>
+      ))}
 
-      {/* Preferences Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        
-        <SettingToggle
-          title="Push Notifications"
-          subtitle="Receive app notifications"
-          value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
-        />
-        
-        <SettingToggle
-          title="Dark Mode"
-          subtitle="Switch to dark theme"
-          value={darkModeEnabled}
-          onValueChange={setDarkModeEnabled}
-        />
-        
-        <SettingItem
-          title="Language"
-          subtitle="English (US)"
-          onPress={() => Alert.alert("Language", "Navigate to language selection")}
-        />
-      </View>
-
-      {/* Support Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support</Text>
-        
-        <SettingItem
-          title="Help Center"
-          subtitle="Get help and support"
-          onPress={() => Alert.alert("Help", "Navigate to help center")}
-        />
-        
-        <SettingItem
-          title="Contact Us"
-          subtitle="Reach out to our team"
-          onPress={() => Alert.alert("Contact", "Navigate to contact form")}
-        />
-        
-        <SettingItem
-          title="Privacy Policy"
-          onPress={() => Alert.alert("Privacy", "Navigate to privacy policy")}
-        />
-        
-        <SettingItem
-          title="Terms of Service"
-          onPress={() => Alert.alert("Terms", "Navigate to terms")}
-        />
-      </View>
-
-      {/* Account Actions */}
       <View style={styles.section}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
-        
         <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
           <Text style={styles.deleteButtonText}>Delete Account</Text>
         </TouchableOpacity>
@@ -189,20 +178,9 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: Colors.primary,
-    padding: 24,
-    paddingTop: 60,
-  },
-  section: {
-    marginBottom: 24,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: { fontSize: 32, fontWeight: "bold", color: Colors.primary, padding: 24, paddingTop: 60 },
+  section: { marginBottom: 24 },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "600",
@@ -222,24 +200,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  settingTextContainer: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  settingSubtitle: {
-    fontSize: 14,
-    color: Colors.mutedText,
-  },
-  arrow: {
-    fontSize: 24,
-    color: Colors.mutedText,
-    marginLeft: 12,
-  },
+  settingTextContainer: { flex: 1 },
+  settingTitle: { fontSize: 16, fontWeight: "500", color: Colors.text, marginBottom: 4 },
+  settingSubtitle: { fontSize: 14, color: Colors.mutedText },
+  arrow: { fontSize: 24, color: Colors.mutedText, marginLeft: 12 },
   logoutButton: {
     backgroundColor: Colors.card,
     padding: 16,
@@ -249,12 +213,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     marginBottom: 12,
   },
-  logoutButtonText: {
-    color: Colors.primary,
-    fontWeight: "bold",
-    textAlign: "center",
-    fontSize: 16,
-  },
+  logoutButtonText: { color: Colors.primary, fontWeight: "bold", textAlign: "center", fontSize: 16 },
   deleteButton: {
     backgroundColor: Colors.card,
     padding: 16,
@@ -264,18 +223,7 @@ const styles = StyleSheet.create({
     borderColor: "#EF4444",
     marginBottom: 12,
   },
-  deleteButtonText: {
-    color: "#EF4444",
-    fontWeight: "bold",
-    textAlign: "center",
-    fontSize: 16,
-  },
-  footer: {
-    padding: 24,
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 14,
-    color: Colors.mutedText,
-  },
+  deleteButtonText: { color: "#EF4444", fontWeight: "bold", textAlign: "center", fontSize: 16 },
+  footer: { padding: 24, alignItems: "center" },
+  footerText: { fontSize: 14, color: Colors.mutedText },
 });

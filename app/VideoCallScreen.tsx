@@ -1,43 +1,70 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { CameraType, CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import React, { useRef, useState } from "react";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+// Control type from backend
+interface BackendControl {
+  id: string; // unique identifier
+  type: "mute" | "switchCamera" | "endCall" | "custom";
+  icon: string;
+  color?: string;
+  size?: number;
+}
 
 export default function VideoCallScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<CameraType>("front");
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [controls, setControls] = useState<BackendControl[]>([]);
   const navigation = useNavigation();
-
   const cameraRef = useRef<CameraView>(null);
 
+  // Request permissions
   const requestPermissions = async () => {
     await requestCameraPermission();
     await requestMicPermission();
   };
 
-  const switchCamera = () => {
-    setCameraFacing((current) => (current === "back" ? "front" : "back"));
+  // Backend actions mapping
+  const actionMap: { [key: string]: () => void } = {
+    mute: () => setIsMuted(prev => !prev),
+    switchCamera: () => setCameraFacing(prev => (prev === "back" ? "front" : "back")),
+    endCall: () => navigation.goBack(),
+    // Add custom actions here
   };
 
-  const toggleMute = () => {
-    setIsMuted((prev) => !prev);
-    // Note: Expo Camera doesn't provide direct audio track control like WebRTC
-    // You'd need to implement audio recording separately if needed
-  };
+  // Fetch dynamic controls from backend
+  useEffect(() => {
+    const fetchControls = async () => {
+      try {
+        // Replace with your backend API call
+        const response = await fetch("https://your-backend.com/api/video-call-controls");
+        const data: BackendControl[] = await response.json();
 
-  const handleEndCall = () => {
-    navigation.goBack();
-  };
+        // Map backend mute icon based on state
+        const mappedData = data.map(ctrl => {
+          if (ctrl.type === "mute") {
+            return {
+              ...ctrl,
+              icon: isMuted ? "mic-off-circle" : "mic-circle",
+              color: isMuted ? "#f87171" : ctrl.color || "white",
+            };
+          }
+          return ctrl;
+        });
 
-  // Check if permissions are still loading
+        setControls(mappedData);
+      } catch (err) {
+        console.log("Failed to fetch controls:", err);
+      }
+    };
+
+    fetchControls();
+  }, [isMuted]); // Re-run if mute state changes
+
   if (!cameraPermission || !micPermission) {
     return (
       <View style={styles.center}>
@@ -46,7 +73,6 @@ export default function VideoCallScreen() {
     );
   }
 
-  // Check if permissions are denied
   if (!cameraPermission.granted || !micPermission.granted) {
     return (
       <View style={styles.center}>
@@ -67,22 +93,20 @@ export default function VideoCallScreen() {
         mode="video"
       />
 
+      {/* Dynamic Controls from backend */}
       <View style={styles.controls}>
-        <TouchableOpacity onPress={toggleMute}>
-          <Ionicons
-            name={isMuted ? "mic-off-circle" : "mic-circle"}
-            size={48}
-            color={isMuted ? "#f87171" : "white"}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={switchCamera}>
-          <Ionicons name="camera-reverse-outline" size={44} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleEndCall}>
-          <Ionicons name="call" size={48} color="#ef4444" />
-        </TouchableOpacity>
+        {controls.map(ctrl => (
+          <TouchableOpacity
+            key={ctrl.id}
+            onPress={() => actionMap[ctrl.type]?.()}
+          >
+            <Ionicons
+              name={ctrl.icon as any}
+              size={ctrl.size || 44}
+              color={ctrl.color || "white"}
+            />
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );

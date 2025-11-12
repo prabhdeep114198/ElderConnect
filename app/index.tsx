@@ -1,7 +1,7 @@
 // app/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   Animated,
   Dimensions,
@@ -11,19 +11,69 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import LoginModal from "../components/LoginModal";
 import { Colors } from "../constants/colors";
 
 const { width } = Dimensions.get("window");
 
+// Types for backend response
+interface Feature {
+  title: string;
+  description: string;
+  icon: string;
+}
+
+interface ButtonItem {
+  title: string;
+  actionType: "route" | "login"; // login opens modal, route navigates
+  route?: `/${string}`; // template literal ensures it's compatible with router.push
+}
+
 export default function LandingScreen() {
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showLogin, setShowLogin] = useState(false);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [buttons, setButtons] = useState<ButtonItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fade-in animation for title
-  React.useEffect(() => {
+  // Fetch features & buttons from backend
+  useEffect(() => {
+    const fetchLandingData = async () => {
+      try {
+        // Replace with your backend endpoint
+        const response = await fetch("https://your-backend.com/api/landing");
+        if (!response.ok) throw new Error("Failed to fetch landing data");
+
+        const data = await response.json();
+        // Expecting { features: Feature[], buttons: ButtonItem[] }
+        setFeatures(data.features || []);
+        setButtons(data.buttons || []);
+      } catch (err) {
+        console.warn("Using fallback landing data", err);
+        // Fallback if network fails
+        setFeatures([
+          { title: "Health Tracker", description: "Track your vitals", icon: "bar-chart" },
+          { title: "Appointments", description: "Never miss your doctor's visits", icon: "calendar" },
+          { title: "Medications", description: "Manage meds", icon: "medkit" },
+          { title: "Magnifier", description: "Zoom small texts", icon: "eye" },
+          { title: "Diary Notes", description: "Track moods", icon: "book" },
+          { title: "Reports", description: "View medical reports", icon: "document-text" },
+        ]);
+        setButtons([
+          { title: "Get Started", actionType: "route", route: "/(tabs)/home" },
+          { title: "Login", actionType: "login" },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLandingData();
+
+    // Animation
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 1200,
@@ -31,70 +81,53 @@ export default function LandingScreen() {
     }).start();
   }, []);
 
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: Colors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={{ marginTop: 10, color: Colors.primary }}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Animated Welcome Title */}
+    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
         Welcome to ElderConnect
       </Animated.Text>
-      <Text style={styles.subtitle}>
-        Empowering seniors with easy health tracking and care
-      </Text>
+      <Text style={styles.subtitle}>Empowering seniors with easy health tracking and care</Text>
 
       {/* Features */}
       <View style={styles.featuresContainer}>
-        <FeatureCard
-          title="Health Tracker"
-          description="Track your vitals and daily activity"
-          icon="bar-chart"
-        />
-        <FeatureCard
-          title="Appointments"
-          description="Never miss your doctor's visits"
-          icon="calendar"
-        />
-        <FeatureCard
-          title="Medications"
-          description="Manage and get reminders for meds"
-          icon="medkit"
-        />
-        <FeatureCard
-          title="Magnifier"
-          description="Zoom and read small texts easily"
-          icon="eye"
-        />
-        <FeatureCard
-          title="Diary Notes"
-          description="Keep track of daily thoughts & moods"
-          icon="book"
-        />
-        <FeatureCard
-          title="Reports"
-          description="Access all your medical reports in one place"
-          icon="document-text"
-        />
+        {features.map((feature) => (
+          <FeatureCard key={feature.title} title={feature.title} description={feature.description} icon={feature.icon} />
+        ))}
       </View>
 
-      {/* CTA Buttons */}
+      {/* Buttons */}
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/(tabs)/home")}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
+  {buttons.map((btn) => (
+    <TouchableOpacity
+      key={btn.title}
+      style={styles.button}
+      onPress={() => {
+        if (btn.actionType === "login") setShowLogin(true);
+        else if (btn.actionType === "route" && btn.route)
+          router.push(btn.route as any); // cast as any
+      }}
+    >
+      <Text style={styles.buttonText}>{btn.title}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
 
-        {/* Login Option */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowLogin(true)}
-        >
-          <Text style={styles.buttonText}>Login</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Login Modal */}
       <Modal visible={showLogin} animationType="slide" transparent>
@@ -105,22 +138,9 @@ export default function LandingScreen() {
 }
 
 // Feature Card Component
-const FeatureCard = ({
-  title,
-  description,
-  icon,
-}: {
-  title: string;
-  description: string;
-  icon: string;
-}) => (
+const FeatureCard = ({ title, description, icon }: { title: string; description: string; icon: string }) => (
   <View style={styles.card}>
-    <Ionicons
-      name={icon as any}
-      size={36}
-      color={Colors.primary}
-      style={{ marginBottom: 8 }}
-    />
+    <Ionicons name={icon as any} size={36} color={Colors.primary} style={{ marginBottom: 8 }} />
     <Text style={styles.cardTitle}>{title}</Text>
     <Text style={styles.cardDesc}>{description}</Text>
   </View>
@@ -188,11 +208,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     alignSelf: "center",
-  },
-  loginButton: {
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.primary,
   },
   buttonText: {
     color: Colors.buttonText,

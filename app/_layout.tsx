@@ -1,75 +1,65 @@
-// app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Colors } from "../constants/colors";
+import React, { useEffect, useState } from "react";
+
+// Define a type for each tab
+interface TabScreen {
+  name: string;
+  title: string;
+  icon: string;
+}
 
 export default function TabsLayout() {
+  const [tabScreens, setTabScreens] = useState<TabScreen[]>([]);
+
+  useEffect(() => {
+    const fetchTabs = async () => {
+      try {
+        // TODO: Replace with your backend API call
+        // Example: const res = await fetch("https://your-backend.com/tabs");
+        // const data = await res.json();
+
+        // Placeholder data (used until backend is connected)
+        const data: TabScreen[] = [
+          { name: "home", title: "Home", icon: "home" },
+          { name: "medications", title: "Medications", icon: "medkit" },
+          { name: "tracker", title: "Tracker", icon: "bar-chart" },
+          { name: "appointments", title: "Appointments", icon: "calendar" },
+          { name: "diary", title: "Diary", icon: "book" },
+          { name: "reports", title: "Reports", icon: "document-text" },
+          { name: "MagnifierScreen", title: "Magnifier", icon: "eye" },
+        ];
+
+        setTabScreens(data);
+      } catch (err) {
+        console.error("Failed to fetch tabs", err);
+      }
+    };
+
+    fetchTabs();
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.mutedText,
-        tabBarStyle: {
-          backgroundColor: Colors.card,
-          paddingBottom: 6,
-          height: 60,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "600",
-        },
+        tabBarStyle: { backgroundColor: Colors.card, paddingBottom: 6, height: 60 },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="medications"
-        options={{
-          title: "Medications",
-          tabBarIcon: ({ color, size }) => <Ionicons name="medkit" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="tracker"
-        options={{
-          title: "Tracker",
-          tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="appointments"
-        options={{
-          title: "Appointments",
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="diary"
-        options={{
-          title: "Diary",
-          tabBarIcon: ({ color, size }) => <Ionicons name="book" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="reports"
-        options={{
-          title: "Reports",
-          tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="MagnifierScreen"
-        options={{
-          title: "Magnifier",
-          tabBarIcon: ({ color, size }) => <Ionicons name="eye" size={size} color={color} />,
-        }}
-      />
+      {tabScreens.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: ({ color, size }) => <Ionicons name={tab.icon as any} size={size} color={color} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
