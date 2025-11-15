@@ -1,5 +1,6 @@
+// app/(tabs)/reports.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -10,8 +11,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  Linking,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 
 const { width } = Dimensions.get("window");
@@ -31,22 +33,65 @@ interface HealthReport {
   downloadLink: string;
 }
 
+// ------- Dummy Offline Data --------
+const dummyReports: HealthReport[] = [
+  {
+    id: "1",
+    title: "Weekly Health Summary - Dec 1st-7th",
+    date: "2024-12-08",
+    type: "weekly",
+    summary:
+      "Overall health metrics remained stable this week. Noted a slight increase in daily steps and consistent medication adherence.",
+    keyMetrics: [
+      { name: "Steps", value: "35,000", trend: "up" },
+      { name: "Sleep", value: "7.2 hrs", trend: "stable" },
+      { name: "Medication Adherence", value: "95%", trend: "up" },
+    ],
+    recommendations: [
+      "Continue daily walks and aim for 8,000 steps.",
+      "Ensure consistent sleep schedule, targeting 7–8 hours.",
+    ],
+    downloadLink: "https://example.com/report-dec1-7.pdf",
+  },
+  {
+    id: "2",
+    title: "Monthly Health Overview - November",
+    date: "2024-12-01",
+    type: "monthly",
+    summary:
+      "November showed good progress in managing blood pressure. Exercise consistency improved significantly.",
+    keyMetrics: [
+      { name: "Blood Pressure", value: "125/80 mmHg", trend: "down" },
+      { name: "Exercise Minutes", value: "200 min", trend: "up" },
+      { name: "Water Intake", value: "7 glasses/day", trend: "stable" },
+    ],
+    recommendations: [
+      "Maintain current exercise routine.",
+      "Monitor blood pressure regularly.",
+    ],
+    downloadLink: "https://example.com/report-nov.pdf",
+  },
+];
+
 export default function ReportsScreen() {
   const [selectedReport, setSelectedReport] = useState<HealthReport | null>(null);
   const [healthReports, setHealthReports] = useState<HealthReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // ✅ Fetch reports dynamically from backend
+  // -------- Backend Fetching ---------
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const response = await fetch("https://your-backend.com/api/reports");
-      if (!response.ok) throw new Error("Failed to fetch reports");
-      const data: HealthReport[] = await response.json();
-      setHealthReports(data);
-    } catch (error: any) {
-      console.error(error);
-      Alert.alert("Error", error.message || "Failed to load reports. Please try again later.");
+      setError(null);
+
+      // 🔥 CHANGE THIS URL WHEN YOUR BACKEND IS READY
+      const response = await fetch("https://your-backend-url.com/api/reports");
+      const data = await response.json();
+      setHealthReports(data.reports);
+    } catch (err) {
+      setError("Unable to fetch reports. Showing offline data.");
+      setHealthReports(dummyReports);
     } finally {
       setLoading(false);
     }
@@ -93,26 +138,17 @@ export default function ReportsScreen() {
     }
   };
 
-  const downloadReport = async (link: string) => {
-    try {
-      const supported = await Linking.canOpenURL(link);
-      if (supported) {
-        await Linking.openURL(link);
-      } else {
-        Alert.alert("Error", "Cannot open this link.");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to open report link.");
-    }
+  const downloadReport = (link: string) => {
+    Alert.alert("Download Report", `Downloading from: ${link}`);
   };
 
+  // -------- Loading Screen --------
   if (loading) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={{ color: Colors.text, marginTop: 10 }}>
-          Loading reports...
+        <Text style={{ marginTop: 10, color: Colors.mutedText }}>
+          Fetching health reports...
         </Text>
       </View>
     );
@@ -131,11 +167,20 @@ export default function ReportsScreen() {
           </View>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => Alert.alert("Generate Report", "Feature coming soon!")}
+            onPress={() =>
+              Alert.alert("Generate Report", "Feature coming soon!")
+            }
           >
-            <Ionicons name="document-text-outline" size={24} color={Colors.buttonText} />
+            <Ionicons
+              name="document-text-outline"
+              size={24}
+              color={Colors.buttonText}
+            />
           </TouchableOpacity>
         </View>
+
+        {/* Error Message */}
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
         {/* Overview */}
         <View style={styles.section}>
@@ -146,16 +191,31 @@ export default function ReportsScreen() {
               <Text style={styles.overviewValue}>{healthReports.length}</Text>
               <Text style={styles.overviewLabel}>Total Reports</Text>
             </View>
+
+            <View style={styles.overviewCard}>
+              <Ionicons name="trending-up" size={28} color={Colors.success} />
+              <Text style={styles.overviewValue}>Good</Text>
+              <Text style={styles.overviewLabel}>Overall Trend</Text>
+            </View>
+
+            <View style={styles.overviewCard}>
+              <Ionicons name="alert-circle" size={28} color={Colors.warning} />
+              <Text style={styles.overviewValue}>2</Text>
+              <Text style={styles.overviewLabel}>Pending Actions</Text>
+            </View>
           </View>
         </View>
 
-        {/* Reports List */}
+        {/* All Reports */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>All Reports</Text>
+
           {healthReports.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-outline" size={48} color={Colors.mutedText} />
-              <Text style={styles.emptyStateText}>No reports found.</Text>
+              <Text style={styles.emptyStateText}>
+                No health reports available yet.
+              </Text>
             </View>
           ) : (
             healthReports.map((report) => (
@@ -177,10 +237,12 @@ export default function ReportsScreen() {
                   </View>
                   <Text style={styles.reportDate}>{report.date}</Text>
                 </View>
+
                 <Text style={styles.reportTitle}>{report.title}</Text>
                 <Text style={styles.reportSummary} numberOfLines={2}>
                   {report.summary}
                 </Text>
+
                 <View style={styles.reportMetrics}>
                   {report.keyMetrics.map((metric, index) => (
                     <View key={index} style={styles.metricItem}>
@@ -201,72 +263,91 @@ export default function ReportsScreen() {
         </View>
       </ScrollView>
 
-      {/* Report Details Modal */}
+      {/* Modal */}
       <Modal visible={!!selectedReport} animationType="slide">
         {selectedReport && (
-          <View style={styles.modalContainer}>
+          <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Report Details</Text>
               <TouchableOpacity onPress={() => setSelectedReport(null)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
+
             <ScrollView style={styles.modalContent}>
-              <Text style={styles.detailTitle}>{selectedReport.title}</Text>
-              <Text style={styles.detailDate}>{selectedReport.date}</Text>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailTitle}>{selectedReport.title}</Text>
+                <Text style={styles.detailDate}>{selectedReport.date}</Text>
+              </View>
 
-              <Text style={styles.detailLabel}>Summary</Text>
-              <Text style={styles.detailText}>{selectedReport.summary}</Text>
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Summary</Text>
+                <Text style={styles.detailText}>{selectedReport.summary}</Text>
+              </View>
 
-              <Text style={[styles.detailLabel, { marginTop: 12 }]}>Key Metrics</Text>
-              {selectedReport.keyMetrics.map((metric, index) => (
-                <View key={index} style={styles.detailMetricItem}>
-                  <Ionicons
-                    name={getTrendIcon(metric.trend) as any}
-                    size={16}
-                    color={getTrendColor(metric.trend)}
-                  />
-                  <Text style={styles.detailMetricText}>
-                    {metric.name}: {metric.value}
-                  </Text>
-                </View>
-              ))}
-
-              <Text style={[styles.detailLabel, { marginTop: 12 }]}>Recommendations</Text>
-              {selectedReport.recommendations.map((rec, i) => (
-                <View key={i} style={styles.recommendationItem}>
-                  <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                  <Text style={styles.recommendationText}>{rec}</Text>
-                </View>
-              ))}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Key Metrics</Text>
+                {selectedReport.keyMetrics.map((metric, index) => (
+                  <View key={index} style={styles.detailMetricItem}>
+                    <Ionicons
+                      name={getTrendIcon(metric.trend) as any}
+                      size={16}
+                      color={getTrendColor(metric.trend)}
+                    />
+                    <Text style={styles.detailMetricText}>
+                      {metric.name}: {metric.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
 
               <TouchableOpacity
                 style={styles.downloadButton}
                 onPress={() => downloadReport(selectedReport.downloadLink)}
               >
                 <Ionicons name="download" size={20} color={Colors.buttonText} />
-                <Text style={styles.downloadButtonText}>Download Report</Text>
+                <Text style={styles.downloadButtonText}>
+                  Download Full Report
+                </Text>
               </TouchableOpacity>
             </ScrollView>
-          </View>
+          </SafeAreaView>
         )}
       </Modal>
     </View>
   );
 }
 
+// ------------------ STYLES ------------------
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { flex: 1, paddingHorizontal: 20 },
-  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    paddingHorizontal: 20,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
     paddingVertical: 20,
   },
-  headerTitle: { fontSize: 24, fontWeight: "bold", color: Colors.text },
-  headerSubtitle: { fontSize: 14, color: Colors.mutedText, marginTop: 2 },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: Colors.text,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: Colors.mutedText,
+    marginTop: 2,
+  },
   addButton: {
     backgroundColor: Colors.primary,
     width: 44,
@@ -275,72 +356,162 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  section: { marginBottom: 30 },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", color: Colors.text, marginBottom: 16 },
-  overviewGrid: { flexDirection: "row", justifyContent: "space-between" },
+  errorText: {
+    color: "red",
+    marginBottom: 10,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  overviewGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   overviewCard: {
+    backgroundColor: Colors.card,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
     flex: 1,
-    backgroundColor: Colors.card,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
     marginHorizontal: 4,
-  },
-  overviewValue: { fontSize: 20, fontWeight: "bold", color: Colors.text, marginTop: 8 },
-  overviewLabel: { fontSize: 12, color: Colors.mutedText },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    color: Colors.mutedText,
-    fontSize: 16,
-    marginTop: 10,
-  },
-  reportCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  reportHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
-  reportTypeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 },
-  reportTypeText: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
-  reportDate: { fontSize: 12, color: Colors.mutedText },
-  reportTitle: { fontSize: 16, fontWeight: "bold", color: Colors.text },
-  reportSummary: { fontSize: 14, color: Colors.mutedText, marginVertical: 6 },
-  reportMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metricItem: { flexDirection: "row", alignItems: "center" },
-  metricText: { fontSize: 12, color: Colors.text, marginLeft: 4 },
-  modalContainer: { flex: 1, backgroundColor: Colors.background },
-  modalHeader: {
+  overviewValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 8,
+  },
+  overviewLabel: {
+    fontSize: 12,
+    color: Colors.mutedText,
+  },
+  emptyState: {
+    backgroundColor: Colors.card,
+    padding: 32,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: Colors.mutedText,
+    marginTop: 16,
+  },
+  reportCard: {
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  reportHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  reportTypeBadge: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  reportTypeText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+  },
+  reportDate: {
+    fontSize: 12,
+    color: Colors.mutedText,
+  },
+  reportTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginVertical: 4,
+  },
+  reportSummary: {
+    color: Colors.mutedText,
+    marginBottom: 12,
+  },
+  reportMetrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  metricItem: {
+    flexDirection: "row",
+    marginRight: 12,
+    alignItems: "center",
+  },
+  metricText: {
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    paddingTop: Platform.OS === "android" ? 25 : 0, // Extra safety on Android
+  },
+  modalHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderColor: Colors.border,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: Colors.text },
-  modalContent: { flex: 1, padding: 20 },
-  detailTitle: { fontSize: 20, fontWeight: "bold", color: Colors.text },
-  detailDate: { fontSize: 14, color: Colors.mutedText, marginBottom: 10 },
-  detailLabel: { fontSize: 14, fontWeight: "600", color: Colors.text },
-  detailText: { fontSize: 14, color: Colors.mutedText, marginTop: 4 },
-  detailMetricItem: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
-  detailMetricText: { fontSize: 14, color: Colors.text, marginLeft: 8 },
-  recommendationItem: { flexDirection: "row", alignItems: "flex-start", marginVertical: 4 },
-  recommendationText: { fontSize: 14, color: Colors.text, marginLeft: 8, flex: 1 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  modalContent: {
+    padding: 20,
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  detailDate: {
+    fontSize: 14,
+    color: Colors.mutedText,
+    marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+  },
+  detailMetricItem: {
+    flexDirection: "row",
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  detailMetricText: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
   downloadButton: {
     backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
   },
-  downloadButtonText: { color: Colors.buttonText, fontSize: 16, marginLeft: 10 },
+  downloadButtonText: {
+    color: Colors.buttonText,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
 });
