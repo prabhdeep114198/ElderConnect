@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -6,58 +7,29 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
+import { useTheme } from "../../context/ThemeContext";
 
-interface Event {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-  category: string;
-  description?: string;
-}
+// ... imports ...
 
-const PREDICTHQ_TOKEN = "q9HswX58SlSCUx4TMHKkORZ-G1q2UjybXf3WtNy-"; // Replace with your token
+import { fetchMockEvents, Event as MockEvent } from "../../services/MockEventService";
 
 export default function EventsHomePage() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const { colors, theme } = useTheme();
+  const [events, setEvents] = useState<MockEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = async () => {
     try {
       const lat = 28.6139; // Delhi coordinates
       const lon = 77.2090;
-      const radiusKm = 20;
 
-      const params = new URLSearchParams({
-        within: `${radiusKm}km@${lat},${lon}`,
-        "active.gte": new Date().toISOString().split("T")[0],
-        limit: "20",
-        sort: "rank",
-      });
-
-      const res = await fetch(`https://api.predicthq.com/v1/events/?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${PREDICTHQ_TOKEN}`,
-          Accept: "application/json",
-        },
-      });
-
-      const data = await res.json();
-
-      const formatted = data.results.map((e: any) => ({
-        id: e.id,
-        name: e.title,
-        start: e.start,
-        end: e.end,
-        category: e.category,
-        description: e.description,
-      }));
-
-      setEvents(formatted);
+      // Use mocked service "Simulated Live Events" 
+      const mockData = await fetchMockEvents(lat, lon);
+      setEvents(mockData);
     } catch (err) {
-      console.error("PredictHQ error:", err);
+      console.error("Event fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -67,38 +39,60 @@ export default function EventsHomePage() {
     fetchEvents();
   }, []);
 
-  if (loading) return <ActivityIndicator style={{ marginTop: 40 }} size="large" />;
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, padding: 16, backgroundColor: "#f5f5f5" }}>
-      <Text style={styles.header}>Social Gatherings Near You</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.header, { color: colors.text }]}>Social Gatherings Near You</Text>
 
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <TouchableOpacity
-  style={styles.card}
-  onPress={() =>
-    router.push({
-      pathname: "/events/[id]",
-      params: {
-        id: item.id,                 // required by Expo Router
-        event: JSON.stringify(item), // the full event object
-      },
-    })
-  }
->
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() =>
+              router.push({
+                pathname: "/events/[id]",
+                params: {
+                  id: item.id,
+                  event: JSON.stringify(item),
+                },
+              })
+            }
+          >
+            <View style={styles.cardHeader}>
+              <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.categoryText}>{item.category}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
+            </View>
 
-            <Text style={styles.title}>{item.name}</Text>
-            <Text style={styles.date}>
-              {new Date(item.start).toLocaleDateString()} –{" "}
-              {new Date(item.end).toLocaleDateString()}
-            </Text>
-            <Text style={styles.venue}>{item.category}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{item.name}</Text>
+
+            <View style={styles.dateRow}>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+              <Text style={[styles.date, { color: colors.mutedText }]}>
+                {new Date(item.start).toLocaleDateString()}
+              </Text>
+            </View>
+
             {item.description && (
-              <Text style={{ marginTop: 4, color: "#555" }}>{item.description}</Text>
+              <Text style={[styles.description, { color: colors.mutedText }]} numberOfLines={2}>
+                {item.description}
+              </Text>
             )}
+
+            <View style={styles.cardFooter}>
+              <Text style={[styles.detailsLink, { color: colors.primary }]}>View Details & Register</Text>
+            </View>
           </TouchableOpacity>
         )}
       />
@@ -107,27 +101,78 @@ export default function EventsHomePage() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
     fontSize: 26,
     fontWeight: "bold",
-    marginBottom: 16,
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    elevation: 3,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  categoryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  categoryText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    textTransform: "capitalize",
   },
   title: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
   date: {
-    marginTop: 4,
-    color: "#555",
+    marginLeft: 6,
+    fontSize: 14,
   },
-  venue: {
-    color: "#777",
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
   },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 4
+  },
+  detailsLink: {
+    fontSize: 14,
+    fontWeight: '600'
+  }
 });

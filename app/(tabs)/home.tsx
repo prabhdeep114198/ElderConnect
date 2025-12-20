@@ -5,7 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Pedometer } from "expo-sensors";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Colors } from "../../constants/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -41,14 +41,15 @@ const API_CONFIG = {
 };
 
 // NOTIFICATION HANDLER
-Notifications.setNotificationHandler({ 
-  handleNotification: async () => 
-    ({ shouldShowAlert: true, 
-      shouldPlaySound: true, 
-      shouldSetBadge: false, 
-      shouldShowBanner: true, 
-      shouldShowList: true, 
-    }), 
+Notifications.setNotificationHandler({
+  handleNotification: async () =>
+  ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
 });
 
 // ANDROID CHANNEL
@@ -63,6 +64,7 @@ if (Platform.OS === "android") {
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const router = useRouter();
+  const { colors, theme } = useTheme();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState("");
@@ -106,17 +108,17 @@ export default function HomeScreen() {
         'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`,
         ...(options.headers as Record<string, string> | undefined),
       };
-  
+
       const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
         ...options,
         headers: mergedHeaders,
       });
-      
+
       if (!response.ok) {
         console.log(`API Error: ${response.status}`);
         return null;
       }
-      
+
       // Safely parse JSON (some endpoints may return empty responses)
       const text = await response.text();
       if (!text) return null;
@@ -323,16 +325,16 @@ export default function HomeScreen() {
 
   const handleHealthCheck = async () => {
     Alert.alert("Health Check", "Refreshing your health data...");
-    
+
     // Update health metrics
     await updateHealthData('steps', steps);
     await updateHealthData('heartRate', heartRate);
     await updateHealthData('sleep', sleepHours);
     await updateHealthData('water', waterIntake);
-    
+
     // Fetch latest from API
     await fetchHealthMetrics();
-    
+
     Alert.alert("Health Check Complete", "All health metrics updated!");
   };
 
@@ -343,9 +345,8 @@ export default function HomeScreen() {
   };
 
   const handleAIChat = async () => {
-    await fetchAIMessage();
-    Alert.alert("AI Companion", "Starting conversation with ElderBot...");
-    // Navigate to chat screen or show chat modal
+    // await fetchAIMessage(); // Optional: Refresh message before entering
+    router.push("/chatbot");
   };
 
   // ============================================
@@ -399,37 +400,37 @@ export default function HomeScreen() {
     {
       title: "Emergency SOS",
       icon: "warning",
-      color: Colors.error,
+      color: colors.error,
       action: handleEmergencySOS,
     },
     {
       title: "Call Family",
       icon: "call",
-      color: Colors.primary,
+      color: colors.primary,
       action: handleFamilyCall,
     },
     {
       title: "Health Check",
       icon: "heart",
-      color: Colors.success,
+      color: colors.success,
       action: handleHealthCheck,
     },
     {
       title: "Reminders",
       icon: "alarm",
-      color: Colors.warning,
+      color: colors.warning,
       action: handleReminders,
     },
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>{greeting}!</Text>
-        <Text style={styles.time}>
+        <Text style={[styles.greeting, { color: colors.primary }]}>{greeting}!</Text>
+        <Text style={[styles.time, { color: colors.text }]}>
           {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </Text>
-        <Text style={styles.date}>
+        <Text style={[styles.date, { color: colors.mutedText }]}>
           {currentTime.toLocaleDateString("en-US", {
             weekday: "long",
             year: "numeric",
@@ -441,7 +442,7 @@ export default function HomeScreen() {
 
       {/* QUICK ACTIONS */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action, index) => (
             <TouchableOpacity
@@ -449,8 +450,8 @@ export default function HomeScreen() {
               style={[styles.quickActionCard, { backgroundColor: action.color }]}
               onPress={action.action}
             >
-              <Ionicons name={action.icon as any} size={24} color={Colors.buttonText} />
-              <Text style={styles.quickActionText}>{action.title}</Text>
+              <Ionicons name={action.icon as any} size={24} color={colors.buttonText} />
+              <Text style={[styles.quickActionText, { color: colors.buttonText }]}>{action.title}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -459,8 +460,8 @@ export default function HomeScreen() {
       {/* REMINDER MODAL */}
       <Modal visible={showReminderModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.appleModalBox}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.appleModalBox, { backgroundColor: theme === 'dark' ? colors.card : "#F2F2F7" }]}>
+            <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
               <TouchableOpacity
                 onPress={() => {
                   setShowReminderModal(false);
@@ -469,29 +470,30 @@ export default function HomeScreen() {
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={styles.modalHeaderTitle}>Add Reminder</Text>
+              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>Add Reminder</Text>
               <TouchableOpacity onPress={scheduleReminder}>
                 <Text style={styles.saveText}>Save</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.timeDisplayContainer}>
-              <Text style={styles.selectedTimeLabel}>Remind me at</Text>
-              <Text style={styles.selectedTime}>
+            <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
+              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>Remind me at</Text>
+              <Text style={[styles.selectedTime, { color: colors.text }]}>
                 {selectedDate.toLocaleString()}
               </Text>
             </View>
 
-            <View style={styles.pickerContainer}>
+            <View style={[styles.pickerContainer, { backgroundColor: colors.card }]}>
               {Platform.OS === "ios" ? (
                 <DateTimePicker
                   value={selectedDate}
                   mode="datetime"
                   display="spinner"
                   onChange={onChange}
-                  textColor={Colors.text}
+                  textColor={colors.text}
                   style={styles.iosDatePicker}
                   minimumDate={new Date()}
+                  themeVariant={theme}
                 />
               ) : (
                 <>
@@ -514,32 +516,32 @@ export default function HomeScreen() {
 
       {/* HEALTH METRICS */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Health Summary</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Health Summary</Text>
         <View style={styles.metricsGrid}>
           {healthMetrics.map((metric, index) => (
-            <View key={index} style={styles.metricCard}>
+            <View key={index} style={[styles.metricCard, { backgroundColor: colors.card }]}>
               <View style={styles.metricHeader}>
-                <Ionicons name={metric.icon as any} size={20} color={Colors.primary} />
+                <Ionicons name={metric.icon as any} size={20} color={colors.primary} />
                 <Ionicons
                   name={
                     metric.trend === "up"
                       ? "trending-up"
                       : metric.trend === "down"
-                      ? "trending-down"
-                      : "remove"
+                        ? "trending-down"
+                        : "remove"
                   }
                   size={16}
                   color={
                     metric.trend === "up"
-                      ? Colors.success
+                      ? colors.success
                       : metric.trend === "down"
-                      ? Colors.warning
-                      : Colors.mutedText
+                        ? colors.warning
+                        : colors.mutedText
                   }
                 />
               </View>
-              <Text style={styles.metricValue}>{metric.value}</Text>
-              <Text style={styles.metricLabel}>{metric.label}</Text>
+              <Text style={[styles.metricValue, { color: colors.text }]}>{metric.value}</Text>
+              <Text style={[styles.metricLabel, { color: colors.mutedText }]}>{metric.label}</Text>
             </View>
           ))}
         </View>
@@ -547,27 +549,27 @@ export default function HomeScreen() {
 
       {/* UPCOMING EVENTS */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Schedule</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Schedule</Text>
         {upcomingEvents.map((event, index) => (
-          <View key={index} style={styles.eventCard}>
-            <View style={styles.eventTime}>
-              <Text style={styles.eventTimeText}>{event.time}</Text>
+          <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.eventTime, { borderRightColor: colors.primary }]}>
+              <Text style={[styles.eventTimeText, { color: colors.primary }]}>{event.time}</Text>
             </View>
             <View style={styles.eventContent}>
-              <Text style={styles.eventTitle}>{event.title}</Text>
+              <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
               <View style={styles.eventType}>
                 <Ionicons
                   name={
                     event.type === "medication"
                       ? "medkit"
                       : event.type === "appointment"
-                      ? "calendar"
-                      : "walk"
+                        ? "calendar"
+                        : "walk"
                   }
                   size={14}
-                  color={Colors.primary}
+                  color={colors.primary}
                 />
-                <Text style={styles.eventTypeText}>{event.type}</Text>
+                <Text style={[styles.eventTypeText, { color: colors.mutedText }]}>{event.type}</Text>
               </View>
             </View>
           </View>
@@ -576,16 +578,16 @@ export default function HomeScreen() {
 
       {/* AI COMPANION */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your AI Companion</Text>
-        <View style={styles.companionCard}>
-          <Ionicons name="chatbubble-ellipses" size={32} color={Colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your AI Companion</Text>
+        <View style={[styles.companionCard, { backgroundColor: colors.card }]}>
+          <Ionicons name="chatbubble-ellipses" size={32} color={colors.primary} />
           <View style={styles.companionContent}>
-            <Text style={styles.companionTitle}>ElderBot is here to help!</Text>
-            <Text style={styles.companionMessage}>"{aiMessage}"</Text>
+            <Text style={[styles.companionTitle, { color: colors.text }]}>ElderBot is here to help!</Text>
+            <Text style={[styles.companionMessage, { color: colors.mutedText }]}>"{aiMessage}"</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.chatButton} onPress={handleAIChat}>
-          <Text style={styles.chatButtonText}>Start Conversation</Text>
+        <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={handleAIChat}>
+          <Text style={[styles.chatButtonText, { color: colors.buttonText }]}>Start Conversation</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -596,14 +598,14 @@ export default function HomeScreen() {
    STYLES
 ---------------------------------------------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   contentContainer: { padding: 20 },
   header: { alignItems: "center", marginBottom: 30, paddingVertical: 20 },
-  greeting: { fontSize: 28, fontWeight: "bold", color: Colors.primary, marginBottom: 8 },
-  time: { fontSize: 36, fontWeight: "300", color: Colors.text, marginBottom: 4 },
-  date: { fontSize: 16, color: Colors.mutedText },
+  greeting: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
+  time: { fontSize: 36, fontWeight: "300", marginBottom: 4 },
+  date: { fontSize: 16 },
   section: { marginBottom: 30 },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", color: Colors.text, marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 16 },
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -616,7 +618,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  quickActionText: { color: Colors.buttonText, fontWeight: "600", marginTop: 8 },
+  quickActionText: { fontWeight: "600", marginTop: 8 },
 
   // Modal
   modalOverlay: {
@@ -625,7 +627,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   appleModalBox: {
-    backgroundColor: "#F2F2F7",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: Platform.OS === "ios" ? 34 : 20,
@@ -637,16 +638,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#C6C6C8",
   },
   modalHeaderTitle: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#000",
   },
   cancelText: {
     fontSize: 17,
@@ -658,7 +656,6 @@ const styles = StyleSheet.create({
     color: "#007AFF",
   },
   timeDisplayContainer: {
-    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 12,
@@ -668,7 +665,6 @@ const styles = StyleSheet.create({
   },
   selectedTimeLabel: {
     fontSize: 13,
-    color: "#8E8E93",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -676,10 +672,8 @@ const styles = StyleSheet.create({
   selectedTime: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#000",
   },
   pickerContainer: {
-    backgroundColor: "#fff",
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: "hidden",
@@ -703,7 +697,6 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     width: (width - 60) / 2,
-    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -716,18 +709,15 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 20,
     fontWeight: "bold",
-    color: Colors.text,
     marginBottom: 4,
   },
   metricLabel: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
 
   // Upcoming events
   eventCard: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -736,22 +726,19 @@ const styles = StyleSheet.create({
     marginRight: 12,
     paddingRight: 12,
     borderRightWidth: 2,
-    borderRightColor: Colors.primary,
   },
   eventTimeText: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.primary,
   },
   eventContent: { flex: 1 },
-  eventTitle: { fontSize: 16, fontWeight: "600", color: Colors.text, marginBottom: 4 },
+  eventTitle: { fontSize: 16, fontWeight: "600", marginBottom: 4 },
   eventType: {
     flexDirection: "row",
     alignItems: "center",
   },
   eventTypeText: {
     fontSize: 12,
-    color: Colors.mutedText,
     marginLeft: 4,
     textTransform: "capitalize",
   },
@@ -759,7 +746,6 @@ const styles = StyleSheet.create({
   // Companion
   companionCard: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -771,22 +757,18 @@ const styles = StyleSheet.create({
   companionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: Colors.text,
     marginBottom: 4,
   },
   companionMessage: {
     fontSize: 14,
-    color: Colors.mutedText,
     fontStyle: "italic",
   },
   chatButton: {
-    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
   },
   chatButtonText: {
-    color: Colors.buttonText,
     fontSize: 16,
     fontWeight: "600",
   },

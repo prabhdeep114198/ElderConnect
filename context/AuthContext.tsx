@@ -1,100 +1,159 @@
-import React, { createContext, useEffect, useState, ReactNode } from "react";
+import { account } from "@/appwriteConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ID, Models, OAuthProvider } from "appwrite";
+import { useRouter } from "expo-router";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
-// Type for backend user
-interface User {
+// =====================
+// Types
+// =====================
+export interface User {
   id: string;
-  name?: string;
-  email?: string;
-  [key: string]: any;
+  name: string;
+  email: string;
+  avatar?: string;
+  isOnboarded?: boolean;
 }
 
-// Context type
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  error: string | null;
+  completeOnboarding: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
 
-// Backend API endpoints
-const API_BASE = "https://your-backend.com/api";
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+// =====================
+// AuthProvider
+// =====================
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // Check if user is logged in on mount
+  // =====================
+  // Load user session on startup
+  // =====================
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
-        if (!res.ok) throw new Error("Not authenticated");
-        const data: User = await res.json();
-        setUser(data);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCurrentUser();
+    checkSession();
   }, []);
 
-  // Login function
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
+  const checkSession = async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include", // for cookies/session
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Login failed");
+      const sessionUser = await account.get();
+      if (sessionUser) {
+        await handleUserAuthenticated(sessionUser);
       }
-      const data: User = await res.json();
-      setUser(data);
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (error) {
+      // No active session
       setUser(null);
-      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Logout function
-  const logout = async () => {
+  const handleUserAuthenticated = async (appwriteUser: Models.User<Models.Preferences>) => {
+    const newUser: User = {
+      id: appwriteUser.$id,
+      name: appwriteUser.name,
+      email: appwriteUser.email,
+      isOnboarded: false,
+    };
+
+    // Check onboarding status from AsyncStorage or a database
+    const existingProfile = await AsyncStorage.getItem(`user_onboarded_${appwriteUser.$id}`);
+    if (existingProfile) {
+      newUser.isOnboarded = true;
+    }
+
+    setUser(newUser);
+    await AsyncStorage.setItem("user_session", JSON.stringify(newUser));
+  };
+
+  // =====================
+  // Appwrite Authentication
+  // =====================
+
+  const login = async (email: string, password: string) => {
     setLoading(true);
-    setError(null);
     try {
-      const res = await fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Logout failed");
-      setUser(null);
-    } catch (err: any) {
-      setError(err.message || "Logout failed");
+      await account.createEmailPasswordSession(email, password);
+      const sessionUser = await account.get();
+      await handleUserAuthenticated(sessionUser);
+    } catch (error: any) {
+      console.error("Login failed", error);
+      throw error;
     } finally {
       setLoading(false);
     }
+  };
+
+  const signup = async (email: string, password: string, name: string) => {
+    setLoading(true);
+    try {
+      await account.create(ID.unique(), email, password, name);
+      await login(email, password);
+    } catch (error: any) {
+      console.error("Signup failed", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      // In Appwrite React Native/Expo, createOAuth2Session will handle the redirection
+      // You may need to configure deep linking in your app.json
+      await account.createOAuth2Session(OAuthProvider.Google);
+    } catch (error) {
+      console.error("Google login failed", error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await account.deleteSession("current");
+      await AsyncStorage.removeItem("user_session");
+      setUser(null);
+      router.replace("/auth/login");
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    if (!user) return;
+    const updatedUser = { ...user, isOnboarded: true };
+    setUser(updatedUser);
+    await AsyncStorage.setItem(`user_onboarded_${user.id}`, "true");
+    await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, error }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        signup,
+        loginWithGoogle,
+        logout,
+        completeOnboarding,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

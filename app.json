@@ -8,11 +8,11 @@
     "scheme": "elderconnect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "notification": {
-      "sounds": ["./assets/sounds/alarm.wav"]
+      "sounds": [
+        "./assets/sounds/alarm.wav"
+      ]
     },
-
     "ios": {
       "supportsTablet": true
     },

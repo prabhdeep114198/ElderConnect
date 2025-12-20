@@ -1,7 +1,8 @@
-// app/(tabs)/diary.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
@@ -11,9 +12,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
-import { Colors } from "../../constants/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +34,7 @@ interface DiaryEntry {
 const API_URL = "http://localhost:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
+  const { colors, theme } = useTheme();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
   const [newEntry, setNewEntry] = useState<Omit<DiaryEntry, "id">>({
@@ -47,18 +48,27 @@ export default function DiaryScreen() {
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /** --- Fetch diary entries from backend --- */
+  /** --- Fetch diary entries from storage --- */
   const fetchDiaryEntries = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/diary`);
-      const data: DiaryEntry[] = await res.json();
-      setDiaryEntries(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const stored = await AsyncStorage.getItem("user_diary_entries");
+      if (stored) {
+        setDiaryEntries(JSON.parse(stored));
+      } else {
+        // Initial mock data if empty
+        const mockData: DiaryEntry[] = [
+          { id: '1', date: '2024-12-20', mood: 'happy', notes: 'Had a great walk in the park.', tags: ['walk', 'nature'], weather: 'sunny', activity: ['walk'] },
+        ];
+        setDiaryEntries(mockData);
+        await AsyncStorage.setItem("user_diary_entries", JSON.stringify(mockData));
+      }
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Failed to load diary entries from server.");
+      Alert.alert("Error", "Failed to load diary entries.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -73,17 +83,15 @@ export default function DiaryScreen() {
 
     const entryToAdd = {
       ...newEntry,
+      id: Date.now().toString(),
       date: newEntry.date,
     };
 
     try {
-      const res = await fetch(`${API_URL}/diary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entryToAdd),
-      });
-      const savedEntry: DiaryEntry = await res.json();
-      setDiaryEntries((prev) => [savedEntry, ...prev]);
+      const updatedEntries = [entryToAdd as DiaryEntry, ...diaryEntries];
+      setDiaryEntries(updatedEntries);
+      await AsyncStorage.setItem("user_diary_entries", JSON.stringify(updatedEntries));
+
       setNewEntry({
         date: new Date().toISOString().split("T")[0],
         mood: "neutral",
@@ -101,11 +109,11 @@ export default function DiaryScreen() {
   };
 
   const moodOptions: Array<{ icon: string; label: string; value: Mood; color: string }> = [
-    { icon: "happy", label: "Happy", value: "happy", color: Colors.success },
-    { icon: "happy-outline", label: "Neutral", value: "neutral", color: Colors.info },
-    { icon: "sad", label: "Sad", value: "sad", color: Colors.primary },
-    { icon: "alert-circle", label: "Anxious", value: "anxious", color: Colors.warning },
-    { icon: "sad-outline", label: "Angry", value: "angry", color: Colors.error },
+    { icon: "happy", label: "Happy", value: "happy", color: colors.success },
+    { icon: "happy-outline", label: "Neutral", value: "neutral", color: colors.info },
+    { icon: "sad", label: "Sad", value: "sad", color: colors.primary },
+    { icon: "alert-circle", label: "Anxious", value: "anxious", color: colors.warning },
+    { icon: "sad-outline", label: "Angry", value: "angry", color: colors.error },
   ];
 
   const weatherOptions: Array<{ icon: string; label: string; value: Weather }> = [
@@ -124,7 +132,7 @@ export default function DiaryScreen() {
     { icon: "brush", label: "Hobby", value: "hobby" },
   ];
 
-  const getMoodColor = (m: DiaryEntry["mood"]) => moodOptions.find((opt) => opt.value === m)?.color || Colors.mutedText;
+  const getMoodColor = (m: DiaryEntry["mood"]) => moodOptions.find((opt) => opt.value === m)?.color || colors.mutedText;
   const getMoodIcon = (m: DiaryEntry["mood"]) => moodOptions.find((opt) => opt.value === m)?.icon || "happy-outline";
 
   const toggleActivity = (activity: ActivityValue) => {
@@ -139,33 +147,37 @@ export default function DiaryScreen() {
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-  if (loading) return <ActivityIndicator size="large" color={Colors.primary} style={{ flex: 1, justifyContent: "center" }} />;
+  if (loading) return (
+    <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>My Diary</Text>
-            <Text style={styles.headerSubtitle}>Reflect on your day and track your mood</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>My Diary</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Reflect on your day and track your mood</Text>
           </View>
-          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)}>
-            <Ionicons name="add" size={24} color={Colors.buttonText} />
+          <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
+            <Ionicons name="add" size={24} color={colors.buttonText} />
           </TouchableOpacity>
         </View>
 
         {/* Mood Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How have you been feeling?</Text>
-          <View style={styles.moodSummaryGrid}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>How have you been feeling?</Text>
+          <View style={[styles.moodSummaryGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {moodOptions.map((opt) => {
               const count = diaryEntries.filter((entry) => entry.mood === opt.value).length;
               return (
                 <View key={opt.value} style={styles.moodSummaryCard}>
                   <Ionicons name={opt.icon as any} size={28} color={opt.color} />
-                  <Text style={styles.moodSummaryCount}>{count}</Text>
-                  <Text style={styles.moodSummaryLabel}>{opt.label}</Text>
+                  <Text style={[styles.moodSummaryCount, { color: colors.text }]}>{count}</Text>
+                  <Text style={[styles.moodSummaryLabel, { color: colors.mutedText }]}>{opt.label}</Text>
                 </View>
               );
             })}
@@ -174,42 +186,42 @@ export default function DiaryScreen() {
 
         {/* Recent Entries */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Entries</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
           {diaryEntries.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color={Colors.mutedText} />
-              <Text style={styles.emptyStateText}>No diary entries yet. Start writing!</Text>
-              <TouchableOpacity style={styles.emptyStateButton} onPress={() => setShowAddModal(true)}>
-                <Text style={styles.emptyStateButtonText}>Add New Entry</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="book-outline" size={48} color={colors.mutedText} />
+              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>No diary entries yet. Start writing!</Text>
+              <TouchableOpacity style={[styles.emptyStateButton, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
+                <Text style={[styles.emptyStateButtonText, { color: colors.buttonText }]}>Add New Entry</Text>
               </TouchableOpacity>
             </View>
           ) : (
             diaryEntries.map((entry) => (
-              <TouchableOpacity key={entry.id} style={styles.entryCard} onPress={() => setSelectedEntry(entry)}>
+              <TouchableOpacity key={entry.id} style={[styles.entryCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setSelectedEntry(entry)}>
                 <View style={styles.entryHeader}>
                   <View style={styles.entryDateContainer}>
-                    <Text style={styles.entryDate}>{formatDate(entry.date)}</Text>
+                    <Text style={[styles.entryDate, { color: colors.text }]}>{formatDate(entry.date)}</Text>
                     <View style={[styles.moodBadge, { backgroundColor: getMoodColor(entry.mood) }]}>
                       <Ionicons name={getMoodIcon(entry.mood) as any} size={14} color="white" />
                       <Text style={styles.moodBadgeText}>{entry.mood}</Text>
                     </View>
                   </View>
                   <View style={styles.weatherIcon}>
-                    <Ionicons name={entry.weather as any} size={20} color={Colors.info} />
+                    <Ionicons name={entry.weather as any} size={20} color={colors.info} />
                   </View>
                 </View>
-                <Text style={styles.entryNotes} numberOfLines={3}>
+                <Text style={[styles.entryNotes, { color: colors.text }]} numberOfLines={3}>
                   {entry.notes}
                 </Text>
                 <View style={styles.entryTags}>
                   {entry.tags.map((tag, index) => (
-                    <View key={index} style={styles.tagItem}>
-                      <Text style={styles.tagText}>#{tag}</Text>
+                    <View key={`tag-${index}`} style={[styles.tagItem, { backgroundColor: colors.background }]}>
+                      <Text style={[styles.tagText, { color: colors.mutedText }]}>#{tag}</Text>
                     </View>
                   ))}
                   {entry.activity.map((act, index) => (
-                    <View key={index} style={styles.tagItem}>
-                      <Text style={styles.tagText}>#{act}</Text>
+                    <View key={`act-${index}`} style={[styles.tagItem, { backgroundColor: colors.background }]}>
+                      <Text style={[styles.tagText, { color: colors.mutedText }]}>#{act}</Text>
                     </View>
                   ))}
                 </View>
@@ -221,39 +233,47 @@ export default function DiaryScreen() {
 
       {/* Add Diary Entry Modal */}
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Diary Entry</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>New Diary Entry</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
             {/* Date */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Date</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Date</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newEntry.date}
                 onChangeText={(text) => setNewEntry((prev) => ({ ...prev, date: text }))}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
 
             {/* Mood Selector */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>How are you feeling?</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>How are you feeling?</Text>
               <View style={styles.moodSelector}>
                 {moodOptions.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
-                    style={[styles.moodButton, newEntry.mood === opt.value && { backgroundColor: opt.color }]}
+                    style={[
+                      styles.moodButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newEntry.mood === opt.value && { backgroundColor: opt.color }
+                    ]}
                     onPress={() => setNewEntry((prev) => ({ ...prev, mood: opt.value }))}
                   >
                     <Ionicons name={opt.icon as any} size={24} color={newEntry.mood === opt.value ? "white" : opt.color} />
-                    <Text style={[styles.moodButtonText, newEntry.mood === opt.value && { color: "white" }]}>{opt.label}</Text>
+                    <Text style={[
+                      styles.moodButtonText,
+                      { color: colors.text },
+                      newEntry.mood === opt.value && { color: "white" }
+                    ]}>{opt.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -261,13 +281,13 @@ export default function DiaryScreen() {
 
             {/* Notes */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>What&apos;s on your mind?</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>What&apos;s on your mind?</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newEntry.notes}
                 onChangeText={(text) => setNewEntry((prev) => ({ ...prev, notes: text }))}
                 placeholder="Write about your day, thoughts, or feelings..."
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={5}
               />
@@ -275,30 +295,38 @@ export default function DiaryScreen() {
 
             {/* Tags */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tags (e.g., #family, #work)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Tags (e.g., #family, #work)</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newEntry.tags.join(", ")}
                 onChangeText={(text) =>
                   setNewEntry((prev) => ({ ...prev, tags: text ? text.split(",").map((t) => t.trim()) : [] }))
                 }
                 placeholder="Separate tags with commas"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
 
             {/* Weather */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Weather</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Weather</Text>
               <View style={styles.weatherSelector}>
                 {weatherOptions.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
-                    style={[styles.weatherButton, newEntry.weather === opt.value && styles.selectedWeather]}
+                    style={[
+                      styles.weatherButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newEntry.weather === opt.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
                     onPress={() => setNewEntry((prev) => ({ ...prev, weather: opt.value }))}
                   >
-                    <Ionicons name={opt.icon as any} size={20} color={newEntry.weather === opt.value ? Colors.buttonText : Colors.text} />
-                    <Text style={[styles.weatherButtonText, newEntry.weather === opt.value && { color: Colors.buttonText }]}>{opt.label}</Text>
+                    <Ionicons name={opt.icon as any} size={20} color={newEntry.weather === opt.value ? colors.buttonText : colors.text} />
+                    <Text style={[
+                      styles.weatherButtonText,
+                      { color: colors.text },
+                      newEntry.weather === opt.value && { color: colors.buttonText }
+                    ]}>{opt.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -306,23 +334,31 @@ export default function DiaryScreen() {
 
             {/* Activities */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Activities</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Activities</Text>
               <View style={styles.activitySelector}>
                 {activityOptions.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
-                    style={[styles.activityButton, newEntry.activity.includes(opt.value) && styles.selectedActivity]}
+                    style={[
+                      styles.activityButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newEntry.activity.includes(opt.value) && { backgroundColor: colors.secondary, borderColor: colors.secondary }
+                    ]}
                     onPress={() => toggleActivity(opt.value)}
                   >
-                    <Ionicons name={opt.icon as any} size={20} color={newEntry.activity.includes(opt.value) ? Colors.buttonText : Colors.text} />
-                    <Text style={[styles.activityButtonText, newEntry.activity.includes(opt.value) && { color: Colors.buttonText }]}>{opt.label}</Text>
+                    <Ionicons name={opt.icon as any} size={20} color={newEntry.activity.includes(opt.value) ? colors.buttonText : colors.text} />
+                    <Text style={[
+                      styles.activityButtonText,
+                      { color: colors.text },
+                      newEntry.activity.includes(opt.value) && { color: colors.buttonText }
+                    ]}>{opt.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            <TouchableOpacity style={styles.addEntryButton} onPress={addDiaryEntry}>
-              <Text style={styles.addEntryButtonText}>Add Entry</Text>
+            <TouchableOpacity style={[styles.addEntryButton, { backgroundColor: colors.primary }]} onPress={addDiaryEntry}>
+              <Text style={[styles.addEntryButtonText, { color: colors.buttonText }]}>Add Entry</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -331,17 +367,17 @@ export default function DiaryScreen() {
       {/* Diary Entry Details Modal */}
       <Modal visible={!!selectedEntry} animationType="slide" presentationStyle="pageSheet">
         {selectedEntry && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Diary Entry</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Diary Entry</Text>
               <TouchableOpacity onPress={() => setSelectedEntry(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailDate}>{formatDate(selectedEntry.date)}</Text>
+                <Text style={[styles.detailDate, { color: colors.text }]}>{formatDate(selectedEntry.date)}</Text>
                 <View style={[styles.moodBadgeLarge, { backgroundColor: getMoodColor(selectedEntry.mood) }]}>
                   <Ionicons name={getMoodIcon(selectedEntry.mood) as any} size={20} color="white" />
                   <Text style={styles.moodBadgeTextLarge}>{selectedEntry.mood}</Text>
@@ -349,31 +385,31 @@ export default function DiaryScreen() {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Notes</Text>
-                <Text style={styles.detailText}>{selectedEntry.notes}</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>Notes</Text>
+                <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedEntry.notes}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Tags</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>Tags</Text>
                 <View style={styles.detailTags}>
                   {selectedEntry.tags.map((tag, index) => (
-                    <View key={index} style={styles.tagItemLarge}>
-                      <Text style={styles.tagTextLarge}>#{tag}</Text>
+                    <View key={`dtag-${index}`} style={[styles.tagItemLarge, { backgroundColor: colors.card }]}>
+                      <Text style={[styles.tagTextLarge, { color: colors.mutedText }]}>#{tag}</Text>
                     </View>
                   ))}
                   {selectedEntry.activity.map((act, index) => (
-                    <View key={index} style={styles.tagItemLarge}>
-                      <Text style={styles.tagTextLarge}>#{act}</Text>
+                    <View key={`dact-${index}`} style={[styles.tagItemLarge, { backgroundColor: colors.card }]}>
+                      <Text style={[styles.tagTextLarge, { color: colors.mutedText }]}>#{act}</Text>
                     </View>
                   ))}
                 </View>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Weather</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>Weather</Text>
                 <View style={styles.detailWeather}>
-                  <Ionicons name={selectedEntry.weather as any} size={24} color={Colors.info} />
-                  <Text style={styles.detailWeatherText}>{selectedEntry.weather}</Text>
+                  <Ionicons name={selectedEntry.weather as any} size={24} color={colors.info} />
+                  <Text style={[styles.detailWeatherText, { color: colors.text }]}>{selectedEntry.weather}</Text>
                 </View>
               </View>
             </ScrollView>
@@ -389,7 +425,6 @@ export default function DiaryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -404,15 +439,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: Colors.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginTop: 2,
   },
   addButton: {
-    backgroundColor: Colors.primary,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -425,17 +457,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: Colors.text,
     marginBottom: 16,
   },
   moodSummaryGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: Colors.card,
     borderRadius: 12,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   moodSummaryCard: {
     alignItems: "center",
@@ -443,43 +472,34 @@ const styles = StyleSheet.create({
   moodSummaryCount: {
     fontSize: 20,
     fontWeight: "bold",
-    color: Colors.text,
     marginTop: 8,
   },
   moodSummaryLabel: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   emptyState: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 32,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   emptyStateText: {
     fontSize: 16,
-    color: Colors.mutedText,
     marginVertical: 16,
   },
   emptyStateButton: {
-    backgroundColor: Colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   emptyStateButtonText: {
-    color: Colors.buttonText,
     fontWeight: "600",
   },
   entryCard: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   entryHeader: {
     flexDirection: "row",
@@ -494,7 +514,6 @@ const styles = StyleSheet.create({
   entryDate: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.text,
     marginRight: 10,
   },
   moodBadge: {
@@ -516,7 +535,6 @@ const styles = StyleSheet.create({
   },
   entryNotes: {
     fontSize: 14,
-    color: Colors.text,
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -526,18 +544,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagItem: {
-    backgroundColor: Colors.background,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,
   },
   tagText: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   modalHeader: {
     flexDirection: "row",
@@ -545,12 +560,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: Colors.text,
   },
   modalContent: {
     flex: 1,
@@ -562,17 +575,13 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.text,
     marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.card,
   },
   textArea: {
     height: 120,
@@ -590,12 +599,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
   },
   moodButtonText: {
     fontSize: 12,
-    color: Colors.text,
     marginTop: 4,
   },
   weatherSelector: {
@@ -610,16 +616,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
   },
   selectedWeather: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    // handled inline
   },
   weatherButtonText: {
     fontSize: 12,
-    color: Colors.text,
     marginLeft: 8,
   },
   activitySelector: {
@@ -634,29 +636,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
   },
   selectedActivity: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
+    // handled inline
   },
   activityButtonText: {
     fontSize: 12,
-    color: Colors.text,
     marginLeft: 8,
   },
   addEntryButton: {
-    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: 20,
   },
   addEntryButtonText: {
-    color: Colors.buttonText,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   detailSection: {
     marginBottom: 20,
@@ -664,7 +660,6 @@ const styles = StyleSheet.create({
   detailDate: {
     fontSize: 18,
     fontWeight: "bold",
-    color: Colors.text,
     marginBottom: 8,
   },
   moodBadgeLarge: {
@@ -685,12 +680,10 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.text,
     marginBottom: 8,
   },
   detailText: {
     fontSize: 14,
-    color: Colors.mutedText,
     lineHeight: 20,
   },
   detailTags: {
@@ -699,14 +692,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagItemLarge: {
-    backgroundColor: Colors.background,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 18,
   },
   tagTextLarge: {
     fontSize: 14,
-    color: Colors.mutedText,
   },
   detailWeather: {
     flexDirection: "row",
@@ -714,7 +705,6 @@ const styles = StyleSheet.create({
   },
   detailWeatherText: {
     fontSize: 14,
-    color: Colors.text,
     marginLeft: 8,
     textTransform: "capitalize",
   },

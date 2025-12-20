@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import React, { useRef, useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 // Type definition for dynamic controls
 interface ControlConfig {
@@ -22,6 +23,7 @@ const fetchControlsFromBackend = async (): Promise<ControlConfig[]> => {
 };
 
 export default function MagnifierScreen() {
+  const { colors, theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [torchOn, setTorchOn] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -42,13 +44,13 @@ export default function MagnifierScreen() {
     setZoom(prev => Math.min(1, Math.max(0, +(prev + delta).toFixed(2))));
   };
 
-  if (!permission) return <View />;
+  if (!permission) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   if (!permission.granted)
     return (
-      <View style={styles.center}>
-        <Text style={styles.infoText}>No camera access</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.permissionButtonText}>Request Permission</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.infoText, { color: colors.text }]}>No camera access</Text>
+        <TouchableOpacity style={[styles.permissionButton, { backgroundColor: colors.primary }]} onPress={requestPermission}>
+          <Text style={[styles.permissionButtonText, { color: colors.buttonText }]}>Request Permission</Text>
         </TouchableOpacity>
       </View>
     );
@@ -108,14 +110,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  infoText: { color: 'white', marginBottom: 12 },
+  infoText: { marginBottom: 12, fontSize: 16 },
   permissionButton: {
-    backgroundColor: '#1f2937',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
   },
-  permissionButtonText: { color: 'white', fontWeight: '600' },
+  permissionButtonText: { fontWeight: '600' },
   zoomBadge: {
     position: 'absolute',
     top: 50,

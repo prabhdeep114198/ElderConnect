@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   View
 } from "react-native";
 import { Colors } from "../constants/colors";
+import { useAuth } from "../context/AuthContext";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -47,6 +48,8 @@ export default function LoginModal({ onClose }: LoginModalProps) {
     },
   ];
 
+  const { login } = useAuth();
+
   const [formValues, setFormValues] = useState<Record<string, string>>(
     formFields.reduce((acc, field) => ({ ...acc, [field.key]: "" }), {})
   );
@@ -57,16 +60,16 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 
   const handleLogin = async () => {
     try {
-      const allFilled = Object.values(formValues).every((v) => v.trim() !== "");
-      if (allFilled) {
-        Alert.alert("Success", "Logged in successfully!");
+      const { email, password } = formValues;
+      if (email.trim() && password.trim()) {
+        await login(email, password);
         onClose();
-        router.push("/(tabs)/home");
+        // Redirection will be handled by the global layout effect
       } else {
         Alert.alert("Error", "Please fill in all fields");
       }
     } catch (err: any) {
-      Alert.alert("Login Failed", err.message);
+      Alert.alert("Login Failed", err.message || "An error occurred");
     }
   };
 
@@ -77,7 +80,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
       text: "Create Account",
       onPress: () => {
         onClose();
-        router.push("/signup");
+        router.push("/auth/login");
       },
       primary: false,
       textColor: Colors.primary,
