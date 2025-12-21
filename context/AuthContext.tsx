@@ -23,6 +23,8 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
+  updatePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -142,6 +144,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
   };
 
+  const updateProfile = async (name: string) => {
+    try {
+      await account.updateName(name);
+      if (user) {
+        const updatedUser = { ...user, name };
+        setUser(updatedUser);
+        await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
+      }
+    } catch (error: any) {
+      console.error("Update profile failed", error);
+      throw error;
+    }
+  };
+
+  const updatePassword = async (newPassword: string, oldPassword?: string) => {
+    try {
+      await account.updatePassword(newPassword, oldPassword);
+    } catch (error: any) {
+      console.error("Update password failed", error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -152,6 +177,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithGoogle,
         logout,
         completeOnboarding,
+        updateProfile,
+        updatePassword,
       }}
     >
       {children}

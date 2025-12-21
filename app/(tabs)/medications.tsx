@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -32,6 +33,7 @@ interface Medication {
 
 export default function MedicationsScreen() {
   const { colors, theme } = useTheme();
+  const { t } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
   const [newMedication, setNewMedication] = useState({
@@ -195,8 +197,8 @@ export default function MedicationsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Medications</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Manage your daily medications</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("medications")}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageDailyMeds")}</Text>
           </View>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -208,14 +210,14 @@ export default function MedicationsScreen() {
 
         {/* Today's Summary */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Summary</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSummary")}</Text>
           <View style={styles.summaryGrid}>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.summaryIcon}>
                 <Ionicons name="medical" size={24} color={colors.primary} />
               </View>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{todayStats.takenMeds}/{todayStats.totalDoses}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Doses Taken</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("dosesTaken")}</Text>
             </View>
 
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -225,7 +227,7 @@ export default function MedicationsScreen() {
               <Text style={[styles.summaryValue, { color: getComplianceColor(todayStats.compliance) }]}>
                 {todayStats.compliance}%
               </Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Compliance</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("compliance")}</Text>
             </View>
 
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -237,14 +239,14 @@ export default function MedicationsScreen() {
                   med.taken.some((taken, i) => !taken && getTimeStatus(med, i) === 'missed')
                 ).length}
               </Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Missed</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("missed")}</Text>
             </View>
           </View>
         </View>
 
         {/* Weekly Compliance Chart */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Compliance</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
           <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.chartContainer}>
               {weeklyCompliance.map((compliance, index) => (
@@ -268,7 +270,7 @@ export default function MedicationsScreen() {
 
         {/* Today's Medications */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Medications</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysMedications")}</Text>
           {medications.map((med) => (
             <View key={med.id} style={[styles.medicationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.medicationHeader}>
@@ -277,7 +279,7 @@ export default function MedicationsScreen() {
                   <View style={styles.medicationDetails}>
                     <Text style={[styles.medicationName, { color: colors.text }]}>{med.name}</Text>
                     <Text style={[styles.medicationDosage, { color: colors.mutedText }]}>{med.dosage} • {med.frequency}</Text>
-                    <Text style={[styles.medicationDoctor, { color: colors.mutedText }]}>Prescribed by {med.prescribedBy}</Text>
+                    <Text style={[styles.medicationDoctor, { color: colors.mutedText }]}>{t("prescribedBy")} {med.prescribedBy}</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -339,7 +341,7 @@ export default function MedicationsScreen() {
                   onPress={() => setReminder(med)}
                 >
                   <Ionicons name="alarm" size={16} color={colors.primary} />
-                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>Set Reminder</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("setReminder")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -347,7 +349,7 @@ export default function MedicationsScreen() {
                   onPress={() => Alert.alert('Refill', `Order refill for ${med.name}?`)}
                 >
                   <Ionicons name="refresh" size={16} color={colors.success} />
-                  <Text style={[styles.actionButtonText, { color: colors.success }]}>Refill</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.success }]}>{t("refill")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -356,19 +358,19 @@ export default function MedicationsScreen() {
 
         {/* Medication Tips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Medication Tips</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("medicationTips")}</Text>
           <View style={[styles.tipsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.tipItem}>
               <Ionicons name="bulb" size={20} color={colors.warning} />
-              <Text style={[styles.tipText, { color: colors.text }]}>Take medications at the same time each day for better results</Text>
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip1")}</Text>
             </View>
             <View style={styles.tipItem}>
               <Ionicons name="water" size={20} color={colors.info} />
-              <Text style={[styles.tipText, { color: colors.text }]}>Always take pills with a full glass of water unless directed otherwise</Text>
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip2")}</Text>
             </View>
             <View style={styles.tipItem}>
               <Ionicons name="warning" size={20} color={colors.error} />
-              <Text style={[styles.tipText, { color: colors.text }]}>Never stop taking prescribed medications without consulting your doctor</Text>
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip3")}</Text>
             </View>
           </View>
         </View>
@@ -382,7 +384,7 @@ export default function MedicationsScreen() {
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Medication</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("addNewMedication")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -390,7 +392,7 @@ export default function MedicationsScreen() {
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Medication Name *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("medicationName")} *</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.name}
@@ -401,7 +403,7 @@ export default function MedicationsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Dosage *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("dosage")} *</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.dosage}
@@ -412,7 +414,7 @@ export default function MedicationsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Frequency</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("frequency")}</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.frequency}
@@ -423,7 +425,7 @@ export default function MedicationsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Special Instructions</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("specialInstructions")}</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.instructions}
@@ -436,7 +438,7 @@ export default function MedicationsScreen() {
             </View>
 
             <TouchableOpacity style={[styles.addMedicationButton, { backgroundColor: colors.primary }]} onPress={addMedication}>
-              <Text style={[styles.addMedicationButtonText, { color: colors.buttonText }]}>Add Medication</Text>
+              <Text style={[styles.addMedicationButtonText, { color: colors.buttonText }]}>{t("addNewMedication")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -459,22 +461,22 @@ export default function MedicationsScreen() {
 
             <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={[styles.detailTitle, { color: colors.text }]}>Dosage Information</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("dosage")}</Text>
                 <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.dosage} • {selectedMed.frequency}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailTitle, { color: colors.text }]}>Instructions</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("specialInstructions")}</Text>
                 <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.instructions}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailTitle, { color: colors.text }]}>Prescribed By</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("prescribedBy")}</Text>
                 <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.prescribedBy}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailTitle, { color: colors.text }]}>Start Date</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("date")}</Text>
                 <Text style={[styles.detailText, { color: colors.mutedText }]}>{new Date(selectedMed.startDate).toLocaleDateString()}</Text>
               </View>
 
@@ -486,7 +488,7 @@ export default function MedicationsScreen() {
               )}
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailTitle, { color: colors.text }]}>Possible Side Effects</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("possibleSideEffects")}</Text>
                 {selectedMed.sideEffects.map((effect, index) => (
                   <Text key={index} style={[styles.sideEffectText, { color: colors.mutedText }]}>• {effect}</Text>
                 ))}

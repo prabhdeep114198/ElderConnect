@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -24,6 +25,7 @@ const fetchControlsFromBackend = async (): Promise<ControlConfig[]> => {
 
 export default function MagnifierScreen() {
   const { colors, theme } = useTheme();
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [torchOn, setTorchOn] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -48,9 +50,9 @@ export default function MagnifierScreen() {
   if (!permission.granted)
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={[styles.infoText, { color: colors.text }]}>No camera access</Text>
+        <Text style={[styles.infoText, { color: colors.text }]}>{t("noCameraAccess")}</Text>
         <TouchableOpacity style={[styles.permissionButton, { backgroundColor: colors.primary }]} onPress={requestPermission}>
-          <Text style={[styles.permissionButtonText, { color: colors.buttonText }]}>Request Permission</Text>
+          <Text style={[styles.permissionButtonText, { color: colors.buttonText }]}>{t("requestPermission")}</Text>
         </TouchableOpacity>
       </View>
     );

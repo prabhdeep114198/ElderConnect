@@ -1,3 +1,4 @@
+import { ActionSheetProvider } from "@expo/react-native-action-sheet";
 import { useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
@@ -5,6 +6,7 @@ import { ActivityIndicator, View } from "react-native";
 import { Colors } from "../constants/colors";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider } from "../context/ThemeContext";
+import "./../i18n";
 
 function InitialLayout() {
   const { user, loading } = useAuth();
@@ -93,11 +95,14 @@ function InitialLayout() {
   );
 }
 
+
 export default function RootLayout() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <InitialLayout />
+        <ActionSheetProvider>
+          <InitialLayout />
+        </ActionSheetProvider>
       </ThemeProvider>
     </AuthProvider>
   );

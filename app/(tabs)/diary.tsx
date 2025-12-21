@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,7 +38,9 @@ const API_URL = "http://localhost:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();
+  const { t, i18n } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
   const [newEntry, setNewEntry] = useState<Omit<DiaryEntry, "id">>({
     date: new Date().toISOString().split("T")[0],
@@ -109,27 +114,27 @@ export default function DiaryScreen() {
   };
 
   const moodOptions: Array<{ icon: string; label: string; value: Mood; color: string }> = [
-    { icon: "happy", label: "Happy", value: "happy", color: colors.success },
-    { icon: "happy-outline", label: "Neutral", value: "neutral", color: colors.info },
-    { icon: "sad", label: "Sad", value: "sad", color: colors.primary },
-    { icon: "alert-circle", label: "Anxious", value: "anxious", color: colors.warning },
-    { icon: "sad-outline", label: "Angry", value: "angry", color: colors.error },
+    { icon: "happy", label: t("happy"), value: "happy", color: colors.success },
+    { icon: "happy-outline", label: t("neutral"), value: "neutral", color: colors.info },
+    { icon: "sad", label: t("sad"), value: "sad", color: colors.primary },
+    { icon: "alert-circle", label: t("anxious"), value: "anxious", color: colors.warning },
+    { icon: "sad-outline", label: t("angry"), value: "angry", color: colors.error },
   ];
 
   const weatherOptions: Array<{ icon: string; label: string; value: Weather }> = [
-    { icon: "sunny", label: "Sunny", value: "sunny" },
-    { icon: "cloudy", label: "Cloudy", value: "cloudy" },
-    { icon: "rainy", label: "Rainy", value: "rainy" },
-    { icon: "snow", label: "Snowy", value: "snowy" },
+    { icon: "sunny", label: t("sunny"), value: "sunny" },
+    { icon: "cloudy", label: t("cloudy"), value: "cloudy" },
+    { icon: "rainy", label: t("rainy"), value: "rainy" },
+    { icon: "snow", label: t("snowy"), value: "snowy" },
   ];
 
   const activityOptions: Array<{ icon: string; label: string; value: ActivityValue }> = [
-    { icon: "walk", label: "Walk", value: "walk" },
-    { icon: "book", label: "Reading", value: "reading" },
-    { icon: "people", label: "Social", value: "social" },
-    { icon: "fitness", label: "Exercise", value: "exercise" },
-    { icon: "meditation", label: "Meditation", value: "meditation" },
-    { icon: "brush", label: "Hobby", value: "hobby" },
+    { icon: "walk", label: t("walk"), value: "walk" },
+    { icon: "book", label: t("reading"), value: "reading" },
+    { icon: "people", label: t("social"), value: "social" },
+    { icon: "fitness", label: t("exercise"), value: "exercise" },
+    { icon: "meditation", label: t("meditation"), value: "meditation" },
+    { icon: "brush", label: t("hobby"), value: "hobby" },
   ];
 
   const getMoodColor = (m: DiaryEntry["mood"]) => moodOptions.find((opt) => opt.value === m)?.color || colors.mutedText;
@@ -145,7 +150,7 @@ export default function DiaryScreen() {
   };
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    new Date(dateString).toLocaleDateString(i18n.language, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   if (loading) return (
     <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
@@ -159,8 +164,8 @@ export default function DiaryScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>My Diary</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Reflect on your day and track your mood</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("myDiary")}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("reflectOnDay")}</Text>
           </View>
           <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
             <Ionicons name="add" size={24} color={colors.buttonText} />
@@ -169,7 +174,7 @@ export default function DiaryScreen() {
 
         {/* Mood Summary */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>How have you been feeling?</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("howFeeling")}</Text>
           <View style={[styles.moodSummaryGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {moodOptions.map((opt) => {
               const count = diaryEntries.filter((entry) => entry.mood === opt.value).length;
@@ -186,13 +191,13 @@ export default function DiaryScreen() {
 
         {/* Recent Entries */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Entries</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("recentEntries")}</Text>
           {diaryEntries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="book-outline" size={48} color={colors.mutedText} />
-              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>No diary entries yet. Start writing!</Text>
+              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>{t("noDiaryEntries")}</Text>
               <TouchableOpacity style={[styles.emptyStateButton, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
-                <Text style={[styles.emptyStateButtonText, { color: colors.buttonText }]}>Add New Entry</Text>
+                <Text style={[styles.emptyStateButtonText, { color: colors.buttonText }]}>{t("addNewEntry")}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -235,7 +240,7 @@ export default function DiaryScreen() {
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>New Diary Entry</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("newDiaryEntry")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -244,19 +249,36 @@ export default function DiaryScreen() {
           <ScrollView style={styles.modalContent}>
             {/* Date */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Date</Text>
-              <TextInput
-                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                value={newEntry.date}
-                onChangeText={(text) => setNewEntry((prev) => ({ ...prev, date: text }))}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.mutedText}
-              />
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("date")}</Text>
+              <TouchableOpacity
+                style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center' }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={{ color: newEntry.date ? colors.text : colors.mutedText, fontSize: 16 }}>
+                  {newEntry.date ? formatDate(newEntry.date) : "YYYY-MM-DD"}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={newEntry.date ? new Date(newEntry.date) : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                    setShowDatePicker(false);
+                    if (selectedDate) {
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(selectedDate.getDate()).padStart(2, '0');
+                      setNewEntry((prev) => ({ ...prev, date: `${year}-${month}-${day}` }));
+                    }
+                  }}
+                />
+              )}
             </View>
 
             {/* Mood Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>How are you feeling?</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("howFeeling")}</Text>
               <View style={styles.moodSelector}>
                 {moodOptions.map((opt) => (
                   <TouchableOpacity
@@ -281,12 +303,12 @@ export default function DiaryScreen() {
 
             {/* Notes */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>What&apos;s on your mind?</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("whatsOnYourMind")}</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newEntry.notes}
                 onChangeText={(text) => setNewEntry((prev) => ({ ...prev, notes: text }))}
-                placeholder="Write about your day, thoughts, or feelings..."
+                placeholder={t("writeAboutDay")}
                 placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={5}
@@ -295,21 +317,21 @@ export default function DiaryScreen() {
 
             {/* Tags */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Tags (e.g., #family, #work)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("tags")}</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newEntry.tags.join(", ")}
                 onChangeText={(text) =>
                   setNewEntry((prev) => ({ ...prev, tags: text ? text.split(",").map((t) => t.trim()) : [] }))
                 }
-                placeholder="Separate tags with commas"
+                placeholder={t("separateTags")}
                 placeholderTextColor={colors.mutedText}
               />
             </View>
 
             {/* Weather */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Weather</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("weather")}</Text>
               <View style={styles.weatherSelector}>
                 {weatherOptions.map((opt) => (
                   <TouchableOpacity
@@ -334,7 +356,7 @@ export default function DiaryScreen() {
 
             {/* Activities */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Activities</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("activities")}</Text>
               <View style={styles.activitySelector}>
                 {activityOptions.map((opt) => (
                   <TouchableOpacity
@@ -358,7 +380,7 @@ export default function DiaryScreen() {
             </View>
 
             <TouchableOpacity style={[styles.addEntryButton, { backgroundColor: colors.primary }]} onPress={addDiaryEntry}>
-              <Text style={[styles.addEntryButtonText, { color: colors.buttonText }]}>Add Entry</Text>
+              <Text style={[styles.addEntryButtonText, { color: colors.buttonText }]}>{t("addEntry")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -369,7 +391,7 @@ export default function DiaryScreen() {
         {selectedEntry && (
           <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Diary Entry</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t("myDiary")}</Text>
               <TouchableOpacity onPress={() => setSelectedEntry(null)}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -385,12 +407,12 @@ export default function DiaryScreen() {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.text }]}>Notes</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>{t("notes")}</Text>
                 <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedEntry.notes}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.text }]}>Tags</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>{t("tags")}</Text>
                 <View style={styles.detailTags}>
                   {selectedEntry.tags.map((tag, index) => (
                     <View key={`dtag-${index}`} style={[styles.tagItemLarge, { backgroundColor: colors.card }]}>
@@ -406,7 +428,7 @@ export default function DiaryScreen() {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.text }]}>Weather</Text>
+                <Text style={[styles.detailLabel, { color: colors.text }]}>{t("weather")}</Text>
                 <View style={styles.detailWeather}>
                   <Ionicons name={selectedEntry.weather as any} size={24} color={colors.info} />
                   <Text style={[styles.detailWeatherText, { color: colors.text }]}>{selectedEntry.weather}</Text>

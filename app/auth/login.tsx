@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
     Alert,
@@ -19,6 +20,7 @@ import { useTheme } from "../../context/ThemeContext";
 export default function LoginScreen() {
     const router = useRouter();
     const { colors, theme } = useTheme();
+    const { t } = useTranslation();
     const { login, signup, loginWithGoogle, loading, user } = useAuth();
 
     const [isLogin, setIsLogin] = useState(true);
@@ -38,7 +40,7 @@ export default function LoginScreen() {
 
     const handleAuth = async () => {
         if (!email || !password || (!isLogin && !name)) {
-            Alert.alert("Error", "Please fill in all fields");
+            Alert.alert(t("error"), t("fillAllFields"));
             return;
         }
 
@@ -49,7 +51,7 @@ export default function LoginScreen() {
                 await signup(email, password, name);
             }
         } catch (error: any) {
-            Alert.alert("Authentication Failed", error.message || "An error occurred");
+            Alert.alert(t("authFailed"), error.message || t("errorOccurred"));
         }
     };
 
@@ -66,12 +68,12 @@ export default function LoginScreen() {
                     </View>
 
                     <Text style={[styles.title, { color: colors.text }]}>
-                        {isLogin ? "Welcome Back" : "Create Account"}
+                        {isLogin ? t("welcomeBack") : t("createAccount")}
                     </Text>
                     <Text style={[styles.subtitle, { color: colors.mutedText }]}>
                         {isLogin
-                            ? "Your companion for a healthier, happier life."
-                            : "Join us in making elder care simpler and better."}
+                            ? t("loginSubtitle")
+                            : t("signupSubtitle")}
                     </Text>
 
                     {/* Inputs */}
@@ -79,7 +81,7 @@ export default function LoginScreen() {
                         <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
                             <Ionicons name="person-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="Full Name"
+                                placeholder={t("fullName")}
                                 placeholderTextColor={colors.mutedText}
                                 style={[styles.input, { color: colors.text }]}
                                 value={name}
@@ -91,7 +93,7 @@ export default function LoginScreen() {
                     <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         <Ionicons name="mail-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
                         <TextInput
-                            placeholder="Email Address"
+                            placeholder={t("emailAddress")}
                             placeholderTextColor={colors.mutedText}
                             style={[styles.input, { color: colors.text }]}
                             value={email}
@@ -104,7 +106,7 @@ export default function LoginScreen() {
                     <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         <Ionicons name="lock-closed-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
                         <TextInput
-                            placeholder="Password"
+                            placeholder={t("password")}
                             placeholderTextColor={colors.mutedText}
                             style={[styles.input, { color: colors.text }]}
                             value={password}
@@ -122,23 +124,23 @@ export default function LoginScreen() {
                             <ActivityIndicator color="#FFF" />
                         ) : (
                             <Text style={styles.mainButtonText}>
-                                {isLogin ? "Sign In" : "Sign Up"}
+                                {isLogin ? t("signIn") : t("signUp")}
                             </Text>
                         )}
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.toggleContainer}>
                         <Text style={[styles.toggleText, { color: colors.mutedText }]}>
-                            {isLogin ? "Don't have an account? " : "Already have an account? "}
+                            {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
                             <Text style={{ color: colors.primary, fontWeight: "bold" }}>
-                                {isLogin ? "Sign Up" : "Sign In"}
+                                {isLogin ? t("signUp") : t("signIn")}
                             </Text>
                         </Text>
                     </TouchableOpacity>
 
                     <View style={styles.dividerContainer}>
                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.dividerText, { color: colors.mutedText }]}>OR</Text>
+                        <Text style={[styles.dividerText, { color: colors.mutedText }]}>{t("or")}</Text>
                         <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     </View>
 
@@ -149,11 +151,11 @@ export default function LoginScreen() {
                         disabled={loading}
                     >
                         <Ionicons name="logo-google" size={24} color={colors.text} style={{ marginRight: 12 }} />
-                        <Text style={[styles.socialButtonText, { color: colors.text }]}>Continue with Google</Text>
+                        <Text style={[styles.socialButtonText, { color: colors.text }]}>{t("continueWithGoogle")}</Text>
                     </TouchableOpacity>
 
                     <Text style={[styles.footerText, { color: colors.mutedText }]}>
-                        By continuing, you agree to our Terms & Privacy Policy.
+                        {t("termsPrivacy")}
                     </Text>
                 </View>
             </ScrollView>

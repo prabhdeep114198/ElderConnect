@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -26,6 +27,7 @@ const STORAGE_KEY = "elder_connect_chat_history";
 export default function ChatbotScreen() {
     const router = useRouter();
     const { colors, theme } = useTheme();
+    const { t } = useTranslation();
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState("");
     const [isTyping, setIsTyping] = useState(false);
@@ -49,7 +51,7 @@ export default function ChatbotScreen() {
                 setMessages([
                     {
                         id: "init-1",
-                        text: "Hello! I am ElderBot, your health companion. How can I help you today?",
+                        text: t("botHello"),
                         sender: "bot",
                         timestamp: Date.now(),
                     },
@@ -97,12 +99,12 @@ export default function ChatbotScreen() {
 
     const getBotResponse = (input: string): string => {
         const lower = input.toLowerCase();
-        if (lower.includes("hello") || lower.includes("hi")) return "Hello there! Stay healthy and happy!";
-        if (lower.includes("medication")) return "It's important to take your meds on time. Check the Medications tab for your schedule.";
-        if (lower.includes("appointment")) return "You can view your upcoming doctor visits in the Appointments tab.";
-        if (lower.includes("water")) return "Staying hydrated is key! Have you had a glass of water recently?";
-        if (lower.includes("emergency")) return "If this is an emergency, please call 911 immediately.";
-        return "That's interesting! Tell me more, or ask me about your daily health routine.";
+        if (lower.includes("hello") || lower.includes("hi")) return t("botHiResponse");
+        if (lower.includes("medication")) return t("botMedication");
+        if (lower.includes("appointment")) return t("botAppointment");
+        if (lower.includes("water")) return t("botWater");
+        if (lower.includes("emergency")) return t("botEmergency");
+        return t("botDefault");
     };
 
     return (
@@ -113,8 +115,8 @@ export default function ChatbotScreen() {
                     <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <View>
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>ElderBot</Text>
-                    <Text style={[styles.headerSubtitle, { color: colors.success }]}>• Online</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>{t("elderBot")}</Text>
+                    <Text style={[styles.headerSubtitle, { color: colors.success }]}>• {t("online")}</Text>
                 </View>
             </View>
 
@@ -149,7 +151,7 @@ export default function ChatbotScreen() {
             {/* Typing Indicator */}
             {isTyping && (
                 <View style={styles.typingContainer}>
-                    <Text style={[styles.typingText, { color: colors.mutedText }]}>ElderBot is typing...</Text>
+                    <Text style={[styles.typingText, { color: colors.mutedText }]}>{t("typingIndicator")}</Text>
                 </View>
             )}
 
@@ -161,7 +163,7 @@ export default function ChatbotScreen() {
                 <View style={[styles.inputContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
                     <TextInput
                         style={[styles.input, { color: colors.text, backgroundColor: colors.background }]}
-                        placeholder="Type a message..."
+                        placeholder={t("chatPlaceholder")}
                         placeholderTextColor={colors.mutedText}
                         value={inputText}
                         onChangeText={setInputText}

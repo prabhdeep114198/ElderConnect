@@ -1,10 +1,13 @@
 // app/(tabs)/appointments.tsx
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -43,7 +46,10 @@ interface Doctor {
 
 export default function AppointmentsScreen() {
   const { colors, theme } = useTheme();
+  const { t, i18n } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
@@ -171,7 +177,7 @@ export default function AppointmentsScreen() {
 
   const addAppointment = () => {
     if (!newAppointment.title || !newAppointment.doctor || !newAppointment.date || !newAppointment.time) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+      Alert.alert(t("error"), t("fillAllFields"));
       return;
     }
 
@@ -202,23 +208,23 @@ export default function AppointmentsScreen() {
       notes: ''
     });
     setShowAddModal(false);
-    Alert.alert('Success', 'Appointment scheduled successfully!');
+    Alert.alert(t("success"), t("apptScheduledSuccess"));
   };
 
   const cancelAppointment = (appointmentId: string) => {
     Alert.alert(
-      'Cancel Appointment',
-      'Are you sure you want to cancel this appointment?',
+      t("cancel"),
+      t("cancelApptConfirm"),
       [
-        { text: 'No', style: 'cancel' },
+        { text: t("no"), style: 'cancel' },
         {
-          text: 'Yes, Cancel',
+          text: t("yesCancel"),
           style: 'destructive',
           onPress: () => {
             setAppointments(prev => prev.map(apt =>
               apt.id === appointmentId ? { ...apt, status: 'cancelled' as const } : apt
             ));
-            Alert.alert('Cancelled', 'Appointment has been cancelled.');
+            Alert.alert(t("cancelled"), t("apptCancelledMsg"));
           }
         }
       ]
@@ -227,17 +233,17 @@ export default function AppointmentsScreen() {
 
   const rescheduleAppointment = (appointmentId: string) => {
     Alert.alert(
-      'Reschedule Appointment',
-      'Would you like to reschedule this appointment?',
+      t("reschedule"),
+      t("rescheduleApptConfirm"),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t("cancel"), style: 'cancel' },
         {
-          text: 'Reschedule',
+          text: t("reschedule"),
           onPress: () => {
             setAppointments(prev => prev.map(apt =>
               apt.id === appointmentId ? { ...apt, status: 'rescheduled' as const } : apt
             ));
-            Alert.alert('Rescheduled', 'Please contact the office to set a new time.');
+            Alert.alert(t("rescheduled"), t("rescheduleContactMsg"));
           }
         }
       ]
@@ -248,11 +254,11 @@ export default function AppointmentsScreen() {
     const doctorInfo = doctors.find(d => d.name === doctor);
     if (doctorInfo) {
       Alert.alert(
-        'Call Doctor',
-        `Call ${doctorInfo.name}?`,
+        t("callDoctor"),
+        `${t("call")} ${doctorInfo.name}?`,
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Call', onPress: () => Alert.alert('Calling...', `Calling ${doctorInfo.phone}`) }
+          { text: t("cancel"), style: 'cancel' },
+          { text: t("call"), onPress: () => Alert.alert(t("calling"), `${t("calling")} ${doctorInfo.phone}`) }
         ]
       );
     }
@@ -280,7 +286,7 @@ export default function AppointmentsScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(i18n.language, {
       weekday: 'short',
       month: 'short',
       day: 'numeric'
@@ -299,8 +305,8 @@ export default function AppointmentsScreen() {
   };
 
   const getDateLabel = (dateString: string) => {
-    if (isToday(dateString)) return 'Today';
-    if (isTomorrow(dateString)) return 'Tomorrow';
+    if (isToday(dateString)) return t("today");
+    if (isTomorrow(dateString)) return t("tomorrow");
     return formatDate(dateString);
   };
 
@@ -310,8 +316,8 @@ export default function AppointmentsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Appointments</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Manage your medical appointments</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("appointments")}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageMedicalAppts")}</Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
@@ -336,7 +342,7 @@ export default function AppointmentsScreen() {
         {/* Today's Appointments */}
         {todayAppointments.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Appointments</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todayAppts")}</Text>
             <View style={styles.todayContainer}>
               {todayAppointments.map((appointment) => (
                 <TouchableOpacity
@@ -368,14 +374,14 @@ export default function AppointmentsScreen() {
 
         {/* Quick Stats */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("overview")}</Text>
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.statIcon, { backgroundColor: colors.primary + '10' }]}>
                 <Ionicons name="calendar" size={24} color={colors.primary} />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{upcomingAppointments.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Upcoming</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("upcoming")}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -383,7 +389,7 @@ export default function AppointmentsScreen() {
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{pastAppointments.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Completed</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("completed")}</Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -391,14 +397,14 @@ export default function AppointmentsScreen() {
                 <Ionicons name="people" size={24} color={colors.info} />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>{doctors.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Doctors</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("doctorsTitle")}</Text>
             </View>
           </View>
         </View>
 
         {/* Upcoming Appointments */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming Appointments</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("upcomingAppts")}</Text>
           {upcomingAppointments.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color={colors.mutedText} />
@@ -447,7 +453,7 @@ export default function AppointmentsScreen() {
                     onPress={() => callDoctor(appointment.doctor)}
                   >
                     <Ionicons name="call" size={16} color={colors.primary} />
-                    <Text style={[styles.actionButtonText, { color: colors.primary }]}>Call</Text>
+                    <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("call")}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -455,7 +461,7 @@ export default function AppointmentsScreen() {
                     onPress={() => rescheduleAppointment(appointment.id)}
                   >
                     <Ionicons name="time" size={16} color={colors.warning} />
-                    <Text style={[styles.actionButtonText, { color: colors.warning }]}>Reschedule</Text>
+                    <Text style={[styles.actionButtonText, { color: colors.warning }]}>{t("reschedule")}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -463,7 +469,7 @@ export default function AppointmentsScreen() {
                     onPress={() => cancelAppointment(appointment.id)}
                   >
                     <Ionicons name="close" size={16} color={colors.error} />
-                    <Text style={[styles.actionButtonText, { color: colors.error }]}>Cancel</Text>
+                    <Text style={[styles.actionButtonText, { color: colors.error }]}>{t("cancel")}</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -473,7 +479,7 @@ export default function AppointmentsScreen() {
 
         {/* My Doctors */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>My Doctors</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("doctorsTitle")}</Text>
           <View style={styles.doctorsGrid}>
             {doctors.map((doctor) => (
               <TouchableOpacity
@@ -498,7 +504,7 @@ export default function AppointmentsScreen() {
         {/* Recent Appointments */}
         {pastAppointments.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Appointments</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("recentAppts")}</Text>
             {pastAppointments.slice(0, 3).map((appointment) => (
               <View key={appointment.id} style={[styles.pastAppointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.pastAppointmentHeader}>
@@ -525,7 +531,7 @@ export default function AppointmentsScreen() {
       >
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Schedule Appointment</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("scheduleAppt")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -533,7 +539,7 @@ export default function AppointmentsScreen() {
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Appointment Title *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("apptTitle")} *</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.title}
@@ -544,7 +550,7 @@ export default function AppointmentsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Doctor *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("doctor")} *</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.doctor}
@@ -555,7 +561,7 @@ export default function AppointmentsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Specialty</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("specialty")}</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.specialty}
@@ -567,30 +573,68 @@ export default function AppointmentsScreen() {
 
             <View style={styles.inputRow}>
               <View style={styles.inputHalf}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Date *</Text>
-                <TextInput
-                  style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                  value={newAppointment.date}
-                  onChangeText={(text) => setNewAppointment(prev => ({ ...prev, date: text }))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.mutedText}
-                />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t("date")} *</Text>
+                <TouchableOpacity
+                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center' }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: newAppointment.date ? colors.text : colors.mutedText, fontSize: 16 }}>
+                    {newAppointment.date || "YYYY-MM-DD"}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={newAppointment.date ? new Date(newAppointment.date) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) {
+                        const year = selectedDate.getFullYear();
+                        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(selectedDate.getDate()).padStart(2, '0');
+                        setNewAppointment(prev => ({ ...prev, date: `${year}-${month}-${day}` }));
+                      }
+                    }}
+                  />
+                )}
               </View>
 
               <View style={styles.inputHalf}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Time *</Text>
-                <TextInput
-                  style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                  value={newAppointment.time}
-                  onChangeText={(text) => setNewAppointment(prev => ({ ...prev, time: text }))}
-                  placeholder="10:00 AM"
-                  placeholderTextColor={colors.mutedText}
-                />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t("time")} *</Text>
+                <TouchableOpacity
+                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center' }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={{ color: newAppointment.time ? colors.text : colors.mutedText, fontSize: 16 }}>
+                    {newAppointment.time || "10:00 AM"}
+                  </Text>
+                </TouchableOpacity>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={new Date()} // Current date, but picker will only return time
+                    mode="time"
+                    is24Hour={false}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                      setShowTimePicker(false);
+                      if (selectedTime) {
+                        let hours = selectedTime.getHours();
+                        const minutes = String(selectedTime.getMinutes()).padStart(2, '0');
+                        const ampm = hours >= 12 ? 'PM' : 'AM';
+                        hours = hours % 12;
+                        hours = hours ? hours : 12; // the hour '0' should be '12'
+                        const strTime = `${hours}:${minutes} ${ampm}`;
+                        setNewAppointment(prev => ({ ...prev, time: strTime }));
+                      }
+                    }}
+                  />
+                )}
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Location</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("location")}</Text>
               <TextInput
                 style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.location}
@@ -601,13 +645,13 @@ export default function AppointmentsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Appointment Type</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("apptType")}</Text>
               <View style={styles.typeSelector}>
                 {[
-                  { key: 'checkup', label: 'Checkup' },
-                  { key: 'follow-up', label: 'Follow-up' },
-                  { key: 'consultation', label: 'Consultation' },
-                  { key: 'emergency', label: 'Emergency' }
+                  { key: 'checkup', label: t('checkup') },
+                  { key: 'follow-up', label: t('followUp') },
+                  { key: 'consultation', label: t('consultation') },
+                  { key: 'emergency', label: t('emergency') }
                 ].map((type) => (
                   <TouchableOpacity
                     key={type.key}
@@ -630,7 +674,7 @@ export default function AppointmentsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Notes</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("notes")}</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.notes}
@@ -643,7 +687,7 @@ export default function AppointmentsScreen() {
             </View>
 
             <TouchableOpacity style={[styles.addAppointmentButton, { backgroundColor: colors.primary }]} onPress={addAppointment}>
-              <Text style={styles.addAppointmentButtonText}>Schedule Appointment</Text>
+              <Text style={styles.addAppointmentButtonText}>{t("scheduleAppt")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -673,23 +717,23 @@ export default function AppointmentsScreen() {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Doctor</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("doctor")}</Text>
                 <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.doctor}</Text>
                 <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.specialty}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Location</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("location")}</Text>
                 <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.location}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Type</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("apptType")}</Text>
                 <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.type}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Status</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("status")}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedAppointment.status) }]}>
                   <Text style={styles.statusBadgeText}>{selectedAppointment.status}</Text>
                 </View>
@@ -697,7 +741,7 @@ export default function AppointmentsScreen() {
 
               {selectedAppointment.notes && (
                 <View style={styles.detailSection}>
-                  <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Notes</Text>
+                  <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("notes")}</Text>
                   <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.notes}</Text>
                 </View>
               )}
@@ -708,7 +752,7 @@ export default function AppointmentsScreen() {
                   onPress={() => callDoctor(selectedAppointment.doctor)}
                 >
                   <Ionicons name="call" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Call Doctor</Text>
+                  <Text style={styles.detailActionButtonText}>{t("callDoctor")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -716,7 +760,7 @@ export default function AppointmentsScreen() {
                   onPress={() => rescheduleAppointment(selectedAppointment.id)}
                 >
                   <Ionicons name="time" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Reschedule</Text>
+                  <Text style={styles.detailActionButtonText}>{t("reschedule")}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -753,7 +797,7 @@ export default function AppointmentsScreen() {
               </View>
 
               <View style={styles.doctorDetailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Contact Information</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("contactInfo")}</Text>
                 <TouchableOpacity style={styles.contactItem}>
                   <Ionicons name="call" size={20} color={colors.primary} />
                   <Text style={[styles.contactText, { color: colors.text }]}>{selectedDoctor.phone}</Text>
@@ -765,7 +809,7 @@ export default function AppointmentsScreen() {
               </View>
 
               <View style={styles.doctorDetailSection}>
-                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>Address</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("address")}</Text>
                 <Text style={[styles.detailText, { color: colors.text }]}>{selectedDoctor.address}</Text>
               </View>
 
@@ -775,7 +819,7 @@ export default function AppointmentsScreen() {
                   onPress={() => Alert.alert('Calling...', `Calling ${selectedDoctor.phone}`)}
                 >
                   <Ionicons name="call" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Call</Text>
+                  <Text style={styles.detailActionButtonText}>{t("call")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -786,7 +830,7 @@ export default function AppointmentsScreen() {
                   }}
                 >
                   <Ionicons name="calendar" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Book Appointment</Text>
+                  <Text style={styles.detailActionButtonText}>{t("bookAppt")}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

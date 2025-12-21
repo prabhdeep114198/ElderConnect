@@ -4,6 +4,7 @@ import * as Print from 'expo-print';
 import { useFocusEffect } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../../context/ThemeContext";
@@ -21,6 +22,7 @@ const METRICS = [
 
 export default function ReportsScreen() {
   const { colors, theme } = useTheme();
+  const { t } = useTranslation();
   const [userData, setUserData] = useState<any>(null);
   const [scores, setScores] = useState({
     physical: 65,
@@ -258,7 +260,7 @@ export default function ReportsScreen() {
     const nodeDist = kgSize / 2.8;
     return (
       <View style={[styles.kgCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Data Knowledge Graph</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph")}</Text>
         <Svg height={kgSize} width={kgSize}>
           {nodes.map((node, i) => {
             if (i === 0) return null;
@@ -293,9 +295,9 @@ export default function ReportsScreen() {
           })}
         </Svg>
         <View style={styles.kgLegend}>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#448AFF' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>Interests</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF5252' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>Health</Text></View>
-          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#69F0AE' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>Contacts</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#448AFF' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("interests") || "Interests"}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF5252' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("health") || "Health"}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#69F0AE' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("contacts") || "Contacts"}</Text></View>
         </View>
       </View>
     );
@@ -304,15 +306,15 @@ export default function ReportsScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Wellness Report</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
         <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-          {userData ? `Analysis for ${userData.name}` : "Your Health Overview"}
+          {userData ? `${t("analysisFor")} ${userData.name}` : t("yourHealthOverview")}
         </Text>
       </View>
 
       <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
         <Ionicons name="download-outline" size={24} color="#fff" />
-        <Text style={styles.pdfButtonText}>Download Detailed Report (PDF)</Text>
+        <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
       </TouchableOpacity>
 
       {/* KNOWLEDGE GRAPH */}
@@ -320,7 +322,7 @@ export default function ReportsScreen() {
 
       {/* RADAR CHART CARD */}
       <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Health Balance Indices</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
         <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize }}>
           <Svg height={radarSize} width={radarSize}>
             <Polygon points={buildRadarPolygon({ physical: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
@@ -340,20 +342,20 @@ export default function ReportsScreen() {
 
             {METRICS.map((m, i) => {
               const { x, y } = getRadarCoordinates(120, i);
-              return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{m.label}</SvgText>;
+              return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
             })}
           </Svg>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Smart Insights</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
         {scores.physical < 60 && (
           <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
             <Ionicons name="walk-outline" size={24} color={colors.warning} />
             <View style={styles.insightContent}>
-              <Text style={[styles.insightTitle, { color: colors.text }]}>Mobility Focus</Text>
-              <Text style={[styles.insightText, { color: colors.mutedText }]}>We noticed your mobility score is lower. Try gentle chair yoga or stretching.</Text>
+              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
+              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
             </View>
           </View>
         )}
@@ -361,8 +363,8 @@ export default function ReportsScreen() {
           <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
             <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
             <View style={styles.insightContent}>
-              <Text style={[styles.insightTitle, { color: colors.text }]}>Social Activity</Text>
-              <Text style={[styles.insightText, { color: colors.mutedText }]}>Joining a local club for {userData?.interests?.[0] || 'your hobbies'} could improve your mood!</Text>
+              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
+              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
             </View>
           </View>
         )}

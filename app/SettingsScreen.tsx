@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
@@ -19,63 +20,78 @@ interface SettingsSectionType {
 }
 
 // Mock function to fetch settings from backend
-const fetchSettings = async (): Promise<SettingsSectionType[]> => [
+const fetchSettings = (t: any): SettingsSectionType[] => [
   {
-    title: "Account",
+    title: t("account"),
     data: [
-      { type: "item", title: "Profile", subtitle: "Update your personal information", action: "profile" },
-      { type: "item", title: "Change Password", subtitle: "Update your password", action: "changePassword" },
-      { type: "item", title: "Email Preferences", subtitle: "Manage your email settings", action: "emailPreferences" },
+      { type: "item", title: t("profile"), subtitle: t("profileSubtitle"), action: "profile" },
+      { type: "item", title: t("changePassword"), subtitle: t("changePasswordSubtitle"), action: "changePassword" },
+      { type: "item", title: t("emailPreferences"), subtitle: t("emailPreferencesSubtitle"), action: "emailPreferences" },
     ],
   },
   {
-    title: "Subscription",
+    title: t("subscription"),
     data: [
-      { type: "item", title: "Manage Subscription", subtitle: "View and manage your plan", action: "manageSubscription" },
-      { type: "item", title: "Billing History", subtitle: "View past transactions", action: "billingHistory" },
-      { type: "item", title: "Upgrade Plan", subtitle: "Explore premium features", action: "upgradePlan" },
+      { type: "item", title: t("manageSubscription"), subtitle: t("manageSubscriptionSubtitle"), action: "manageSubscription" },
+      { type: "item", title: t("billingHistory"), subtitle: t("billingHistorySubtitle"), action: "billingHistory" },
+      { type: "item", title: t("upgradePlan"), subtitle: t("upgradePlanSubtitle"), action: "upgradePlan" },
     ],
   },
   {
-    title: "Preferences",
+    title: t("preferences"),
     data: [
-      { type: "toggle", title: "Push Notifications", key: "notifications", subtitle: "Receive app notifications" },
-      { type: "toggle", title: "Dark Mode", key: "darkMode", subtitle: "Switch to dark theme" },
-      { type: "item", title: "Language", subtitle: "English (US)", action: "language" },
+      { type: "toggle", title: t("notifications"), key: "notifications", subtitle: t("notificationsSubtitle") },
+      { type: "toggle", title: t("darkMode"), key: "darkMode", subtitle: t("darkModeSubtitle") },
+      { type: "item", title: t("language"), subtitle: t("languageSubtitleEnglish"), action: "language" },
     ],
   },
   {
-    title: "Support",
+    title: t("support"),
     data: [
-      { type: "item", title: "Help Center", action: "helpCenter", subtitle: "Get help and support" },
-      { type: "item", title: "Contact Us", action: "contactUs", subtitle: "Reach out to our team" },
-      { type: "item", title: "Privacy Policy", action: "privacyPolicy" },
-      { type: "item", title: "Terms of Service", action: "termsOfService" },
+      { type: "item", title: t("helpCenter"), action: "helpCenter", subtitle: t("helpCenterSubtitle") },
+      { type: "item", title: t("contactUs"), action: "contactUs", subtitle: t("contactUsSubtitle") },
+      { type: "item", title: t("privacyPolicy"), action: "privacyPolicy" },
+      { type: "item", title: t("termsOfService"), action: "termsOfService" },
     ],
   },
+];
+
+const LANGUAGES = [
+  { label: "English", value: "en", subtitle: "English (US)" },
+  { label: "Hindi", value: "hi", subtitle: "हिन्दी" },
+  { label: "Punjabi", value: "pa", subtitle: "ਪੰਜਾਬੀ" },
+  { label: "Spanish", value: "es", subtitle: "Español" },
+  { label: "French", value: "fr", subtitle: "Français" },
+  { label: "German", value: "de", subtitle: "Deutsch" },
+  { label: "Bengali", value: "bn", subtitle: "বাংলা" },
+  { label: "Tamil", value: "ta", subtitle: "தமிழ்" },
+  { label: "Telugu", value: "te", subtitle: "తెలుగు" },
+  { label: "Marathi", value: "mr", subtitle: "मराठी" },
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, colors, toggleTheme } = useTheme();
   const { logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const [settingsSections, setSettingsSections] = useState<SettingsSectionType[]>([]);
   const [toggles, setToggles] = useState<{ [key: string]: boolean }>({
     notifications: true,
     darkMode: theme === "dark",
   });
+  const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
 
   useEffect(() => {
     setToggles((prev) => ({ ...prev, darkMode: theme === "dark" }));
   }, [theme]);
 
   useEffect(() => {
-    const loadSettings = async () => {
-      const data = await fetchSettings();
+    const loadSettings = () => {
+      const data = fetchSettings(t);
       setSettingsSections(data);
     };
     loadSettings();
-  }, []);
+  }, [i18n.language]);
 
   const handleToggleChange = (key: string, value: boolean) => {
     if (key === "darkMode") {
@@ -87,7 +103,20 @@ export default function SettingsScreen() {
 
   const handleItemAction = (action?: string) => {
     if (!action) return;
-    Alert.alert("Action", `Perform ${action}`);
+
+    switch (action) {
+      case "profile":
+        router.push("/profile");
+        break;
+      case "changePassword":
+        router.push("/change-password");
+        break;
+      case "language":
+        setIsLanguageModalVisible(true);
+        break;
+      default:
+        Alert.alert("Action", `Perform ${action}`);
+    }
   };
 
   const handleLogout = async () => {
@@ -143,7 +172,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.primary }]}>Settings</Text>
+      <Text style={[styles.header, { color: colors.primary }]}>{t("settings")}</Text>
 
       {settingsSections.map((section, index) => (
         <View key={index} style={styles.section}>
@@ -156,7 +185,7 @@ export default function SettingsScreen() {
                 <SettingItem
                   key={idx}
                   title={item.title}
-                  subtitle={item.subtitle}
+                  subtitle={item.action === "language" ? LANGUAGES.find(l => l.value === i18n.language)?.subtitle : item.subtitle}
                   onPress={() => handleItemAction(item.action)}
                 />
               );
@@ -183,19 +212,62 @@ export default function SettingsScreen() {
           style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.primary }]}
           onPress={handleLogout}
         >
-          <Text style={[styles.logoutButtonText, { color: colors.primary }]}>Log Out</Text>
+          <Text style={[styles.logoutButtonText, { color: colors.primary }]}>{t("logout")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.deleteButton, { backgroundColor: colors.card }]}
           onPress={handleDeleteAccount}
         >
-          <Text style={styles.deleteButtonText}>Delete Account</Text>
+          <Text style={styles.deleteButtonText}>{t("deleteAccount")}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.mutedText }]}>Version 1.0.0</Text>
+        <Text style={[styles.footerText, { color: colors.mutedText }]}>{t("version")} 1.0.0</Text>
       </View>
+
+      <Modal
+        visible={isLanguageModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsLanguageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Language</Text>
+              <TouchableOpacity onPress={() => setIsLanguageModalVisible(false)}>
+                <Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={LANGUAGES}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.languageOption,
+                    { borderBottomColor: colors.border },
+                    i18n.language === item.value && { backgroundColor: colors.border + "40" }
+                  ]}
+                  onPress={() => {
+                    i18n.changeLanguage(item.value);
+                    setIsLanguageModalVisible(false);
+                  }}
+                >
+                  <View>
+                    <Text style={[styles.languageLabel, { color: colors.text }]}>{item.label}</Text>
+                    <Text style={[styles.languageSubtitle, { color: colors.mutedText }]}>{item.subtitle}</Text>
+                  </View>
+                  {i18n.language === item.value && (
+                    <Text style={{ color: colors.primary, fontSize: 20 }}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -243,6 +315,36 @@ const styles = StyleSheet.create({
     borderStyle: 'solid'
   },
   deleteButtonText: { color: "#EF4444", fontWeight: "bold", textAlign: "center", fontSize: 16 },
-  footer: { padding: 24, alignItems: "center" },
+  footer: { padding: 24, paddingBottom: 60, alignItems: "center" },
   footerText: { fontSize: 14 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalTitle: { fontSize: 20, fontWeight: "bold" },
+  closeButton: { fontSize: 16, fontWeight: "600" },
+  languageOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+  },
+  languageLabel: { fontSize: 18, fontWeight: "600" },
+  languageSubtitle: { fontSize: 14, marginTop: 2 },
 });

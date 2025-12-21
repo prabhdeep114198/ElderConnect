@@ -6,6 +6,7 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Pedometer } from "expo-sensors";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -65,6 +66,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { t, i18n } = useTranslation();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState("");
@@ -82,16 +84,16 @@ export default function HomeScreen() {
   const [waterIntake, setWaterIntake] = useState(6);
 
   const [healthMetrics, setHealthMetrics] = useState([
-    { label: "Steps Today", value: "0", icon: "walk", trend: "up" },
-    { label: "Heart Rate", value: "72 bpm", icon: "heart", trend: "stable" },
-    { label: "Sleep Quality", value: "7.5 hrs", icon: "moon", trend: "up" },
-    { label: "Hydration", value: "6/8 cups", icon: "water", trend: "down" },
+    { label: t("stepsToday"), value: "0", icon: "walk", trend: "up" },
+    { label: t("heartRate"), value: `72 ${t("bpm")}`, icon: "heart", trend: "stable" },
+    { label: t("sleepQuality"), value: `7.5 ${t("hrs")}`, icon: "moon", trend: "up" },
+    { label: t("hydration"), value: `6/8 ${t("cups")}`, icon: "water", trend: "down" },
   ]);
 
   const [upcomingEvents, setUpcomingEvents] = useState([
-    { time: "10:00 AM", title: "Take Morning Medication", type: "medication" },
-    { time: "2:00 PM", title: "Doctor Appointment", type: "appointment" },
-    { time: "6:00 PM", title: "Evening Walk Reminder", type: "activity" },
+    { time: "10:00 AM", title: t("takeMorningMedication"), type: "medication" },
+    { time: "2:00 PM", title: t("doctorAppointment"), type: "appointment" },
+    { time: "6:00 PM", title: t("eveningWalkReminder"), type: "activity" },
   ]);
 
   const [aiMessage, setAiMessage] = useState(
@@ -198,10 +200,10 @@ export default function HomeScreen() {
 
   const updateHealthMetrics = () => {
     setHealthMetrics([
-      { label: "Steps Today", value: steps.toLocaleString(), icon: "walk", trend: steps > 5000 ? "up" : "down" },
-      { label: "Heart Rate", value: `${heartRate} bpm`, icon: "heart", trend: "stable" },
-      { label: "Sleep Quality", value: `${sleepHours} hrs`, icon: "moon", trend: sleepHours >= 7 ? "up" : "down" },
-      { label: "Hydration", value: `${waterIntake}/8 cups`, icon: "water", trend: waterIntake >= 6 ? "up" : "down" },
+      { label: t("stepsToday"), value: steps.toLocaleString(), icon: "walk", trend: steps > 5000 ? "up" : "down" },
+      { label: t("heartRate"), value: `${heartRate} ${t("bpm")}`, icon: "heart", trend: "stable" },
+      { label: t("sleepQuality"), value: `${sleepHours} ${t("hrs")}`, icon: "moon", trend: sleepHours >= 7 ? "up" : "down" },
+      { label: t("hydration"), value: `${waterIntake}/8 ${t("cups")}`, icon: "water", trend: waterIntake >= 6 ? "up" : "down" },
     ]);
   };
 
@@ -372,9 +374,9 @@ export default function HomeScreen() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good Morning");
-    else if (hour < 18) setGreeting("Good Afternoon");
-    else setGreeting("Good Evening");
+    if (hour < 12) setGreeting(t("goodMorning"));
+    else if (hour < 18) setGreeting(t("goodAfternoon"));
+    else setGreeting(t("goodEvening"));
 
     // Auto-refresh every 5 minutes
     const refreshInterval = setInterval(() => {
@@ -398,25 +400,25 @@ export default function HomeScreen() {
   // ============================================
   const quickActions = [
     {
-      title: "Emergency SOS",
+      title: t("emergencySOS"),
       icon: "warning",
       color: colors.error,
       action: handleEmergencySOS,
     },
     {
-      title: "Call Family",
+      title: t("callFamily"),
       icon: "call",
       color: colors.primary,
       action: handleFamilyCall,
     },
     {
-      title: "Health Check",
+      title: t("healthCheck"),
       icon: "heart",
       color: colors.success,
       action: handleHealthCheck,
     },
     {
-      title: "Reminders",
+      title: t("reminders"),
       icon: "alarm",
       color: colors.warning,
       action: handleReminders,
@@ -431,7 +433,7 @@ export default function HomeScreen() {
           {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </Text>
         <Text style={[styles.date, { color: colors.mutedText }]}>
-          {currentTime.toLocaleDateString("en-US", {
+          {currentTime.toLocaleDateString(i18n.language, {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -442,7 +444,7 @@ export default function HomeScreen() {
 
       {/* QUICK ACTIONS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("quickActions")}</Text>
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action, index) => (
             <TouchableOpacity
@@ -468,16 +470,16 @@ export default function HomeScreen() {
                   setMode("date");
                 }}
               >
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t("cancel")}</Text>
               </TouchableOpacity>
-              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>Add Reminder</Text>
+              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>{t("addReminder")}</Text>
               <TouchableOpacity onPress={scheduleReminder}>
-                <Text style={styles.saveText}>Save</Text>
+                <Text style={styles.saveText}>{t("saveChanges")}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
-              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>Remind me at</Text>
+              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>{t("remindMeAt")}</Text>
               <Text style={[styles.selectedTime, { color: colors.text }]}>
                 {selectedDate.toLocaleString()}
               </Text>
@@ -516,7 +518,7 @@ export default function HomeScreen() {
 
       {/* HEALTH METRICS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Health Summary</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysHealthSummary")}</Text>
         <View style={styles.metricsGrid}>
           {healthMetrics.map((metric, index) => (
             <View key={index} style={[styles.metricCard, { backgroundColor: colors.card }]}>
@@ -549,7 +551,7 @@ export default function HomeScreen() {
 
       {/* UPCOMING EVENTS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Schedule</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSchedule")}</Text>
         {upcomingEvents.map((event, index) => (
           <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }]}>
             <View style={[styles.eventTime, { borderRightColor: colors.primary }]}>
@@ -578,16 +580,16 @@ export default function HomeScreen() {
 
       {/* AI COMPANION */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your AI Companion</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("yourAICompanion")}</Text>
         <View style={[styles.companionCard, { backgroundColor: colors.card }]}>
           <Ionicons name="chatbubble-ellipses" size={32} color={colors.primary} />
           <View style={styles.companionContent}>
-            <Text style={[styles.companionTitle, { color: colors.text }]}>ElderBot is here to help!</Text>
+            <Text style={[styles.companionTitle, { color: colors.text }]}>{t("elderBotHelp")}</Text>
             <Text style={[styles.companionMessage, { color: colors.mutedText }]}>"{aiMessage}"</Text>
           </View>
         </View>
         <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={handleAIChat}>
-          <Text style={[styles.chatButtonText, { color: colors.buttonText }]}>Start Conversation</Text>
+          <Text style={[styles.chatButtonText, { color: colors.buttonText }]}>{t("startConversation")}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
