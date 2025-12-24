@@ -18,7 +18,7 @@ import { useTheme } from "../context/ThemeContext";
 
 export default function ProfileScreen() {
     const router = useRouter();
-    const { colors } = useTheme();
+    const { colors, theme } = useTheme();
     const { t } = useTranslation();
     const { user, updateProfile } = useAuth();
     const [name, setName] = useState(user?.name || "");
@@ -47,53 +47,75 @@ export default function ProfileScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={[styles.container, { backgroundColor: colors.background }]}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="arrow-back" size={28} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: colors.text }]}>{t("profile")}</Text>
+            <View style={[styles.topBranding, { backgroundColor: colors.primary }]}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => router.back()}
+                >
+                    <Ionicons name="chevron-back" size={28} color="#FFF" />
+                </TouchableOpacity>
+                <Text style={styles.brandingTitle}>{t("profile")}</Text>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.avatarSection}>
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+                        <Ionicons name="person" size={80} color={colors.primary} />
+                        <TouchableOpacity style={styles.editAvatarBtn}>
+                            <Ionicons name="camera" size={20} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.profileNamePrimary, { color: colors.text }]}>{user?.name}</Text>
+                    <Text style={[styles.profileEmailSecondary, { color: colors.mutedText }]}>{user?.email}</Text>
                 </View>
 
                 <View style={styles.content}>
-                    <View style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: colors.mutedText }]}>{t("fullName")}</Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                {
-                                    backgroundColor: colors.card,
-                                    color: colors.text,
-                                    borderColor: colors.border,
-                                },
-                            ]}
-                            value={name}
-                            onChangeText={setName}
-                            placeholder={t("fullName")}
-                            placeholderTextColor={colors.mutedText}
-                        />
-                    </View>
+                    <View style={[styles.card, { backgroundColor: colors.card }]}>
+                        <View style={styles.inputGroup}>
+                            <View style={styles.labelRow}>
+                                <Ionicons name="person-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+                                <Text style={[styles.label, { color: colors.text }]}>{t("fullName")}</Text>
+                            </View>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: theme === 'dark' ? colors.background : '#F9FCFF',
+                                        color: colors.text,
+                                        borderColor: colors.border,
+                                    },
+                                ]}
+                                value={name}
+                                onChangeText={setName}
+                                placeholder={t("fullName")}
+                                placeholderTextColor={colors.mutedText}
+                            />
+                        </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: colors.mutedText }]}>{t("emailAddress")}</Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                styles.disabledInput,
-                                {
-                                    backgroundColor: colors.border,
-                                    color: colors.mutedText,
-                                    borderColor: colors.border,
-                                },
-                            ]}
-                            value={user?.email}
-                            editable={false}
-                            placeholder={t("emailAddress")}
-                        />
-                        <Text style={styles.infoText}>{t("emailCannotBeChanged")}</Text>
+                        <View style={[styles.inputGroup, { marginBottom: 10 }]}>
+                            <View style={styles.labelRow}>
+                                <Ionicons name="mail-outline" size={18} color={colors.mutedText} style={{ marginRight: 8 }} />
+                                <Text style={[styles.label, { color: colors.mutedText }]}>{t("emailAddress")}</Text>
+                            </View>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    styles.disabledInput,
+                                    {
+                                        backgroundColor: theme === 'dark' ? colors.background : '#F0F0F0',
+                                        color: colors.mutedText,
+                                        borderColor: colors.border,
+                                    },
+                                ]}
+                                value={user?.email}
+                                editable={false}
+                                placeholder={t("emailAddress")}
+                            />
+                            <View style={styles.infoRow}>
+                                <Ionicons name="information-circle-outline" size={14} color={colors.mutedText} style={{ marginRight: 4 }} />
+                                <Text style={[styles.infoText, { color: colors.mutedText }]}>{t("emailCannotBeChanged")}</Text>
+                            </View>
+                        </View>
                     </View>
 
                     <TouchableOpacity
@@ -105,14 +127,15 @@ export default function ProfileScreen() {
                         disabled={loading}
                     >
                         <Text style={styles.saveButtonText}>{loading ? t("saving") : t("saveChanges")}</Text>
+                        {!loading && <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginLeft: 8 }} />}
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.cancelButton, { borderColor: colors.border }]}
+                        style={[styles.cancelButton, { borderStyle: 'dashed', borderColor: colors.border }]}
                         onPress={() => router.back()}
                         disabled={loading}
                     >
-                        <Text style={[styles.cancelButtonText, { color: colors.text }]}>{t("cancel")}</Text>
+                        <Text style={[styles.cancelButtonText, { color: colors.mutedText }]}>{t("cancel")}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -122,54 +145,125 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { flexGrow: 1, paddingBottom: 40 },
-    header: {
+    topBranding: {
         paddingTop: 60,
-        paddingHorizontal: 24,
-        marginBottom: 32,
-        flexDirection: "row",
-        alignItems: "center",
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
     },
-    backButton: { marginRight: 16 },
-    backButtonText: { fontSize: 18, fontWeight: "600" },
-    title: { fontSize: 32, fontWeight: "bold" },
-    content: { paddingHorizontal: 24 },
-    inputGroup: { marginBottom: 24 },
-    label: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    brandingTitle: {
+        color: '#FFF',
+        fontSize: 22,
+        fontWeight: 'bold',
+    },
+    scrollContent: { flexGrow: 1, paddingBottom: 40 },
+    avatarSection: {
+        alignItems: 'center',
+        marginTop: -40,
+        marginBottom: 20,
+    },
+    avatarCircle: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+    editAvatarBtn: {
+        position: 'absolute',
+        bottom: 5,
+        right: 5,
+        backgroundColor: '#2E5EAA',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
+    profileNamePrimary: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginTop: 15,
+    },
+    profileEmailSecondary: {
+        fontSize: 16,
+        marginTop: 4,
+    },
+    content: { paddingHorizontal: 20 },
+    card: {
+        borderRadius: 24,
+        padding: 24,
+        marginBottom: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    inputGroup: { marginBottom: 20 },
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    label: { fontSize: 14, fontWeight: "600" },
     input: {
-        height: 60,
-        borderRadius: 12,
+        height: 55,
+        borderRadius: 15,
         borderWidth: 1,
         paddingHorizontal: 16,
-        fontSize: 18,
+        fontSize: 16,
     },
     disabledInput: { opacity: 0.8 },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+    },
     infoText: {
-        fontSize: 14,
-        color: "#666",
-        marginTop: 4,
+        fontSize: 12,
         fontStyle: "italic",
     },
     saveButton: {
         height: 60,
-        borderRadius: 12,
+        borderRadius: 18,
+        flexDirection: 'row',
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 16,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 10,
     },
-    saveButtonText: { color: "#FFF", fontSize: 20, fontWeight: "bold" },
+    saveButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
     cancelButton: {
-        height: 60,
-        borderRadius: 12,
+        height: 55,
+        borderRadius: 18,
         borderWidth: 1,
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 12,
+        marginTop: 15,
     },
-    cancelButtonText: { fontSize: 18, fontWeight: "600" },
+    cancelButtonText: { fontSize: 16, fontWeight: "600" },
 });

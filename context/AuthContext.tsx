@@ -1,8 +1,11 @@
 import { account } from "@/appwriteConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ID, Models, OAuthProvider } from "appwrite";
+import { ID, Models } from "appwrite";
+import * as Linking from 'expo-linking';
 import { useRouter } from "expo-router";
+import * as WebBrowser from 'expo-web-browser';
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 // =====================
 // Types
@@ -13,6 +16,7 @@ export interface User {
   email: string;
   avatar?: string;
   isOnboarded?: boolean;
+  plan_level?: "free" | "premium" | "enterprise";
 }
 
 interface AuthContextType {
@@ -25,6 +29,7 @@ interface AuthContextType {
   completeOnboarding: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
   updatePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
+  requireAuth: (action: () => void) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,29 +42,27 @@ export const useAuth = () => {
   return context;
 };
 
-// =====================
-// AuthProvider
-// =====================
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  // =====================
-  // Load user session on startup
-  // =====================
   useEffect(() => {
     checkSession();
   }, []);
 
   const checkSession = async () => {
+    console.log("Checking session...");
     try {
       const sessionUser = await account.get();
       if (sessionUser) {
+        console.log("Session found for user:", sessionUser.email);
         await handleUserAuthenticated(sessionUser);
+      } else {
+        console.log("No session user returned from account.get()");
+        setUser(null);
       }
-    } catch (error) {
-      // No active session
+    } catch (error: any) {
+      console.log("No active session found or error during checkSession:", error.message);
       setUser(null);
     } finally {
       setLoading(false);
@@ -67,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleUserAuthenticated = async (appwriteUser: Models.User<Models.Preferences>) => {
+    console.log("Handling authenticated user:", appwriteUser.$id);
     const newUser: User = {
       id: appwriteUser.$id,
       name: appwriteUser.name,
@@ -75,11 +79,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Check onboarding status from AsyncStorage or a database
-    const existingProfile = await AsyncStorage.getItem(`user_onboarded_${appwriteUser.$id}`);
+    const profileKey = `user_onboarded_${appwriteUser.$id}`;
+    const existingProfile = await AsyncStorage.getItem(profileKey);
+    console.log("Onboarding status check for", appwriteUser.$id, ":", existingProfile);
+
     if (existingProfile) {
       newUser.isOnboarded = true;
     }
 
+    console.log("Setting user state with onboarding:", newUser.isOnboarded);
     setUser(newUser);
     await AsyncStorage.setItem("user_session", JSON.stringify(newUser));
   };
@@ -116,12 +124,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginWithGoogle = async () => {
+    setLoading(true);
     try {
-      // In Appwrite React Native/Expo, createOAuth2Session will handle the redirection
-      // You may need to configure deep linking in your app.json
-      await account.createOAuth2Session(OAuthProvider.Google);
-    } catch (error) {
+      const redirectUri = Linking.createURL("/");
+      const endpoint = process.env.EXPO_PUBLIC_APPWRITE_URL;
+      const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID;
+
+      console.log("Starting Google Login with redirect:", redirectUri);
+
+      // Construct OAuth URL manually to bypass SDK's internal location.href attempt
+      const authUrl = `${endpoint}/account/sessions/oauth2/google?project=${projectId}&success=${encodeURIComponent(redirectUri)}&failure=${encodeURIComponent(redirectUri)}`;
+
+      const browserResult = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        redirectUri
+      );
+
+      console.log("Browser Result Type:", browserResult.type);
+      if (browserResult.type === 'success' && browserResult.url) {
+        console.log("Google Login callback URL received:", browserResult.url);
+
+        // Robust parameter extraction for custom schemes
+        const getParam = (url: string, param: string) => {
+          const match = url.match(new RegExp('[?&]' + param + '=([^&]+)'));
+          return match ? match[1] : null;
+        };
+
+        const secret = getParam(browserResult.url, 'secret');
+        const userId = getParam(browserResult.url, 'userId');
+
+        if (secret && userId) {
+          console.log("Secret and UserId found, creating session for:", userId);
+          try {
+            await account.createSession(userId, secret);
+            console.log("Session created manually successfully");
+          } catch (sessionError: any) {
+            console.error("Failed to create session from secret:", sessionError.message);
+          }
+        } else {
+          console.log("No secret/userId found in callback URL. Query string present?", browserResult.url.includes('?'));
+        }
+
+        await checkSession();
+      } else {
+        console.log("Google Login was cancelled or failed in browser");
+      }
+    } catch (error: any) {
       console.error("Google login failed", error);
+      Alert.alert("Login Failed", error.message || "Could not sign in with Google. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,6 +219,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const requireAuth = (action: () => void) => {
+    if (user) {
+      action();
+    } else {
+      Alert.alert(
+        "Sign In Required",
+        "You need to be signed in to access this feature.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Sign In", onPress: () => router.push("/auth/login") },
+        ]
+      );
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -179,6 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completeOnboarding,
         updateProfile,
         updatePassword,
+        requireAuth,
       }}
     >
       {children}

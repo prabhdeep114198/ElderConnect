@@ -91,16 +91,19 @@ export default function LandingScreen() {
           {
             title: "Get Started",
             actionType: "route",
-            route: user
-              ? (user.isOnboarded ? "/(tabs)/home" : "/onboarding")
-              : "/auth/login",
+            route: user && !user.isOnboarded ? "/onboarding" : "/(tabs)/home",
             primary: true
           }
         ];
 
         // Add Login button only if not logged in
         if (!user) {
-          btns.push({ title: "Login", actionType: "login", primary: false });
+          btns.push({
+            title: "Login",
+            actionType: "route",
+            route: "/auth/login",
+            primary: false
+          });
         }
 
         setButtons(btns);

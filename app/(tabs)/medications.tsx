@@ -13,6 +13,7 @@ import {
   View
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { ReminderService } from "../../utils/reminderService";
 
 const { width } = Dimensions.get('window');
 
@@ -162,12 +163,36 @@ export default function MedicationsScreen() {
   const setReminder = (med: Medication) => {
     Alert.alert(
       'Set Reminder',
-      `Set reminder for ${med.name}?`,
+      `Set reminder for ${med.name} at ${med.times.join(', ')}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Set Reminder',
-          onPress: () => Alert.alert('Reminder Set', `Reminder set for ${med.name} at ${med.times.join(', ')}`)
+          onPress: async () => {
+            try {
+              // For simplicity, we'll set it for tomorrow at the first time mentioned
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const [hour, minutePart] = med.times[0].split(':');
+              const [minutes, ampm] = minutePart.split(' ');
+
+              let h = parseInt(hour);
+              if (ampm === 'PM' && h < 12) h += 12;
+              if (ampm === 'AM' && h === 12) h = 0;
+
+              tomorrow.setHours(h, parseInt(minutes), 0, 0);
+
+              await ReminderService.scheduleReminder({
+                title: `Medication: ${med.name}`,
+                body: `Time to take your ${med.name} (${med.dosage})`,
+                date: tomorrow.toISOString(),
+                type: 'medication',
+              });
+              Alert.alert('Reminder Set', `Reminder set for tomorrow at ${med.times[0]}`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || "Failed to set reminder");
+            }
+          }
         }
       ]
     );

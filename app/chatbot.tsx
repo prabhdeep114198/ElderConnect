@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import { useFlags } from "react-native-flagsmith/react";
 import { useTheme } from "../context/ThemeContext";
 
 interface Message {
@@ -70,6 +71,9 @@ export default function ChatbotScreen() {
         }
     };
 
+    const flags = useFlags(["advanced_chatbot"]);
+    const isAdvancedBot = flags.advanced_chatbot.enabled;
+
     const handleSend = () => {
         if (!inputText.trim()) return;
 
@@ -88,13 +92,18 @@ export default function ChatbotScreen() {
         setTimeout(() => {
             const botMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: getBotResponse(userMsg.text),
+                text: isAdvancedBot ? getAIResponse(userMsg.text) : getBotResponse(userMsg.text),
                 sender: "bot",
                 timestamp: Date.now(),
             };
             setMessages((prev) => [...prev, botMsg]);
             setIsTyping(false);
         }, 1500);
+    };
+
+    const getAIResponse = (input: string): string => {
+        // In a real app, this would call an LLM API
+        return `[Premium AI] Analyzed your query: "${input}". Based on your recent health trends, I recommend...`;
     };
 
     const getBotResponse = (input: string): string => {

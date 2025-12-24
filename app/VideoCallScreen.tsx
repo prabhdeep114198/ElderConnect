@@ -6,24 +6,32 @@ import {
   useMicrophonePermissions,
 } from "expo-camera";
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  FlatList,
-  Dimensions,
 } from "react-native";
+import { useFlags } from "react-native-flagsmith/react";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
 export default function VideoCallScreen() {
+  const { t } = useTranslation();
+  const { requireAuth } = useAuth();
+  const flags = useFlags(["unlimited_video"]);
+  const isPremium = flags.unlimited_video.enabled;
   const [isMuted, setIsMuted] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<CameraType>("front");
 
@@ -85,16 +93,31 @@ export default function VideoCallScreen() {
   };
 
   const addContact = () => {
-    if (!newName.trim() || !newPhone.trim()) return;
+    requireAuth(() => {
+      if (!isPremium && contacts.length >= 2) {
+        Alert.alert(
+          t("premiumFeature"),
+          t("contactLimitReached"),
+          [
+            { text: t("cancel"), style: "cancel" },
+            { text: t("upgradeNow"), onPress: () => router.push("/SettingsScreen") }
+          ]
+        );
+        setAdding(false);
+        return;
+      }
 
-    setContacts((prev) => [
-      ...prev,
-      { id: Date.now().toString(), name: newName, phone: newPhone },
-    ]);
+      if (!newName.trim() || !newPhone.trim()) return;
 
-    setNewName("");
-    setNewPhone("");
-    setAdding(false);
+      setContacts((prev) => [
+        ...prev,
+        { id: Date.now().toString(), name: newName, phone: newPhone },
+      ]);
+
+      setNewName("");
+      setNewPhone("");
+      setAdding(false);
+    });
   };
 
   // NEW — When user taps a contact
@@ -272,12 +295,12 @@ export default function VideoCallScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   camera: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-},
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   infoText: { color: "white", marginTop: 12, fontSize: 16 },
 

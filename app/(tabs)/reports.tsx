@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from 'expo-print';
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFlags } from "react-native-flagsmith/react";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
+import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -21,8 +23,10 @@ const METRICS = [
 ];
 
 export default function ReportsScreen() {
+  const router = useRouter();
   const { colors, theme } = useTheme();
   const { t } = useTranslation();
+  const { requireAuth } = useAuth();
   const [userData, setUserData] = useState<any>(null);
   const [scores, setScores] = useState({
     physical: 65,
@@ -31,6 +35,9 @@ export default function ReportsScreen() {
     sleep: 80,
     diet: 55
   });
+
+  const flags = useFlags(["download_reports"]);
+  const canDownload = flags.download_reports.enabled;
 
   useFocusEffect(
     useCallback(() => {
@@ -109,12 +116,25 @@ export default function ReportsScreen() {
   };
 
   const generatePDF = async () => {
-    if (!userData) {
-      Alert.alert("Error", "No profile data found to generate report.");
-      return;
-    }
+    requireAuth(async () => {
+      if (!canDownload) {
+        Alert.alert(
+          t("premiumFeature"),
+          t("upgradeToDownload"),
+          [
+            { text: t("cancel"), style: "cancel" },
+            { text: t("upgradeNow"), onPress: () => router.push("/SettingsScreen") }
+          ]
+        );
+        return;
+      }
 
-    const html = `
+      if (!userData) {
+        Alert.alert("Error", "No profile data found to generate report.");
+        return;
+      }
+
+      const html = `
       <html>
         <head>
           <style>
@@ -197,13 +217,14 @@ export default function ReportsScreen() {
       </html>
     `;
 
-    try {
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to generate or share report.");
-    }
+      try {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "Failed to generate or share report.");
+      }
+    });
   };
 
   // --- RADAR CHART LOGIC ---

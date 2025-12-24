@@ -19,13 +19,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-// ============================================
-// API CONFIGURATION - JUST CHANGE THESE URLs
-// ============================================
 const API_CONFIG = {
   BASE_URL: 'https://your-api.com/api', // Change this to your backend URL
   ENDPOINTS: {
@@ -67,6 +65,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
   const { t, i18n } = useTranslation();
+  const { user, requireAuth } = useAuth();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState("");
@@ -315,14 +314,16 @@ export default function HomeScreen() {
   };
 
   const handleFamilyCall = async () => {
-    // Send to API
-    await fetchFromAPI(API_CONFIG.ENDPOINTS.FAMILY_CALL, {
-      method: 'POST',
-      body: JSON.stringify({ callType: 'video' })
-    });
+    requireAuth(async () => {
+      // Send to API
+      await fetchFromAPI(API_CONFIG.ENDPOINTS.FAMILY_CALL, {
+        method: 'POST',
+        body: JSON.stringify({ callType: 'video' })
+      });
 
-    // Navigate to video call screen
-    router.push("/VideoCallScreen");
+      // Navigate to video call screen
+      router.push("/VideoCallScreen");
+    });
   };
 
   const handleHealthCheck = async () => {
@@ -341,14 +342,16 @@ export default function HomeScreen() {
   };
 
   const handleReminders = () => {
-    setSelectedDate(new Date(Date.now() + 60000));
-    setMode("date");
-    setShowReminderModal(true);
+    requireAuth(() => {
+      router.push("/reminders");
+    });
   };
 
   const handleAIChat = async () => {
-    // await fetchAIMessage(); // Optional: Refresh message before entering
-    router.push("/chatbot");
+    requireAuth(() => {
+      // await fetchAIMessage(); // Optional: Refresh message before entering
+      router.push("/chatbot");
+    });
   };
 
   // ============================================
@@ -441,6 +444,22 @@ export default function HomeScreen() {
           })}
         </Text>
       </View>
+
+      {!user && (
+        <TouchableOpacity
+          style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+          onPress={() => router.push("/auth/login")}
+        >
+          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
+          <View style={styles.guestCtaContent}>
+            <Text style={[styles.guestCtaTitle, { color: colors.primary }]}>{t("signInToUnlock") || "Sign in to unlock full access"}</Text>
+            <Text style={[styles.guestCtaSubtitle, { color: colors.mutedText }]}>
+              {t("guestModeMessage") || "Enjoy personalized health tracking and stay connected with your family."}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      )}
 
       {/* QUICK ACTIONS */}
       <View style={styles.section}>
@@ -769,6 +788,27 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
+  },
+  guestCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginBottom: 24,
+  },
+  guestCtaContent: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  guestCtaTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  guestCtaSubtitle: {
+    fontSize: 13,
   },
   chatButtonText: {
     fontSize: 16,

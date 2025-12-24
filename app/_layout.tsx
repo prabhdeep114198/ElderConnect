@@ -1,109 +1,353 @@
 import { ActionSheetProvider } from "@expo/react-native-action-sheet";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  DrawerContentScrollView,
+  DrawerItemList,
+} from "@react-navigation/drawer";
 import { useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import flagsmith from "react-native-flagsmith";
+import { FlagsmithProvider } from "react-native-flagsmith/react";
 import { Colors } from "../constants/colors";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ThemeProvider } from "../context/ThemeContext";
-import "./../i18n";
+import { ThemeProvider, useTheme } from "../context/ThemeContext";
+
+import * as Notifications from "expo-notifications";
+import "../i18n";
+
+// NOTIFICATION HANDLER CONFIG
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 function InitialLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const { theme, colors, toggleTheme } = useTheme();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
+    const setupNotifications = async () => {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (Platform.OS === 'android') {
+        Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: colors.primary,
+        });
+      }
+    };
+
+    setupNotifications();
+
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notification Received:", notification);
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      const { actionIdentifier, notification } = response;
+      console.log("Notification Tapped:", notification.request.content.title);
+      // Logic for navigating based on notification can be added here
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === "auth";
-    const inOnboarding = segments[0] === "onboarding";
-    const isLandingPage = !segments[0];
-
-    if (!user) {
-      // Redirect to login if not authenticated AND not on landing page
-      if (!inAuthGroup && !isLandingPage) {
-        router.replace("/auth/login");
-      }
+    if (user) {
+      flagsmith.identify(user.id, {
+        plan_level: user.plan_level ?? "free",
+      });
     } else {
-      // User is authenticated
-      if (inAuthGroup || (!user.isOnboarded && !inOnboarding)) {
-        // If in auth screens or not onboarded, redirect accordingly
-        if (user.isOnboarded) {
-          router.replace("/(tabs)/home");
-        } else {
-          router.replace("/onboarding");
-        }
-      }
+      flagsmith.logout();
     }
-  }, [user, loading, segments]);
+  }, [user, loading]);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const segment = segments[0];
+    const inAuthGroup = segment === "auth";
+    const inOnboarding = segment === "onboarding";
+    const isLandingPage = !segment;
+
+    // NOT AUTHENTICATED
+    if (!user) {
+      return;
+    }
+
+    // AUTHENTICATED BUT NOT ONBOARDED
+    if (!user.isOnboarded && !inOnboarding) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    // AUTHENTICATED AND ONBOARDED BUT ON AUTH SCREENS
+    if (inAuthGroup) {
+      router.replace("/(tabs)/home");
+    }
+  }, [user, loading, segments, router]);
+
+  /* ------------------------------ Loading UI ------------------------------- */
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
+  /* -------------------------- Custom Drawer Content -------------------------- */
+  const CustomDrawerContent = (props: any) => {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
+          {/* Drawer Header */}
+          <View style={[styles.drawerHeader, { backgroundColor: colors.primary }]}>
+            <View style={styles.avatarContainer}>
+              <Ionicons name="person-circle" size={64} color="#FFF" />
+              {user?.plan_level === 'premium' && (
+                <View style={styles.premiumBadge}>
+                  <Ionicons name="star" size={12} color="#FFD700" />
+                </View>
+              )}
+            </View>
+            <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
+            <Text style={styles.userEmail}>{user?.email || 'Sign in for full access'}</Text>
+          </View>
+
+          {/* Drawer Items */}
+          <View style={{ paddingVertical: 10 }}>
+            <DrawerItemList {...props} />
+          </View>
+        </DrawerContentScrollView>
+
+        {/* Drawer Footer */}
+        <View style={[styles.drawerFooter, { borderTopColor: colors.border }]}>
+          {/* Dark Mode Toggle */}
+          <View style={styles.footerItem}>
+            <View style={styles.footerItemLeft}>
+              <Ionicons
+                name={theme === 'dark' ? "moon" : "sunny"}
+                size={22}
+                color={colors.text}
+              />
+              <Text style={[styles.footerItemText, { color: colors.text }]}>
+                {theme === 'dark' ? "Dark Mode" : "Light Mode"}
+              </Text>
+            </View>
+            <Switch
+              value={theme === 'dark'}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.card}
+            />
+          </View>
+
+          {/* Logout Button */}
+          {user && (
+            <TouchableOpacity
+              style={[styles.footerItem, { marginTop: 10 }]}
+              onPress={async () => {
+                await logout();
+                router.replace("/auth/login");
+              }}
+            >
+              <View style={styles.footerItemLeft}>
+                <Ionicons name="log-out-outline" size={22} color={colors.error} />
+                <Text style={[styles.footerItemText, { color: colors.error }]}>Log Out</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  /* ------------------------------ App Drawer ------------------------------- */
   return (
     <Drawer
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: true,
-        drawerActiveTintColor: Colors.primary,
-        drawerInactiveTintColor: Colors.mutedText,
+        headerStyle: {
+          backgroundColor: colors.background,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerTintColor: colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+          fontSize: 18,
+        },
+        drawerActiveTintColor: colors.primary,
+        drawerInactiveTintColor: colors.mutedText,
+        drawerActiveBackgroundColor: colors.primary + '10',
+        drawerLabelStyle: {
+          marginLeft: -10,
+          fontWeight: '600',
+          fontSize: 16,
+        },
+        drawerStyle: {
+          width: 280,
+          backgroundColor: colors.background,
+        }
       }}
     >
       <Drawer.Screen
         name="(tabs)"
-        options={{ title: "Main" }}
+        options={{
+          title: "Home",
+          drawerIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />
+        }}
       />
 
       <Drawer.Screen
         name="events"
-        options={{ headerShown: false }}
+        options={{
+          headerShown: false,
+          drawerIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />
+        }}
       />
 
       <Drawer.Screen
         name="MagnifierScreen"
-        options={{ title: "Magnifier" }}
+        options={{
+          title: "Magnifier",
+          drawerIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />
+        }}
+      />
+
+      <Drawer.Screen
+        name="reminders"
+        options={{
+          title: "Reminders",
+          drawerIcon: ({ color, size }) => <Ionicons name="notifications" size={size} color={color} />
+        }}
       />
 
       <Drawer.Screen
         name="SettingsScreen"
-        options={{ title: "Settings" }}
+        options={{
+          title: "Settings",
+          drawerIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />
+        }}
       />
 
-      {/* HIDE AUTH SCREENS FROM DRAWER */}
+      {/* Hidden Routes */}
       <Drawer.Screen
         name="auth/login"
         options={{
-          drawerItemStyle: { display: 'none' },
+          drawerItemStyle: { display: "none" },
           headerShown: false,
-          swipeEnabled: false
         }}
       />
+
       <Drawer.Screen
         name="onboarding/index"
         options={{
-          drawerItemStyle: { display: 'none' },
+          drawerItemStyle: { display: "none" },
           headerShown: false,
-          swipeEnabled: false
         }}
       />
     </Drawer>
   );
 }
 
+const styles = StyleSheet.create({
+  drawerHeader: {
+    padding: 24,
+    paddingTop: 60,
+    borderBottomRightRadius: 30,
+    marginBottom: 10,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  premiumBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: -5,
+    backgroundColor: '#000',
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  userName: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  userEmail: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  drawerFooter: {
+    padding: 20,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+  },
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  footerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  footerItemText: {
+    fontSize: 16,
+    marginLeft: 15,
+    fontWeight: '500',
+  },
+});
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <ActionSheetProvider>
-          <InitialLayout />
-        </ActionSheetProvider>
-      </ThemeProvider>
-    </AuthProvider>
+    <FlagsmithProvider
+      flagsmith={flagsmith}
+      options={{
+        environmentID: process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID!,
+      }}
+    >
+      <AuthProvider>
+        <ThemeProvider>
+          <ActionSheetProvider>
+            <InitialLayout />
+          </ActionSheetProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </FlagsmithProvider>
   );
 }

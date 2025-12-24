@@ -72,7 +72,7 @@ const LANGUAGES = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, colors, toggleTheme } = useTheme();
-  const { logout } = useAuth();
+  const { user, logout, requireAuth } = useAuth();
   const { t, i18n } = useTranslation();
   const [settingsSections, setSettingsSections] = useState<SettingsSectionType[]>([]);
   const [toggles, setToggles] = useState<{ [key: string]: boolean }>({
@@ -106,10 +106,15 @@ export default function SettingsScreen() {
 
     switch (action) {
       case "profile":
-        router.push("/profile");
+        requireAuth(() => router.push("/profile"));
         break;
       case "changePassword":
-        router.push("/change-password");
+        requireAuth(() => router.push("/change-password"));
+        break;
+      case "manageSubscription":
+      case "upgradePlan":
+      case "billingHistory":
+        requireAuth(() => Alert.alert("Action", `Perform ${action}`));
         break;
       case "language":
         setIsLanguageModalVisible(true);
@@ -208,18 +213,29 @@ export default function SettingsScreen() {
       ))}
 
       <View style={styles.section}>
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.primary }]}
-          onPress={handleLogout}
-        >
-          <Text style={[styles.logoutButtonText, { color: colors.primary }]}>{t("logout")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.deleteButton, { backgroundColor: colors.card }]}
-          onPress={handleDeleteAccount}
-        >
-          <Text style={styles.deleteButtonText}>{t("deleteAccount")}</Text>
-        </TouchableOpacity>
+        {user ? (
+          <>
+            <TouchableOpacity
+              style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.primary }]}
+              onPress={handleLogout}
+            >
+              <Text style={[styles.logoutButtonText, { color: colors.primary }]}>{t("logout")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteButton, { backgroundColor: colors.card }]}
+              onPress={handleDeleteAccount}
+            >
+              <Text style={styles.deleteButtonText}>{t("deleteAccount")}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={[styles.loginButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push("/auth/login")}
+          >
+            <Text style={[styles.loginButtonText, { color: colors.buttonText }]}>{t("signIn") || "Sign In"}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.footer}>
@@ -315,6 +331,13 @@ const styles = StyleSheet.create({
     borderStyle: 'solid'
   },
   deleteButtonText: { color: "#EF4444", fontWeight: "bold", textAlign: "center", fontSize: 16 },
+  loginButton: {
+    padding: 16,
+    marginHorizontal: 24,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  loginButtonText: { fontWeight: "bold", textAlign: "center", fontSize: 16 },
   footer: { padding: 24, paddingBottom: 60, alignItems: "center" },
   footerText: { fontSize: 14 },
   modalOverlay: {
