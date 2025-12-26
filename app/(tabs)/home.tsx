@@ -103,6 +103,40 @@ export default function HomeScreen() {
   // API FUNCTIONS
   // ============================================
   const fetchFromAPI = async (endpoint: string, options: RequestInit = {}) => {
+    // If we're using a placeholder URL, don't even try to fetch to avoid console noise
+    if (API_CONFIG.BASE_URL.includes('your-api.com')) {
+      // Return some realistic mock data based on the endpoint
+      switch (endpoint) {
+        case API_CONFIG.ENDPOINTS.HEALTH_METRICS:
+          return {
+            metrics: [
+              { label: t("stepsToday") || "Steps Today", value: "3,452", icon: "walk", trend: "up" },
+              { label: t("heartRate") || "Heart Rate", value: `75 ${t("bpm") || "bpm"}`, icon: "heart", trend: "stable" },
+              { label: t("sleepQuality") || "Sleep Quality", value: `7.2 ${t("hrs") || "hrs"}`, icon: "moon", trend: "up" },
+              { label: t("hydration") || "Hydration", value: `5/8 ${t("cups") || "cups"}`, icon: "water", trend: "down" },
+            ]
+          };
+        case API_CONFIG.ENDPOINTS.SCHEDULE:
+          return {
+            events: [
+              { time: "09:00 AM", title: t("takeMorningMedication"), type: "medication" },
+              { time: "11:30 AM", title: t("physiotherapySession") || "Physiotherapy Session", type: "activity" },
+              { time: "04:30 PM", title: t("eveningWalkReminder"), type: "activity" },
+            ]
+          };
+        case API_CONFIG.ENDPOINTS.AI_COMPANION:
+          return {
+            message: "I've checked your health metrics. You're doing great with your steps today! Don't forget to drink a bit more water."
+          };
+        case API_CONFIG.ENDPOINTS.REMINDERS:
+          return {
+            reminders: []
+          };
+        default:
+          return null;
+      }
+    }
+
     try {
       const mergedHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -120,7 +154,6 @@ export default function HomeScreen() {
         return null;
       }
 
-      // Safely parse JSON (some endpoints may return empty responses)
       const text = await response.text();
       if (!text) return null;
       try {
@@ -129,7 +162,12 @@ export default function HomeScreen() {
         return text;
       }
     } catch (error) {
-      console.log(`API Fetch Error (${endpoint}):`, error);
+      // Suppress network request failed logs for better UX during development
+      if (error instanceof TypeError && error.message === 'Network request failed') {
+        // console.log(`API Fetch Suppressed (Network Error) for ${endpoint}`);
+      } else {
+        console.log(`API Fetch Error (${endpoint}):`, error);
+      }
       return null;
     }
   };

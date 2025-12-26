@@ -1,4 +1,4 @@
-import { Audio, AVPlaybackStatus, AVPlaybackStatusSuccess } from "expo-av";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,9 +19,10 @@ interface Track {
 export default function FreesoundMusic() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+
+  const player = useAudioPlayer();
+  const status = useAudioPlayerStatus(player);
 
   const FREESOUND_API_KEY = "cUBi6vZab4NtW0sC4dJpDFAnQGzRz0HVFTjwsV5c";
 
@@ -48,39 +49,19 @@ export default function FreesoundMusic() {
     };
 
     fetchMusic();
-
-    return () => {
-      if (sound) sound.unloadAsync();
-    };
   }, []);
 
   const playTrack = async (index: number) => {
-    if (sound) await sound.unloadAsync();
-
-    const { sound: newSound } = await Audio.Sound.createAsync({
-      uri: tracks[index].audio,
-    });
-
-    setSound(newSound);
+    player.replace(tracks[index].audio);
     setCurrentIndex(index);
-    setIsPlaying(true);
-    await newSound.playAsync();
+    player.play();
   };
 
   const togglePause = async () => {
-    if (!sound) return;
-    const status: AVPlaybackStatus = await sound.getStatusAsync();
-
-    if (!status.isLoaded) return;
-
-    const s = status as AVPlaybackStatusSuccess;
-
-    if (s.isPlaying) {
-      await sound.pauseAsync();
-      setIsPlaying(false);
+    if (player.playing) {
+      player.pause();
     } else {
-      await sound.playAsync();
-      setIsPlaying(true);
+      player.play();
     }
   };
 
@@ -121,7 +102,7 @@ export default function FreesoundMusic() {
               <Button title="Play" onPress={() => playTrack(index)} />
 
               <Button
-                title="Pause"
+                title={isCurrent && player.playing ? "Pause" : "Resume"}
                 onPress={togglePause}
                 disabled={!isCurrent}
               />
@@ -147,6 +128,9 @@ export default function FreesoundMusic() {
           Now Playing:{" "}
           {currentIndex !== null ? tracks[currentIndex].name : "None"}
         </Text>
+        {currentIndex !== null && (
+          <Text>Status: {player.playing ? "Playing" : "Paused"}</Text>
+        )}
       </View>
     </ScrollView>
   );

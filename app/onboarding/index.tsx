@@ -1,4 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -25,6 +27,7 @@ const DIETARY_PREFERENCES = ["No Restrictions", "Vegetarian", "Vegan", "Diabetic
 const ACTIVITY_LEVELS = ["Sedentary", "Light Activity", "Moderate Activity", "Very Active"];
 const SOCIAL_PREFERENCES = ["Prefer Alone Time", "Small Groups", "Large Gatherings", "One-on-One"];
 const MEMORY_SUPPORT = ["No Issues", "Occasional Forgetfulness", "Need Regular Reminders", "Need Significant Support"];
+const GENDERS = ["Male", "Female", "Non-binary", "Other", "Prefer not to say"];
 
 export default function OnboardingScreen() {
     const router = useRouter();
@@ -38,11 +41,16 @@ export default function OnboardingScreen() {
     // Basic Information
     const [name, setName] = useState(user?.name || "");
     const [age, setAge] = useState("");
-    const [birthDate, setBirthDate] = useState("");
+    const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
     const [gender, setGender] = useState("");
     const [phone, setPhone] = useState("");
     const [address, setAddress] = useState("");
     const [city, setCity] = useState("");
+
+    // Picker states
+    const [showBirthPicker, setShowBirthPicker] = useState(false);
+    const [showWakeUpPicker, setShowWakeUpPicker] = useState(false);
+    const [showBedTimePicker, setShowBedTimePicker] = useState(false);
 
     // Health Information
     const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
@@ -74,8 +82,8 @@ export default function OnboardingScreen() {
     const [emergencyRelation2, setEmergencyRelation2] = useState("");
 
     // Daily Routine & Goals
-    const [wakeUpTime, setWakeUpTime] = useState("");
-    const [bedTime, setBedTime] = useState("");
+    const [wakeUpTime, setWakeUpTime] = useState<Date | undefined>(undefined);
+    const [bedTime, setBedTime] = useState<Date | undefined>(undefined);
     const [goals, setGoals] = useState("");
     const [concerns, setConcerns] = useState("");
 
@@ -104,7 +112,7 @@ export default function OnboardingScreen() {
             // Basic Info
             name,
             age,
-            birthDate,
+            birthDate: birthDate?.toISOString(),
             gender,
             phone,
             address,
@@ -138,8 +146,8 @@ export default function OnboardingScreen() {
             ],
 
             // Routine
-            wakeUpTime,
-            bedTime,
+            wakeUpTime: wakeUpTime?.toISOString(),
+            bedTime: bedTime?.toISOString(),
             goals,
             concerns,
 
@@ -195,17 +203,31 @@ export default function OnboardingScreen() {
                             />
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Date of Birth</Text>
-                            <TextInput
-                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                                value={birthDate}
-                                onChangeText={setBirthDate}
-                                placeholder="MM/DD/YYYY"
-                                placeholderTextColor={colors.mutedText}
-                            />
+                            <TouchableOpacity
+                                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }]}
+                                onPress={() => setShowBirthPicker(true)}
+                            >
+                                <Text style={{ flex: 1, color: birthDate ? colors.text : colors.mutedText, fontSize: 16 }}>
+                                    {birthDate ? birthDate.toLocaleDateString() : "Select Date"}
+                                </Text>
+                                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                            {showBirthPicker && (
+                                <DateTimePicker
+                                    value={birthDate || new Date(1950, 0, 1)}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={(event, date) => {
+                                        setShowBirthPicker(false);
+                                        if (date) setBirthDate(date);
+                                    }}
+                                    maximumDate={new Date()}
+                                />
+                            )}
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Age</Text>
                             <TextInput
-                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, fontSize: 16 }]}
                                 value={age}
                                 onChangeText={setAge}
                                 placeholder="e.g. 72"
@@ -214,13 +236,25 @@ export default function OnboardingScreen() {
                             />
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Gender</Text>
-                            <TextInput
-                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                                value={gender}
-                                onChangeText={setGender}
-                                placeholder="e.g. Male, Female, Other"
-                                placeholderTextColor={colors.mutedText}
-                            />
+                            <View style={styles.chipContainer}>
+                                {GENDERS.map((g) => (
+                                    <TouchableOpacity
+                                        key={g}
+                                        style={[
+                                            styles.chip,
+                                            gender === g
+                                                ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                                                : { backgroundColor: colors.background, borderColor: colors.border }
+                                        ]}
+                                        onPress={() => setGender(g)}
+                                    >
+                                        <Text style={[
+                                            styles.chipText,
+                                            gender === g ? { color: colors.buttonText } : { color: colors.text }
+                                        ]}>{g}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Phone Number</Text>
                             <TextInput
@@ -617,22 +651,48 @@ export default function OnboardingScreen() {
 
                         <View style={[styles.section, { backgroundColor: colors.card }]}>
                             <Text style={[styles.label, { color: colors.text }]}>Typical Wake-Up Time</Text>
-                            <TextInput
-                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                                value={wakeUpTime}
-                                onChangeText={setWakeUpTime}
-                                placeholder="e.g. 7:00 AM"
-                                placeholderTextColor={colors.mutedText}
-                            />
+                            <TouchableOpacity
+                                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }]}
+                                onPress={() => setShowWakeUpPicker(true)}
+                            >
+                                <Text style={{ flex: 1, color: wakeUpTime ? colors.text : colors.mutedText, fontSize: 16 }}>
+                                    {wakeUpTime ? wakeUpTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Select Time"}
+                                </Text>
+                                <Ionicons name="time-outline" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                            {showWakeUpPicker && (
+                                <DateTimePicker
+                                    value={wakeUpTime || new Date()}
+                                    mode="time"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={(event, date) => {
+                                        setShowWakeUpPicker(false);
+                                        if (date) setWakeUpTime(date);
+                                    }}
+                                />
+                            )}
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Typical Bedtime</Text>
-                            <TextInput
-                                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                                value={bedTime}
-                                onChangeText={setBedTime}
-                                placeholder="e.g. 10:00 PM"
-                                placeholderTextColor={colors.mutedText}
-                            />
+                            <TouchableOpacity
+                                style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }]}
+                                onPress={() => setShowBedTimePicker(true)}
+                            >
+                                <Text style={{ flex: 1, color: bedTime ? colors.text : colors.mutedText, fontSize: 16 }}>
+                                    {bedTime ? bedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Select Time"}
+                                </Text>
+                                <Ionicons name="moon-outline" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                            {showBedTimePicker && (
+                                <DateTimePicker
+                                    value={bedTime || new Date()}
+                                    mode="time"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={(event, date) => {
+                                        setShowBedTimePicker(false);
+                                        if (date) setBedTime(date);
+                                    }}
+                                />
+                            )}
 
                             <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Health & Wellness Goals</Text>
                             <TextInput
@@ -688,7 +748,7 @@ export default function OnboardingScreen() {
                             style={[styles.navButton, { backgroundColor: colors.border }]}
                             onPress={handleBack}
                         >
-                            <Text style={{ color: colors.text }}>Back</Text>
+                            <Text style={[styles.navButtonText, { color: colors.text }]}>Back</Text>
                         </TouchableOpacity>
                     )}
 
@@ -697,14 +757,14 @@ export default function OnboardingScreen() {
                             style={[styles.navButton, { backgroundColor: colors.primary }]}
                             onPress={handleNext}
                         >
-                            <Text style={{ color: colors.buttonText }}>Next</Text>
+                            <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Next</Text>
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity
                             style={[styles.navButton, { backgroundColor: colors.primary }]}
                             onPress={handleFinish}
                         >
-                            <Text style={{ color: colors.buttonText }}>Finish</Text>
+                            <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Finish</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -740,14 +800,15 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     label: {
-        fontSize: 14,
-        marginBottom: 4,
+        fontSize: 16,
+        fontWeight: "600",
+        marginBottom: 8,
     },
     input: {
         borderWidth: 1,
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 14,
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
     },
     multilineInput: {
         minHeight: 80,
@@ -776,9 +837,21 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     navButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        minWidth: 120,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    navButtonText: {
+        fontSize: 18,
+        fontWeight: "bold",
     },
     progressContainer: {
         flexDirection: "row",
