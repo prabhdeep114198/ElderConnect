@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -11,7 +12,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Colors } from "../../constants/colors";
+import { useTheme } from "../../context/ThemeContext";
+import { ReminderService } from "../../utils/reminderService";
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,8 @@ interface Medication {
 }
 
 export default function MedicationsScreen() {
+  const { colors, theme } = useTheme();
+  const { t } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
   const [newMedication, setNewMedication] = useState({
@@ -102,7 +106,7 @@ export default function MedicationsScreen() {
     totalDoses: medications.reduce((sum, med) => sum + med.times.length, 0),
     compliance: 0
   };
-  
+
   todayStats.compliance = Math.round((todayStats.takenMeds / todayStats.totalDoses) * 100);
 
   const weeklyCompliance = [92, 88, 95, 90, 85, 93, todayStats.compliance];
@@ -117,7 +121,7 @@ export default function MedicationsScreen() {
       }
       return med;
     }));
-    
+
     Alert.alert(
       'Medication Logged',
       'Your medication has been marked as taken.',
@@ -148,7 +152,7 @@ export default function MedicationsScreen() {
     setMedications(prev => [...prev, newMed]);
     setNewMedication({ name: '', dosage: '', frequency: '', instructions: '' });
     setShowAddModal(false);
-    
+
     Alert.alert('Success', 'Medication added successfully!');
   };
 
@@ -159,21 +163,45 @@ export default function MedicationsScreen() {
   const setReminder = (med: Medication) => {
     Alert.alert(
       'Set Reminder',
-      `Set reminder for ${med.name}?`,
+      `Set reminder for ${med.name} at ${med.times.join(', ')}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Set Reminder', 
-          onPress: () => Alert.alert('Reminder Set', `Reminder set for ${med.name} at ${med.times.join(', ')}`) 
+        {
+          text: 'Set Reminder',
+          onPress: async () => {
+            try {
+              // For simplicity, we'll set it for tomorrow at the first time mentioned
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const [hour, minutePart] = med.times[0].split(':');
+              const [minutes, ampm] = minutePart.split(' ');
+
+              let h = parseInt(hour);
+              if (ampm === 'PM' && h < 12) h += 12;
+              if (ampm === 'AM' && h === 12) h = 0;
+
+              tomorrow.setHours(h, parseInt(minutes), 0, 0);
+
+              await ReminderService.scheduleReminder({
+                title: `Medication: ${med.name}`,
+                body: `Time to take your ${med.name} (${med.dosage})`,
+                date: tomorrow.toISOString(),
+                type: 'medication',
+              });
+              Alert.alert('Reminder Set', `Reminder set for tomorrow at ${med.times[0]}`);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || "Failed to set reminder");
+            }
+          }
         }
       ]
     );
   };
 
   const getComplianceColor = (percentage: number) => {
-    if (percentage >= 90) return Colors.success;
-    if (percentage >= 70) return Colors.warning;
-    return Colors.error;
+    if (percentage >= 90) return colors.success;
+    if (percentage >= 70) return colors.warning;
+    return colors.error;
   };
 
   const getTimeStatus = (med: Medication, timeIndex: number) => {
@@ -182,83 +210,83 @@ export default function MedicationsScreen() {
     const medTime = new Date();
     medTime.setHours(parseInt(hours.replace(/[^\d]/g, '')));
     medTime.setMinutes(parseInt(minutes.replace(/[^\d]/g, '')));
-    
+
     if (med.taken[timeIndex]) return 'taken';
     if (currentTime > medTime) return 'missed';
     return 'upcoming';
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Medications</Text>
-            <Text style={styles.headerSubtitle}>Manage your daily medications</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("medications")}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageDailyMeds")}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addButton}
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowAddModal(true)}
           >
-            <Ionicons name="add" size={24} color={Colors.buttonText} />
+            <Ionicons name="add" size={24} color={colors.buttonText} />
           </TouchableOpacity>
         </View>
 
         {/* Today's Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Summary</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSummary")}</Text>
           <View style={styles.summaryGrid}>
-            <View style={styles.summaryCard}>
+            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.summaryIcon}>
-                <Ionicons name="medical" size={24} color={Colors.primary} />
+                <Ionicons name="medical" size={24} color={colors.primary} />
               </View>
-              <Text style={styles.summaryValue}>{todayStats.takenMeds}/{todayStats.totalDoses}</Text>
-              <Text style={styles.summaryLabel}>Doses Taken</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>{todayStats.takenMeds}/{todayStats.totalDoses}</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("dosesTaken")}</Text>
             </View>
-            
-            <View style={styles.summaryCard}>
+
+            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.summaryIcon}>
                 <Ionicons name="checkmark-circle" size={24} color={getComplianceColor(todayStats.compliance)} />
               </View>
               <Text style={[styles.summaryValue, { color: getComplianceColor(todayStats.compliance) }]}>
                 {todayStats.compliance}%
               </Text>
-              <Text style={styles.summaryLabel}>Compliance</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("compliance")}</Text>
             </View>
-            
-            <View style={styles.summaryCard}>
+
+            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.summaryIcon}>
-                <Ionicons name="time" size={24} color={Colors.warning} />
+                <Ionicons name="time" size={24} color={colors.warning} />
               </View>
-              <Text style={styles.summaryValue}>
-                {medications.filter(med => 
+              <Text style={[styles.summaryValue, { color: colors.text }]}>
+                {medications.filter(med =>
                   med.taken.some((taken, i) => !taken && getTimeStatus(med, i) === 'missed')
                 ).length}
               </Text>
-              <Text style={styles.summaryLabel}>Missed</Text>
+              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("missed")}</Text>
             </View>
           </View>
         </View>
 
         {/* Weekly Compliance Chart */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Compliance</Text>
-          <View style={styles.chartCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
+          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.chartContainer}>
               {weeklyCompliance.map((compliance, index) => (
                 <View key={index} style={styles.chartBar}>
-                  <View 
+                  <View
                     style={[
-                      styles.chartBarFill, 
-                      { 
+                      styles.chartBarFill,
+                      {
                         height: `${compliance}%`,
                         backgroundColor: getComplianceColor(compliance)
                       }
-                    ]} 
+                    ]}
                   />
-                  <Text style={styles.chartLabel}>{weekDays[index]}</Text>
-                  <Text style={styles.chartValue}>{compliance}%</Text>
+                  <Text style={[styles.chartLabel, { color: colors.mutedText }]}>{weekDays[index]}</Text>
+                  <Text style={[styles.chartValue, { color: colors.mutedText }]}>{compliance}%</Text>
                 </View>
               ))}
             </View>
@@ -267,26 +295,26 @@ export default function MedicationsScreen() {
 
         {/* Today's Medications */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Medications</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysMedications")}</Text>
           {medications.map((med) => (
-            <View key={med.id} style={styles.medicationCard}>
+            <View key={med.id} style={[styles.medicationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.medicationHeader}>
                 <View style={styles.medicationInfo}>
                   <View style={[styles.medicationColor, { backgroundColor: med.color }]} />
                   <View style={styles.medicationDetails}>
-                    <Text style={styles.medicationName}>{med.name}</Text>
-                    <Text style={styles.medicationDosage}>{med.dosage} • {med.frequency}</Text>
-                    <Text style={styles.medicationDoctor}>Prescribed by {med.prescribedBy}</Text>
+                    <Text style={[styles.medicationName, { color: colors.text }]}>{med.name}</Text>
+                    <Text style={[styles.medicationDosage, { color: colors.mutedText }]}>{med.dosage} • {med.frequency}</Text>
+                    <Text style={[styles.medicationDoctor, { color: colors.mutedText }]}>{t("prescribedBy")} {med.prescribedBy}</Text>
                   </View>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.infoButton}
                   onPress={() => showMedicationDetails(med)}
                 >
-                  <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
+                  <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.medicationTimes}>
                 {med.times.map((time, timeIndex) => {
                   const status = getTimeStatus(med, timeIndex);
@@ -295,56 +323,58 @@ export default function MedicationsScreen() {
                       key={timeIndex}
                       style={[
                         styles.timeSlot,
-                        status === 'taken' && styles.timeSlotTaken,
-                        status === 'missed' && styles.timeSlotMissed,
-                        status === 'upcoming' && styles.timeSlotUpcoming
+                        { borderColor: status === 'taken' ? colors.success : status === 'missed' ? colors.error : colors.warning },
+                        status === 'taken' && { backgroundColor: colors.success + '20' },
+                        status === 'missed' && { backgroundColor: colors.error + '20' },
+                        status === 'upcoming' && { backgroundColor: colors.warning + '20' }
                       ]}
                       onPress={() => markAsTaken(med.id, timeIndex)}
                     >
-                      <Text style={styles.timeText}>{time}</Text>
+                      <Text style={[styles.timeText, { color: colors.text }]}>{time}</Text>
                       <View style={styles.timeStatus}>
-                        <Ionicons 
+                        <Ionicons
                           name={
                             status === 'taken' ? 'checkmark-circle' :
-                            status === 'missed' ? 'close-circle' : 'time'
-                          } 
-                          size={16} 
+                              status === 'missed' ? 'close-circle' : 'time'
+                          }
+                          size={16}
                           color={
-                            status === 'taken' ? Colors.success :
-                            status === 'missed' ? Colors.error : Colors.warning
-                          } 
+                            status === 'taken' ? colors.success :
+                              status === 'missed' ? colors.error : colors.warning
+                          }
                         />
                         <Text style={[
                           styles.statusText,
-                          { color: 
-                            status === 'taken' ? Colors.success :
-                            status === 'missed' ? Colors.error : Colors.warning
+                          {
+                            color:
+                              status === 'taken' ? colors.success :
+                                status === 'missed' ? colors.error : colors.warning
                           }
                         ]}>
-                          {status === 'taken' ? 'Taken' : 
-                           status === 'missed' ? 'Missed' : 'Pending'}
+                          {status === 'taken' ? 'Taken' :
+                            status === 'missed' ? 'Missed' : 'Pending'}
                         </Text>
                       </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              
+
               <View style={styles.medicationActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => setReminder(med)}
                 >
-                  <Ionicons name="alarm" size={16} color={Colors.primary} />
-                  <Text style={styles.actionButtonText}>Set Reminder</Text>
+                  <Ionicons name="alarm" size={16} color={colors.primary} />
+                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("setReminder")}</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => Alert.alert('Refill', `Order refill for ${med.name}?`)}
                 >
-                  <Ionicons name="refresh" size={16} color={Colors.success} />
-                  <Text style={styles.actionButtonText}>Refill</Text>
+                  <Ionicons name="refresh" size={16} color={colors.success} />
+                  <Text style={[styles.actionButtonText, { color: colors.success }]}>{t("refill")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -353,19 +383,19 @@ export default function MedicationsScreen() {
 
         {/* Medication Tips */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Medication Tips</Text>
-          <View style={styles.tipsCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("medicationTips")}</Text>
+          <View style={[styles.tipsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.tipItem}>
-              <Ionicons name="bulb" size={20} color={Colors.warning} />
-              <Text style={styles.tipText}>Take medications at the same time each day for better results</Text>
+              <Ionicons name="bulb" size={20} color={colors.warning} />
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip1")}</Text>
             </View>
             <View style={styles.tipItem}>
-              <Ionicons name="water" size={20} color={Colors.info} />
-              <Text style={styles.tipText}>Always take pills with a full glass of water unless directed otherwise</Text>
+              <Ionicons name="water" size={20} color={colors.info} />
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip2")}</Text>
             </View>
             <View style={styles.tipItem}>
-              <Ionicons name="warning" size={20} color={Colors.error} />
-              <Text style={styles.tipText}>Never stop taking prescribed medications without consulting your doctor</Text>
+              <Ionicons name="warning" size={20} color={colors.error} />
+              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip3")}</Text>
             </View>
           </View>
         </View>
@@ -377,63 +407,63 @@ export default function MedicationsScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add New Medication</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("addNewMedication")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Medication Name *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("medicationName")} *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.name}
                 onChangeText={(text) => setNewMedication(prev => ({ ...prev, name: text }))}
                 placeholder="Enter medication name"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Dosage *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("dosage")} *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.dosage}
                 onChangeText={(text) => setNewMedication(prev => ({ ...prev, dosage: text }))}
                 placeholder="e.g., 10mg, 1 tablet"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Frequency</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("frequency")}</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.frequency}
                 onChangeText={(text) => setNewMedication(prev => ({ ...prev, frequency: text }))}
                 placeholder="e.g., Once daily, Twice daily"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Special Instructions</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("specialInstructions")}</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newMedication.instructions}
                 onChangeText={(text) => setNewMedication(prev => ({ ...prev, instructions: text }))}
                 placeholder="e.g., Take with food, Avoid alcohol"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={3}
               />
             </View>
-            
-            <TouchableOpacity style={styles.addMedicationButton} onPress={addMedication}>
-              <Text style={styles.addMedicationButtonText}>Add Medication</Text>
+
+            <TouchableOpacity style={[styles.addMedicationButton, { backgroundColor: colors.primary }]} onPress={addMedication}>
+              <Text style={[styles.addMedicationButtonText, { color: colors.buttonText }]}>{t("addNewMedication")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -446,46 +476,46 @@ export default function MedicationsScreen() {
         presentationStyle="pageSheet"
       >
         {selectedMed && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedMed.name}</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedMed.name}</Text>
               <TouchableOpacity onPress={() => setSelectedMed(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Dosage Information</Text>
-                <Text style={styles.detailText}>{selectedMed.dosage} • {selectedMed.frequency}</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("dosage")}</Text>
+                <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.dosage} • {selectedMed.frequency}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Instructions</Text>
-                <Text style={styles.detailText}>{selectedMed.instructions}</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("specialInstructions")}</Text>
+                <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.instructions}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Prescribed By</Text>
-                <Text style={styles.detailText}>{selectedMed.prescribedBy}</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("prescribedBy")}</Text>
+                <Text style={[styles.detailText, { color: colors.mutedText }]}>{selectedMed.prescribedBy}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Start Date</Text>
-                <Text style={styles.detailText}>{new Date(selectedMed.startDate).toLocaleDateString()}</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("date")}</Text>
+                <Text style={[styles.detailText, { color: colors.mutedText }]}>{new Date(selectedMed.startDate).toLocaleDateString()}</Text>
               </View>
-              
+
               {selectedMed.endDate && (
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailTitle}>End Date</Text>
-                  <Text style={styles.detailText}>{new Date(selectedMed.endDate).toLocaleDateString()}</Text>
+                  <Text style={[styles.detailTitle, { color: colors.text }]}>End Date</Text>
+                  <Text style={[styles.detailText, { color: colors.mutedText }]}>{new Date(selectedMed.endDate).toLocaleDateString()}</Text>
                 </View>
               )}
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Possible Side Effects</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{t("possibleSideEffects")}</Text>
                 {selectedMed.sideEffects.map((effect, index) => (
-                  <Text key={index} style={styles.sideEffectText}>• {effect}</Text>
+                  <Text key={index} style={[styles.sideEffectText, { color: colors.mutedText }]}>• {effect}</Text>
                 ))}
               </View>
             </ScrollView>
@@ -499,7 +529,6 @@ export default function MedicationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -514,15 +543,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginTop: 2,
   },
   addButton: {
-    backgroundColor: Colors.primary,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -535,7 +561,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 16,
   },
   summaryGrid: {
@@ -544,13 +569,11 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: Colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   summaryIcon: {
     marginBottom: 8,
@@ -558,20 +581,16 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 12,
-    color: Colors.mutedText,
     textAlign: 'center',
   },
   chartCard: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   chartContainer: {
     flexDirection: 'row',
@@ -592,20 +611,16 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     fontSize: 10,
-    color: Colors.mutedText,
     marginBottom: 2,
   },
   chartValue: {
     fontSize: 8,
-    color: Colors.mutedText,
   },
   medicationCard: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   medicationHeader: {
     flexDirection: 'row',
@@ -629,17 +644,14 @@ const styles = StyleSheet.create({
   medicationName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 2,
   },
   medicationDosage: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginBottom: 2,
   },
   medicationDoctor: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   infoButton: {
     padding: 4,
@@ -656,22 +668,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
   },
-  timeSlotTaken: {
-    backgroundColor: Colors.success + '20',
-    borderColor: Colors.success,
-  },
-  timeSlotMissed: {
-    backgroundColor: Colors.error + '20',
-    borderColor: Colors.error,
-  },
-  timeSlotUpcoming: {
-    backgroundColor: Colors.warning + '20',
-    borderColor: Colors.warning,
-  },
   timeText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
   },
   timeStatus: {
     flexDirection: 'row',
@@ -693,15 +692,12 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    color: Colors.primary,
     marginLeft: 4,
   },
   tipsCard: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   tipItem: {
     flexDirection: 'row',
@@ -710,14 +706,12 @@ const styles = StyleSheet.create({
   },
   tipText: {
     fontSize: 14,
-    color: Colors.text,
     marginLeft: 12,
     flex: 1,
     lineHeight: 20,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -725,12 +719,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   modalContent: {
     flex: 1,
@@ -742,31 +734,25 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.card,
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
   addMedicationButton: {
-    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
   },
   addMedicationButtonText: {
-    color: Colors.buttonText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -776,17 +762,14 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 8,
   },
   detailText: {
     fontSize: 14,
-    color: Colors.mutedText,
     lineHeight: 20,
   },
   sideEffectText: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginBottom: 4,
   },
 });

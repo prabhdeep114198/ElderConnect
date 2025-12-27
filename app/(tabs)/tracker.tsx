@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Colors } from "../../constants/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +41,7 @@ interface VitalSign {
 }
 
 export default function HealthTrackerScreen() {
+  const { colors, theme } = useTheme();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<HealthMetric | null>(null);
   const [showVitalModal, setShowVitalModal] = useState(false);
@@ -60,7 +61,7 @@ export default function HealthTrackerScreen() {
       unit: 'steps',
       target: 8000,
       icon: 'walk',
-      color: Colors.primary,
+      color: colors.primary,
       trend: 'up',
       lastUpdated: '2 hours ago',
       history: [
@@ -77,7 +78,7 @@ export default function HealthTrackerScreen() {
       unit: 'bpm',
       target: 75,
       icon: 'heart',
-      color: Colors.error,
+      color: colors.error,
       trend: 'stable',
       lastUpdated: '30 minutes ago',
       history: [
@@ -94,7 +95,7 @@ export default function HealthTrackerScreen() {
       unit: 'hours',
       target: 8,
       icon: 'moon',
-      color: Colors.info,
+      color: colors.info,
       trend: 'up',
       lastUpdated: 'This morning',
       history: [
@@ -111,7 +112,7 @@ export default function HealthTrackerScreen() {
       unit: 'glasses',
       target: 8,
       icon: 'water',
-      color: Colors.info,
+      color: colors.info,
       trend: 'down',
       lastUpdated: '1 hour ago',
       history: [
@@ -127,7 +128,7 @@ export default function HealthTrackerScreen() {
       value: 68.5,
       unit: 'kg',
       icon: 'fitness',
-      color: Colors.success,
+      color: colors.success,
       trend: 'stable',
       lastUpdated: 'Yesterday',
       history: [
@@ -144,7 +145,7 @@ export default function HealthTrackerScreen() {
       unit: 'minutes',
       target: 60,
       icon: 'barbell',
-      color: Colors.warning,
+      color: colors.warning,
       trend: 'up',
       lastUpdated: '3 hours ago',
       history: [
@@ -255,7 +256,7 @@ export default function HealthTrackerScreen() {
         const today = new Date().toISOString().split('T')[0];
         const updatedHistory = [...metric.history];
         const todayIndex = updatedHistory.findIndex(h => h.date === today);
-        
+
         if (todayIndex >= 0) {
           updatedHistory[todayIndex].value = newValue;
         } else {
@@ -275,11 +276,11 @@ export default function HealthTrackerScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'normal': return Colors.success;
-      case 'high': return Colors.warning;
-      case 'low': return Colors.info;
-      case 'critical': return Colors.error;
-      default: return Colors.mutedText;
+      case 'normal': return colors.success;
+      case 'high': return colors.warning;
+      case 'low': return colors.info;
+      case 'critical': return colors.error;
+      default: return colors.mutedText;
     }
   };
 
@@ -293,9 +294,9 @@ export default function HealthTrackerScreen() {
 
   const getTrendColor = (trend: string) => {
     switch (trend) {
-      case 'up': return Colors.success;
-      case 'down': return Colors.error;
-      default: return Colors.mutedText;
+      case 'up': return colors.success;
+      case 'down': return colors.error;
+      default: return colors.mutedText;
     }
   };
 
@@ -322,68 +323,74 @@ export default function HealthTrackerScreen() {
       'How many minutes did you exercise?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: '15 min', onPress: () => {
-          const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-          if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 15);
-        }},
-        { text: '30 min', onPress: () => {
-          const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-          if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 30);
-        }},
-        { text: '60 min', onPress: () => {
-          const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-          if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 60);
-        }}
+        {
+          text: '15 min', onPress: () => {
+            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
+            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 15);
+          }
+        },
+        {
+          text: '30 min', onPress: () => {
+            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
+            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 30);
+          }
+        },
+        {
+          text: '60 min', onPress: () => {
+            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
+            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 60);
+          }
+        }
       ]
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Health Tracker</Text>
-            <Text style={styles.headerSubtitle}>Monitor your daily health metrics</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Health Tracker</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Monitor your daily health metrics</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addButton}
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowVitalModal(true)}
           >
-            <Ionicons name="add" size={24} color={Colors.buttonText} />
+            <Ionicons name="add" size={24} color={colors.buttonText} />
           </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Log</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Log</Text>
           <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickActionButton} onPress={quickLogWater}>
-              <Ionicons name="water" size={24} color={Colors.info} />
-              <Text style={styles.quickActionText}>Log Water</Text>
+            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogWater}>
+              <Ionicons name="water" size={24} color={colors.info} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Water</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionButton} onPress={quickLogExercise}>
-              <Ionicons name="barbell" size={24} color={Colors.warning} />
-              <Text style={styles.quickActionText}>Log Exercise</Text>
+
+            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogExercise}>
+              <Ionicons name="barbell" size={24} color={colors.warning} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Exercise</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => setShowVitalModal(true)}>
-              <Ionicons name="heart" size={24} color={Colors.error} />
-              <Text style={styles.quickActionText}>Log Vitals</Text>
+
+            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setShowVitalModal(true)}>
+              <Ionicons name="heart" size={24} color={colors.error} />
+              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Vitals</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Today's Metrics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Metrics</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Metrics</Text>
           <View style={styles.metricsGrid}>
             {healthMetrics.map((metric) => (
               <TouchableOpacity
                 key={metric.id}
-                style={styles.metricCard}
+                style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => showMetricDetails(metric)}
               >
                 <View style={styles.metricHeader}>
@@ -391,39 +398,39 @@ export default function HealthTrackerScreen() {
                     <Ionicons name={metric.icon as any} size={20} color={metric.color} />
                   </View>
                   <View style={styles.metricTrend}>
-                    <Ionicons 
-                      name={getTrendIcon(metric.trend)} 
-                      size={16} 
-                      color={getTrendColor(metric.trend)} 
+                    <Ionicons
+                      name={getTrendIcon(metric.trend)}
+                      size={16}
+                      color={getTrendColor(metric.trend)}
                     />
                   </View>
                 </View>
-                
-                <Text style={styles.metricValue}>
+
+                <Text style={[styles.metricValue, { color: colors.text }]}>
                   {metric.value} {metric.unit}
                 </Text>
-                <Text style={styles.metricName}>{metric.name}</Text>
-                
+                <Text style={[styles.metricName, { color: colors.mutedText }]}>{metric.name}</Text>
+
                 {metric.target && (
                   <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View 
+                    <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
+                      <View
                         style={[
-                          styles.progressFill, 
-                          { 
+                          styles.progressFill,
+                          {
                             width: `${getProgressPercentage(metric.value, metric.target)}%`,
                             backgroundColor: metric.color
                           }
-                        ]} 
+                        ]}
                       />
                     </View>
-                    <Text style={styles.progressText}>
+                    <Text style={[styles.progressText, { color: colors.mutedText }]}>
                       {Math.round(getProgressPercentage(metric.value, metric.target))}% of goal
                     </Text>
                   </View>
                 )}
-                
-                <Text style={styles.metricLastUpdated}>{metric.lastUpdated}</Text>
+
+                <Text style={[styles.metricLastUpdated, { color: colors.mutedText }]}>{metric.lastUpdated}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -431,32 +438,32 @@ export default function HealthTrackerScreen() {
 
         {/* Weekly Goals */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Goals</Text>
-          <View style={styles.goalsContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Goals</Text>
+          <View style={[styles.goalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {weeklyGoals.map((goal, index) => (
               <View key={index} style={styles.goalCard}>
                 <View style={styles.goalHeader}>
-                  <Text style={styles.goalName}>{goal.name}</Text>
-                  <Text style={styles.goalPercentage}>
+                  <Text style={[styles.goalName, { color: colors.text }]}>{goal.name}</Text>
+                  <Text style={[styles.goalPercentage, { color: colors.primary }]}>
                     {Math.round((goal.current / goal.target) * 100)}%
                   </Text>
                 </View>
-                
+
                 <View style={styles.goalProgress}>
-                  <View style={styles.goalProgressBar}>
-                    <View 
+                  <View style={[styles.goalProgressBar, { backgroundColor: colors.background }]}>
+                    <View
                       style={[
-                        styles.goalProgressFill, 
-                        { 
+                        styles.goalProgressFill,
+                        {
                           width: `${Math.min((goal.current / goal.target) * 100, 100)}%`,
-                          backgroundColor: (goal.current / goal.target) >= 0.8 ? Colors.success : Colors.warning
+                          backgroundColor: (goal.current / goal.target) >= 0.8 ? colors.success : colors.warning
                         }
-                      ]} 
+                      ]}
                     />
                   </View>
                 </View>
-                
-                <Text style={styles.goalText}>
+
+                <Text style={[styles.goalText, { color: colors.mutedText }]}>
                   {goal.current} / {goal.target} {goal.unit}
                 </Text>
               </View>
@@ -466,30 +473,30 @@ export default function HealthTrackerScreen() {
 
         {/* Recent Vital Signs */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Vital Signs</Text>
-          <View style={styles.vitalsContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Vital Signs</Text>
+          <View style={[styles.vitalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {vitalSigns.slice(0, 4).map((vital) => (
-              <View key={vital.id} style={styles.vitalCard}>
+              <View key={vital.id} style={[styles.vitalCard, { borderBottomColor: colors.border }]}>
                 <View style={styles.vitalHeader}>
-                  <Text style={styles.vitalName}>{vital.name}</Text>
+                  <Text style={[styles.vitalName, { color: colors.text }]}>{vital.name}</Text>
                   <View style={[styles.vitalStatus, { backgroundColor: getStatusColor(vital.status) }]}>
                     <Text style={styles.vitalStatusText}>{vital.status}</Text>
                   </View>
                 </View>
-                
-                <Text style={styles.vitalValue}>
-                  {vital.systolic && vital.diastolic 
-                    ? `${vital.systolic}/${vital.diastolic}` 
+
+                <Text style={[styles.vitalValue, { color: colors.text }]}>
+                  {vital.systolic && vital.diastolic
+                    ? `${vital.systolic}/${vital.diastolic}`
                     : vital.value
                   } {vital.unit}
                 </Text>
-                
-                <Text style={styles.vitalTimestamp}>
+
+                <Text style={[styles.vitalTimestamp, { color: colors.mutedText }]}>
                   {new Date(vital.timestamp).toLocaleString()}
                 </Text>
-                
+
                 {vital.notes && (
-                  <Text style={styles.vitalNotes}>{vital.notes}</Text>
+                  <Text style={[styles.vitalNotes, { color: colors.mutedText }]}>{vital.notes}</Text>
                 )}
               </View>
             ))}
@@ -498,39 +505,39 @@ export default function HealthTrackerScreen() {
 
         {/* Health Insights */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Health Insights</Text>
-          <View style={styles.insightsContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Insights</Text>
+          <View style={[styles.insightsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.insightCard}>
-              <View style={styles.insightIcon}>
-                <Ionicons name="trending-up" size={20} color={Colors.success} />
+              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                <Ionicons name="trending-up" size={20} color={colors.success} />
               </View>
               <View style={styles.insightContent}>
-                <Text style={styles.insightTitle}>Great Progress!</Text>
-                <Text style={styles.insightText}>
+                <Text style={[styles.insightTitle, { color: colors.text }]}>Great Progress!</Text>
+                <Text style={[styles.insightText, { color: colors.mutedText }]}>
                   Your sleep quality has improved by 15% this week. Keep up the good work!
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.insightCard}>
-              <View style={styles.insightIcon}>
-                <Ionicons name="water" size={20} color={Colors.info} />
+              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                <Ionicons name="water" size={20} color={colors.info} />
               </View>
               <View style={styles.insightContent}>
-                <Text style={styles.insightTitle}>Stay Hydrated</Text>
-                <Text style={styles.insightText}>
-                  You're 2 glasses short of your daily water goal. Try setting hourly reminders.
+                <Text style={[styles.insightTitle, { color: colors.text }]}>Stay Hydrated</Text>
+                <Text style={[styles.insightText, { color: colors.mutedText }]}>
+                  You&apos;re 2 glasses short of your daily water goal. Try setting hourly reminders.
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.insightCard}>
-              <View style={styles.insightIcon}>
-                <Ionicons name="walk" size={20} color={Colors.primary} />
+              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                <Ionicons name="walk" size={20} color={colors.primary} />
               </View>
               <View style={styles.insightContent}>
-                <Text style={styles.insightTitle}>Almost There!</Text>
-                <Text style={styles.insightText}>
+                <Text style={[styles.insightTitle, { color: colors.text }]}>Almost There!</Text>
+                <Text style={[styles.insightText, { color: colors.mutedText }]}>
                   You need 1,153 more steps to reach your daily goal. A 10-minute walk should do it!
                 </Text>
               </View>
@@ -545,17 +552,17 @@ export default function HealthTrackerScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Log Vital Sign</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Log Vital Sign</Text>
             <TouchableOpacity onPress={() => setShowVitalModal(false)}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Vital Sign Type</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Vital Sign Type</Text>
               <View style={styles.typeSelector}>
                 {[
                   { key: 'blood_pressure', label: 'Blood Pressure' },
@@ -567,13 +574,15 @@ export default function HealthTrackerScreen() {
                     key={type.key}
                     style={[
                       styles.typeButton,
-                      newVital.type === type.key && styles.selectedType
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newVital.type === type.key && { backgroundColor: colors.primary, borderColor: colors.primary }
                     ]}
                     onPress={() => setNewVital(prev => ({ ...prev, type: type.key }))}
                   >
                     <Text style={[
                       styles.typeButtonText,
-                      newVital.type === type.key && styles.selectedTypeText
+                      { color: colors.text },
+                      newVital.type === type.key && { color: colors.buttonText }
                     ]}>
                       {type.label}
                     </Text>
@@ -581,68 +590,68 @@ export default function HealthTrackerScreen() {
                 ))}
               </View>
             </View>
-            
+
             {newVital.type === 'blood_pressure' ? (
               <View style={styles.bpContainer}>
                 <View style={styles.bpInput}>
-                  <Text style={styles.inputLabel}>Systolic</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Systolic</Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                     value={newVital.systolic}
                     onChangeText={(text) => setNewVital(prev => ({ ...prev, systolic: text }))}
                     placeholder="120"
                     keyboardType="numeric"
-                    placeholderTextColor={Colors.mutedText}
+                    placeholderTextColor={colors.mutedText}
                   />
                 </View>
-                <Text style={styles.bpSeparator}>/</Text>
+                <Text style={[styles.bpSeparator, { color: colors.text }]}>/</Text>
                 <View style={styles.bpInput}>
-                  <Text style={styles.inputLabel}>Diastolic</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Diastolic</Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                     value={newVital.diastolic}
                     onChangeText={(text) => setNewVital(prev => ({ ...prev, diastolic: text }))}
                     placeholder="80"
                     keyboardType="numeric"
-                    placeholderTextColor={Colors.mutedText}
+                    placeholderTextColor={colors.mutedText}
                   />
                 </View>
               </View>
             ) : (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
                   Value ({getVitalUnit(newVital.type)})
                 </Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                   value={newVital.value}
                   onChangeText={(text) => setNewVital(prev => ({ ...prev, value: text }))}
                   placeholder={
                     newVital.type === 'blood_sugar' ? '95' :
-                    newVital.type === 'temperature' ? '98.6' :
-                    newVital.type === 'oxygen' ? '98' : ''
+                      newVital.type === 'temperature' ? '98.6' :
+                        newVital.type === 'oxygen' ? '98' : ''
                   }
                   keyboardType="numeric"
-                  placeholderTextColor={Colors.mutedText}
+                  placeholderTextColor={colors.mutedText}
                 />
               </View>
             )}
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Notes (Optional)</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Notes (Optional)</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newVital.notes}
                 onChangeText={(text) => setNewVital(prev => ({ ...prev, notes: text }))}
                 placeholder="Any additional notes..."
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={3}
               />
             </View>
-            
-            <TouchableOpacity style={styles.addVitalButton} onPress={addVitalSign}>
-              <Text style={styles.addVitalButtonText}>Log Vital Sign</Text>
+
+            <TouchableOpacity style={[styles.addVitalButton, { backgroundColor: colors.primary }]} onPress={addVitalSign}>
+              <Text style={[styles.addVitalButtonText, { color: colors.buttonText }]}>Log Vital Sign</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -655,61 +664,61 @@ export default function HealthTrackerScreen() {
         presentationStyle="pageSheet"
       >
         {selectedMetric && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedMetric.name} Details</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedMetric.name} Details</Text>
               <TouchableOpacity onPress={() => setSelectedMetric(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Current Value</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>Current Value</Text>
+                <Text style={[styles.detailValue, { color: colors.primary }]}>
                   {selectedMetric.value} {selectedMetric.unit}
                 </Text>
                 {selectedMetric.target && (
-                  <Text style={styles.detailTarget}>
+                  <Text style={[styles.detailTarget, { color: colors.mutedText }]}>
                     Target: {selectedMetric.target} {selectedMetric.unit}
                   </Text>
                 )}
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>7-Day History</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>7-Day History</Text>
                 <View style={styles.historyChart}>
                   {selectedMetric.history.slice(-7).map((entry, index) => (
                     <View key={index} style={styles.historyBar}>
-                      <View 
+                      <View
                         style={[
                           styles.historyBarFill,
-                          { 
+                          {
                             height: `${(entry.value / Math.max(...selectedMetric.history.map(h => h.value))) * 100}%`,
                             backgroundColor: selectedMetric.color
                           }
                         ]}
                       />
-                      <Text style={styles.historyDate}>
+                      <Text style={[styles.historyDate, { color: colors.mutedText }]}>
                         {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short' })}
                       </Text>
-                      <Text style={styles.historyValue}>{entry.value}</Text>
+                      <Text style={[styles.historyValue, { color: colors.mutedText }]}>{entry.value}</Text>
                     </View>
                   ))}
                 </View>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>Trend Analysis</Text>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>Trend Analysis</Text>
                 <View style={styles.trendContainer}>
-                  <Ionicons 
-                    name={getTrendIcon(selectedMetric.trend)} 
-                    size={24} 
-                    color={getTrendColor(selectedMetric.trend)} 
+                  <Ionicons
+                    name={getTrendIcon(selectedMetric.trend)}
+                    size={24}
+                    color={getTrendColor(selectedMetric.trend)}
                   />
-                  <Text style={styles.trendText}>
+                  <Text style={[styles.trendText, { color: colors.text }]}>
                     {selectedMetric.trend === 'up' ? 'Increasing trend' :
-                     selectedMetric.trend === 'down' ? 'Decreasing trend' : 'Stable trend'}
+                      selectedMetric.trend === 'down' ? 'Decreasing trend' : 'Stable trend'}
                   </Text>
                 </View>
               </View>
@@ -724,7 +733,6 @@ export default function HealthTrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -739,15 +747,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginTop: 2,
   },
   addButton: {
-    backgroundColor: Colors.primary,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -760,7 +765,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 16,
   },
   quickActions: {
@@ -768,17 +772,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
   },
   quickActionButton: {
-    backgroundColor: Colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
     minWidth: 80,
   },
   quickActionText: {
     fontSize: 12,
-    color: Colors.text,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -789,12 +790,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     width: (width - 60) / 2,
-    backgroundColor: Colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   metricHeader: {
     flexDirection: 'row',
@@ -815,12 +814,10 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   metricName: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginBottom: 8,
   },
   progressContainer: {
@@ -828,7 +825,6 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    backgroundColor: Colors.background,
     borderRadius: 2,
     marginBottom: 4,
   },
@@ -838,19 +834,15 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 10,
-    color: Colors.mutedText,
   },
   metricLastUpdated: {
     fontSize: 10,
-    color: Colors.mutedText,
     fontStyle: 'italic',
   },
   goalsContainer: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   goalCard: {
     marginBottom: 16,
@@ -864,19 +856,16 @@ const styles = StyleSheet.create({
   goalName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
   },
   goalPercentage: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: Colors.primary,
   },
   goalProgress: {
     marginBottom: 8,
   },
   goalProgressBar: {
     height: 8,
-    backgroundColor: Colors.background,
     borderRadius: 4,
   },
   goalProgressFill: {
@@ -885,20 +874,16 @@ const styles = StyleSheet.create({
   },
   goalText: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   vitalsContainer: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   vitalCard: {
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   vitalHeader: {
     flexDirection: 'row',
@@ -909,7 +894,6 @@ const styles = StyleSheet.create({
   vitalName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
   },
   vitalStatus: {
     paddingHorizontal: 8,
@@ -925,25 +909,20 @@ const styles = StyleSheet.create({
   vitalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   vitalTimestamp: {
     fontSize: 12,
-    color: Colors.mutedText,
     marginBottom: 4,
   },
   vitalNotes: {
     fontSize: 12,
-    color: Colors.mutedText,
     fontStyle: 'italic',
   },
   insightsContainer: {
-    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   insightCard: {
     flexDirection: 'row',
@@ -954,7 +933,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -965,17 +943,14 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 4,
   },
   insightText: {
     fontSize: 12,
-    color: Colors.mutedText,
     lineHeight: 16,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -983,12 +958,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   modalContent: {
     flex: 1,
@@ -1000,7 +973,6 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 8,
   },
   typeSelector: {
@@ -1013,19 +985,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
   },
   selectedType: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    // handled inline
   },
   typeButtonText: {
     fontSize: 12,
-    color: Colors.text,
   },
   selectedTypeText: {
-    color: Colors.buttonText,
+    color: 'white',
   },
   bpContainer: {
     flexDirection: 'row',
@@ -1038,32 +1006,26 @@ const styles = StyleSheet.create({
   bpSeparator: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
     marginHorizontal: 16,
     marginBottom: 12,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.card,
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
   addVitalButton: {
-    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
   },
   addVitalButtonText: {
-    color: Colors.buttonText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1073,18 +1035,15 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 8,
   },
   detailValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.primary,
     marginBottom: 4,
   },
   detailTarget: {
     fontSize: 14,
-    color: Colors.mutedText,
   },
   historyChart: {
     flexDirection: 'row',
@@ -1106,12 +1065,10 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: 10,
-    color: Colors.mutedText,
     marginBottom: 2,
   },
   historyValue: {
     fontSize: 8,
-    color: Colors.mutedText,
   },
   trendContainer: {
     flexDirection: 'row',
@@ -1119,7 +1076,6 @@ const styles = StyleSheet.create({
   },
   trendText: {
     fontSize: 14,
-    color: Colors.text,
     marginLeft: 8,
   },
 });

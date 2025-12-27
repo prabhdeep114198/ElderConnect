@@ -1,9 +1,8 @@
-// app/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Animated,
+  ActivityIndicator,
   Dimensions,
   Modal,
   ScrollView,
@@ -12,88 +11,189 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming
+} from "react-native-reanimated";
 import LoginModal from "../components/LoginModal";
-import { Colors } from "../constants/colors";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
+// Types for backend response
+interface Feature {
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+}
+
+interface ButtonItem {
+  title: string;
+  actionType: "route" | "login";
+  route?: `/${string}`;
+  primary?: boolean;
+}
+
+// Reusable Animated Card
+const AnimatedFeatureCard = ({ feature, index, colors }: { feature: Feature, index: number, colors: any }) => {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 100).springify()}
+      style={[styles.card, { backgroundColor: colors.card, shadowColor: colors.text }]}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: feature.color + '20' }]}>
+        <Ionicons name={feature.icon as any} size={28} color={feature.color} />
+      </View>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{feature.title}</Text>
+      <Text style={[styles.cardDesc, { color: colors.mutedText }]}>{feature.description}</Text>
+    </Animated.View>
+  );
+};
+
 export default function LandingScreen() {
   const router = useRouter();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { colors, theme } = useTheme();
+  const { user } = useAuth(); // Check auth state to adjust buttons if needed
   const [showLogin, setShowLogin] = useState(false);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [buttons, setButtons] = useState<ButtonItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fade-in animation for title
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 1200,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  // Hero Animation Values
+  const heroOpacity = useSharedValue(0);
+  const heroTranslateY = useSharedValue(50);
+
+  useEffect(() => {
+    // Start Hero Animation
+    heroOpacity.value = withTiming(1, { duration: 1000 });
+    heroTranslateY.value = withSpring(0);
+
+    const fetchLandingData = async () => {
+      try {
+        // Simulate API fetch
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        setFeatures([
+          { title: "Health Tracker", description: "Monitor vitals & steps", icon: "pulse", color: "#FF5252" },
+          { title: "Appointments", description: "Never miss a visit", icon: "calendar", color: "#448AFF" },
+          { title: "Medications", description: "Pill reminders", icon: "medkit", color: "#69F0AE" },
+          { title: "Magnifier", description: "Read small text", icon: "eye", color: "#FFD740" },
+          { title: "Mood Diary", description: "Track wellbeing", icon: "book", color: "#E040FB" },
+          { title: "Reports", description: "Visualize health", icon: "pie-chart", color: "#536DFE" },
+        ]);
+
+        const btns: ButtonItem[] = [
+          {
+            title: "Get Started",
+            actionType: "route",
+            route: user && !user.isOnboarded ? "/onboarding" : "/(tabs)/home",
+            primary: true
+          }
+        ];
+
+        // Add Login button only if not logged in
+        if (!user) {
+          btns.push({
+            title: "Login",
+            actionType: "route",
+            route: "/auth/login",
+            primary: false
+          });
+        }
+
+        setButtons(btns);
+
+      } catch (err) {
+        console.warn("Error loading data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLandingData();
+  }, [user]);
+
+  const heroStyle = useAnimatedStyle(() => {
+    return {
+      opacity: heroOpacity.value,
+      transform: [{ translateY: heroTranslateY.value }]
+    };
+  });
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Animated Welcome Title */}
-      <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
-        Welcome to ElderConnect
-      </Animated.Text>
-      <Text style={styles.subtitle}>
-        Empowering seniors with easy health tracking and care
-      </Text>
+      {/* Hero Section */}
+      <Animated.View style={[styles.heroSection, heroStyle]}>
+        <View style={[styles.heroIconContainer, { backgroundColor: colors.primary + '15' }]}>
+          <Ionicons name="heart-circle" size={80} color={colors.primary} />
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>
+          Welcome to <Text style={{ color: colors.primary }}>ElderConnect</Text>
+        </Text>
+        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+          Empowering your golden years with smart health tracking and effortless care.
+        </Text>
+      </Animated.View>
 
-      {/* Features */}
+      {/* Features Grid */}
       <View style={styles.featuresContainer}>
-        <FeatureCard
-          title="Health Tracker"
-          description="Track your vitals and daily activity"
-          icon="bar-chart"
-        />
-        <FeatureCard
-          title="Appointments"
-          description="Never miss your doctor's visits"
-          icon="calendar"
-        />
-        <FeatureCard
-          title="Medications"
-          description="Manage and get reminders for meds"
-          icon="medkit"
-        />
-        <FeatureCard
-          title="Magnifier"
-          description="Zoom and read small texts easily"
-          icon="eye"
-        />
-        <FeatureCard
-          title="Diary Notes"
-          description="Keep track of daily thoughts & moods"
-          icon="book"
-        />
-        <FeatureCard
-          title="Reports"
-          description="Access all your medical reports in one place"
-          icon="document-text"
-        />
+        {features.map((feature, index) => (
+          <AnimatedFeatureCard
+            key={feature.title}
+            feature={feature}
+            index={index}
+            colors={colors}
+          />
+        ))}
       </View>
 
-      {/* CTA Buttons */}
+      {/* Action Buttons */}
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/(tabs)/home")}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
-
-        {/* Login Option */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowLogin(true)}
-        >
-          <Text style={styles.buttonText}>Login</Text>
-        </TouchableOpacity>
+        {buttons.map((btn, index) => (
+          <Animated.View
+            key={btn.title}
+            entering={FadeInDown.delay(600 + (index * 100)).springify()}
+            style={{ width: '100%', alignItems: 'center' }}
+          >
+            <TouchableOpacity
+              style={[
+                styles.button,
+                btn.primary
+                  ? { backgroundColor: colors.primary, shadowColor: colors.primary }
+                  : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
+              ]}
+              onPress={() => {
+                if (btn.actionType === "login") setShowLogin(true);
+                else if (btn.actionType === "route" && btn.route)
+                  router.push(btn.route as any);
+              }}
+            >
+              <Text style={[
+                styles.buttonText,
+                btn.primary ? { color: "#fff" } : { color: colors.text }
+              ]}>
+                {btn.title}
+              </Text>
+              {btn.primary && <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />}
+            </TouchableOpacity>
+          </Animated.View>
+        ))}
       </View>
 
       {/* Login Modal */}
@@ -104,100 +204,94 @@ export default function LandingScreen() {
   );
 }
 
-// Feature Card Component
-const FeatureCard = ({
-  title,
-  description,
-  icon,
-}: {
-  title: string;
-  description: string;
-  icon: string;
-}) => (
-  <View style={styles.card}>
-    <Ionicons
-      name={icon as any}
-      size={36}
-      color={Colors.primary}
-      style={{ marginBottom: 8 }}
-    />
-    <Text style={styles.cardTitle}>{title}</Text>
-    <Text style={styles.cardDesc}>{description}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 40,
+    paddingVertical: 60,
     paddingHorizontal: 20,
-    backgroundColor: Colors.background,
+    alignItems: "center",
+    minHeight: '100%'
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+    width: '100%'
+  },
+  heroIconContainer: {
+    padding: 10,
+    borderRadius: 50,
+    marginBottom: 16
+  },
   title: {
-    marginTop: "5%",
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    color: Colors.primary,
     textAlign: "center",
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.mutedText,
     textAlign: "center",
-    marginBottom: 20,
+    lineHeight: 24,
+    paddingHorizontal: 20
   },
   featuresContainer: {
     width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    marginBottom: 30
   },
   card: {
     width: "48%",
-    backgroundColor: Colors.card,
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 20,
     marginBottom: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  iconCircle: {
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 12
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: Colors.primary,
-    marginBottom: 4,
+    fontWeight: "bold",
+    marginBottom: 6,
     textAlign: "center",
   },
   cardDesc: {
     fontSize: 12,
-    color: Colors.mutedText,
     textAlign: "center",
+    lineHeight: 16
   },
   buttonsContainer: {
     width: "100%",
-    marginTop: 20,
+    marginTop: 10,
     alignItems: "center",
+    gap: 16
   },
   button: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 12,
-    marginBottom: 12,
-    alignSelf: "center",
-  },
-  loginButton: {
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: "90%",
+    paddingVertical: 18,
+    borderRadius: 16,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4
   },
   buttonText: {
-    color: Colors.buttonText,
-    fontWeight: "700",
-    fontSize: 16,
-    textAlign: "center",
+    fontWeight: "bold",
+    fontSize: 18,
   },
 });

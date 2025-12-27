@@ -1,11 +1,9 @@
 // appwriteConfig.ts
 import { Account, Client } from "appwrite";
 
-const client = new Client();
-
-client
-  .setEndpoint("https://cloud.appwrite.io/v1") // your Appwrite endpoint
-  .setProject("68c71029003afb856d1e"); // replace with your project ID
+const client = new Client()
+  .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!) // your Appwrite endpoint
+  .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!); // replace with your project ID
 
 export const account = new Account(client);
 export { client };

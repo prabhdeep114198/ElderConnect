@@ -1,536 +1,418 @@
-// app/(tabs)/reports.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import {
-  Alert,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { Colors } from "../../constants/colors";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Print from 'expo-print';
+import { useFocusEffect, useRouter } from "expo-router";
+import * as Sharing from 'expo-sharing';
+import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFlags } from "react-native-flagsmith/react";
+import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-interface HealthReport {
-  id: string;
-  title: string;
-  date: string;
-  type: "weekly" | "monthly" | "quarterly" | "annual";
-  summary: string;
-  keyMetrics: {
-    name: string;
-    value: string;
-    trend: "up" | "down" | "stable";
-  }[];
-  recommendations: string[];
-  downloadLink: string;
-}
+// Metrics for the Radar Chart
+const METRICS = [
+  { label: "Physical", key: "physical", max: 100 },
+  { label: "Social", key: "social", max: 100 },
+  { label: "Mental", key: "mental", max: 100 },
+  { label: "Sleep", key: "sleep", max: 100 },
+  { label: "Diet", key: "diet", max: 100 },
+];
 
 export default function ReportsScreen() {
-  const [selectedReport, setSelectedReport] = useState<HealthReport | null>(null);
+  const router = useRouter();
+  const { colors, theme } = useTheme();
+  const { t } = useTranslation();
+  const { requireAuth } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
+  const [scores, setScores] = useState({
+    physical: 65,
+    social: 40,
+    mental: 70,
+    sleep: 80,
+    diet: 55
+  });
 
-  const [healthReports, setHealthReports] = useState<HealthReport[]>([
-    {
-      id: "1",
-      title: "Weekly Health Summary - Dec 1st-7th",
-      date: "2024-12-08",
-      type: "weekly",
-      summary:
-        "Overall health metrics remained stable this week. Noted a slight increase in daily steps and consistent medication adherence.",
-      keyMetrics: [
-        { name: "Steps", value: "35,000", trend: "up" },
-        { name: "Sleep", value: "7.2 hrs", trend: "stable" },
-        { name: "Medication Adherence", value: "95%", trend: "up" },
-      ],
-      recommendations: [
-        "Continue daily walks and aim for 8,000 steps.",
-        "Ensure consistent sleep schedule, targeting 7-8 hours.",
-      ],
-      downloadLink: "https://example.com/report-dec1-7.pdf",
-    },
-    {
-      id: "2",
-      title: "Monthly Health Overview - November",
-      date: "2024-12-01",
-      type: "monthly",
-      summary:
-        "November showed good progress in managing blood pressure. Exercise consistency improved significantly.",
-      keyMetrics: [
-        { name: "Blood Pressure", value: "125/80 mmHg", trend: "down" },
-        { name: "Exercise Minutes", value: "200 min", trend: "up" },
-        { name: "Water Intake", value: "7 glasses/day", trend: "stable" },
-      ],
-      recommendations: [
-        "Maintain current exercise routine.",
-        "Monitor blood pressure regularly and report any significant changes.",
-      ],
-      downloadLink: "https://example.com/report-nov.pdf",
-    },
-    {
-      id: "3",
-      title: "Quarterly Health Review - Q3 2024",
-      date: "2024-10-05",
-      type: "quarterly",
-      summary:
-        "Q3 saw a focus on dietary improvements and weight management. Achieved target weight loss of 2kg.",
-      keyMetrics: [
-        { name: "Weight", value: "68 kg", trend: "down" },
-        { name: "BMI", value: "24.5", trend: "down" },
-        { name: "Cholesterol", value: "Normal", trend: "stable" },
-      ],
-      recommendations: [
-        "Continue healthy eating habits.",
-        "Schedule follow-up with nutritionist next quarter.",
-      ],
-      downloadLink: "https://example.com/report-q3.pdf",
-    },
-  ]);
+  const flags = useFlags(["download_reports"]);
+  const canDownload = flags.download_reports.enabled;
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return "trending-up";
-      case "down":
-        return "trending-down";
-      default:
-        return "remove";
+  useFocusEffect(
+    useCallback(() => {
+      loadUserProfile();
+    }, [])
+  );
+
+  const loadUserProfile = async () => {
+    try {
+      const profile = await AsyncStorage.getItem("user_profile_data");
+      const tickets = await AsyncStorage.getItem("user_tickets");
+      const diary = await AsyncStorage.getItem("user_diary_entries");
+
+      let calculatedScores = {
+        physical: 65,
+        social: 40,
+        mental: 70,
+        sleep: 80,
+        diet: 55
+      };
+
+      if (profile) {
+        const data = JSON.parse(profile);
+        setUserData(data);
+
+        // 1. Process Profile (Base Scores)
+        if (data.interests) {
+          calculatedScores.social = Math.min(85, 30 + (data.interests.length * 5));
+        }
+
+        if (data.mobilityLevel) {
+          if (data.mobilityLevel === "Independent") calculatedScores.physical = 85;
+          else if (data.mobilityLevel === "Uses Cane") calculatedScores.physical = 70;
+          else if (data.mobilityLevel === "Uses Walker") calculatedScores.physical = 55;
+          else calculatedScores.physical = 40;
+        }
+
+        if (data.activityLevel) {
+          const activityBoost = { Sedentary: 0, "Light Activity": 5, "Moderate Activity": 15, "Very Active": 25 };
+          calculatedScores.physical = Math.min(100, calculatedScores.physical + (activityBoost[data.activityLevel as keyof typeof activityBoost] || 0));
+        }
+
+        if (data.dietaryPreferences && data.dietaryPreferences.length > 0) {
+          calculatedScores.diet = Math.min(95, 60 + (data.dietaryPreferences.length * 5));
+        }
+      }
+
+      // 2. Process Tickets (Boost Social)
+      if (tickets) {
+        const ticketList = JSON.parse(tickets);
+        const ticketBoost = Math.min(20, ticketList.length * 5);
+        calculatedScores.social = Math.min(100, calculatedScores.social + ticketBoost);
+      }
+
+      // 3. Process Diary (Mental Score)
+      if (diary) {
+        const entries = JSON.parse(diary);
+        if (entries.length > 0) {
+          let totalMoodScore = 0;
+          entries.forEach((e: any) => {
+            if (e.mood === 'happy') totalMoodScore += 90;
+            else if (e.mood === 'neutral') totalMoodScore += 70;
+            else if (e.mood === 'sad') totalMoodScore += 40;
+            else if (e.mood === 'anxious') totalMoodScore += 50;
+            else if (e.mood === 'angry') totalMoodScore += 30;
+            else totalMoodScore += 60;
+          });
+          calculatedScores.mental = Math.round(totalMoodScore / entries.length);
+        }
+      }
+
+      setScores(calculatedScores);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return Colors.success;
-      case "down":
-        return Colors.error;
-      default:
-        return Colors.mutedText;
-    }
+  const generatePDF = async () => {
+    requireAuth(async () => {
+      if (!canDownload) {
+        Alert.alert(
+          t("premiumFeature"),
+          t("upgradeToDownload"),
+          [
+            { text: t("cancel"), style: "cancel" },
+            { text: t("upgradeNow"), onPress: () => router.push("/SettingsScreen") }
+          ]
+        );
+        return;
+      }
+
+      if (!userData) {
+        Alert.alert("Error", "No profile data found to generate report.");
+        return;
+      }
+
+      const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #5a67d8; padding-bottom: 20px; margin-bottom: 30px; }
+            .section { margin-bottom: 25px; }
+            .section-title { color: #5a67d8; font-size: 20px; font-weight: bold; margin-bottom: 15px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .card { background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .label { font-size: 12px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
+            .value { font-size: 16px; font-weight: 500; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            th { background: #edf2f7; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>ElderConnect Health Report</h1>
+            <p>Participant: ${userData.name}</p>
+            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Personal Profile</div>
+            <div class="grid">
+              <div class="card"><div class="label">Age</div><div class="value">${userData.age || 'N/A'}</div></div>
+              <div class="card"><div class="label">Living Arrangement</div><div class="value">${userData.livingArrangement || 'N/A'}</div></div>
+              <div class="card"><div class="label">Activity Level</div><div class="value">${userData.activityLevel || 'N/A'}</div></div>
+              <div class="card"><div class="label">Mobility</div><div class="value">${userData.mobilityLevel || 'N/A'}</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Wellness Indices</div>
+            <table>
+              <thead>
+                <tr><th>Metric</th><th>Score</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Physical</td><td>${scores.physical}%</td><td>${scores.physical > 70 ? 'Excellent' : scores.physical > 50 ? 'Good' : 'Needs Improvement'}</td></tr>
+                <tr><td>Social</td><td>${scores.social}%</td><td>${scores.social > 70 ? 'Connected' : scores.social > 50 ? 'Steady' : 'Isolated'}</td></tr>
+                <tr><td>Mental</td><td>${scores.mental}%</td><td>${scores.mental > 70 ? 'Strong' : scores.mental > 50 ? 'Balanced' : 'Vulnerable'}</td></tr>
+                <tr><td>Dietary</td><td>${scores.diet}%</td><td>${scores.diet > 70 ? 'Healthy' : scores.diet > 50 ? 'Standard' : 'Unbalanced'}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Health Conditions & Medications</div>
+            <div class="card">
+                <strong>Conditions:</strong> ${userData.conditions?.join(", ") || 'None stated'}<br/>
+                <strong style="margin-top: 10px; display: block;">Medication Frequency:</strong> ${userData.medicationFrequency || 'N/A'}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Interests & Hobbies</div>
+            <p>${userData.interests?.join(" • ") || 'None listed'}</p>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Emergency Contacts</div>
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Phone</th><th>Relation</th></tr>
+                </thead>
+                <tbody>
+                    ${userData.emergencyContacts?.map((c: any) => `
+                        <tr><td>${c.name}</td><td>${c.phone}</td><td>${c.relation}</td></tr>
+                    `).join('') || '<tr><td colspan="3">No contacts listed</td></tr>'}
+                </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top: 50px; font-size: 10px; color: #a0aec0; text-align: center;">
+            This report is generated by ElderConnect and is intended for informational purposes only.
+          </div>
+        </body>
+      </html>
+    `;
+
+      try {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "Failed to generate or share report.");
+      }
+    });
   };
 
-  const getReportTypeColor = (type: string) => {
-    switch (type) {
-      case "weekly":
-        return Colors.primary;
-      case "monthly":
-        return Colors.info;
-      case "quarterly":
-        return Colors.warning;
-      case "annual":
-        return Colors.error;
-      default:
-        return Colors.mutedText;
-    }
+  // --- RADAR CHART LOGIC ---
+  const radarSize = width - 60;
+  const radarCenter = radarSize / 2;
+  const radarRadius = (radarSize - 80) / 2;
+  const angleSlice = (Math.PI * 2) / METRICS.length;
+
+  const getRadarCoordinates = (value: number, index: number) => {
+    const angle = index * angleSlice - Math.PI / 2;
+    const r = (value / 100) * radarRadius;
+    return { x: radarCenter + r * Math.cos(angle), y: radarCenter + r * Math.sin(angle) };
   };
 
-  const downloadReport = (link: string) => {
-    Alert.alert("Download Report", `Attempting to download report from: ${link}`);
-    // In a real app, you would use a library like expo-linking or react-native-fs
-    // to handle file downloads.
+  const buildRadarPolygon = (dataScores: any) => {
+    return METRICS.map((m, i) => {
+      const { x, y } = getRadarCoordinates(dataScores[m.key], i);
+      return `${x},${y}`;
+    }).join(" ");
+  };
+
+  // --- KNOWLEDGE GRAPH LOGIC ---
+  const kgSize = width - 40;
+  const kgCenter = kgSize / 2;
+
+  const renderKnowledgeGraph = () => {
+    if (!userData) return null;
+
+    const nodes: any[] = [{ id: 'User', label: userData.name?.split(" ")[0], type: 'main', color: colors.primary }];
+
+    // Add Interest nodes
+    if (userData.interests) {
+      userData.interests.slice(0, 3).forEach((int: string) => {
+        nodes.push({ id: `int_${int}`, label: int, type: 'interest', color: '#448AFF' });
+      });
+    }
+    // Add Condition nodes
+    if (userData.conditions) {
+      userData.conditions.slice(0, 2).forEach((cond: string) => {
+        if (cond !== "None") {
+          nodes.push({ id: `cond_${cond}`, label: cond, type: 'condition', color: '#FF5252' });
+        }
+      });
+    }
+    // Add Contact nodes
+    if (userData.emergencyContacts) {
+      userData.emergencyContacts.forEach((c: any, i: number) => {
+        if (c.name) {
+          nodes.push({ id: `cont_${i}`, label: c.name.split(" ")[0], type: 'contact', color: '#69F0AE' });
+        }
+      });
+    }
+
+    const nodeDist = kgSize / 2.8;
+    return (
+      <View style={[styles.kgCard, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph")}</Text>
+        <Svg height={kgSize} width={kgSize}>
+          {nodes.map((node, i) => {
+            if (i === 0) return null;
+            const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
+            const nx = kgCenter + nodeDist * Math.cos(angle);
+            const ny = kgCenter + nodeDist * Math.sin(angle);
+            return (
+              <G key={`edge_${node.id}`}>
+                <Line x1={kgCenter} y1={kgCenter} x2={nx} y2={ny} stroke={colors.border} strokeWidth="2" strokeDasharray="5,5" />
+              </G>
+            );
+          })}
+
+          {nodes.map((node, i) => {
+            let nx = kgCenter;
+            let ny = kgCenter;
+            if (i > 0) {
+              const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
+              nx = kgCenter + nodeDist * Math.cos(angle);
+              ny = kgCenter + nodeDist * Math.sin(angle);
+            }
+
+            const r = i === 0 ? 35 : 25;
+            return (
+              <G key={node.id}>
+                <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={i === 0 ? 1 : 0.8} />
+                <SvgText x={nx} y={ny} fill="#fff" fontSize={i === 0 ? 12 : 10} fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">
+                  {node.label}
+                </SvgText>
+              </G>
+            );
+          })}
+        </Svg>
+        <View style={styles.kgLegend}>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#448AFF' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("interests") || "Interests"}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF5252' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("health") || "Health"}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#69F0AE' }]} /><Text style={[styles.legendText, { color: colors.mutedText }]}>{t("contacts") || "Contacts"}</Text></View>
+        </View>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Health Reports</Text>
-            <Text style={styles.headerSubtitle}>View and manage your health summaries</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => Alert.alert("Generate Report", "Feature coming soon!")}
-          >
-            <Ionicons name="document-text-outline" size={24} color={Colors.buttonText} />
-          </TouchableOpacity>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
+        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
+          {userData ? `${t("analysisFor")} ${userData.name}` : t("yourHealthOverview")}
+        </Text>
+      </View>
+
+      <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
+        <Ionicons name="download-outline" size={24} color="#fff" />
+        <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+      </TouchableOpacity>
+
+      {/* KNOWLEDGE GRAPH */}
+      {renderKnowledgeGraph()}
+
+      {/* RADAR CHART CARD */}
+      <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
+        <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize }}>
+          <Svg height={radarSize} width={radarSize}>
+            <Polygon points={buildRadarPolygon({ physical: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
+            <Polygon points={buildRadarPolygon({ physical: 50, social: 50, mental: 50, sleep: 50, diet: 50 })} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" fill="none" />
+
+            {METRICS.map((m, i) => {
+              const { x, y } = getRadarCoordinates(100, i);
+              return <Line key={i} x1={radarCenter} y1={radarCenter} x2={x} y2={y} stroke={colors.border} strokeWidth="1" />;
+            })}
+
+            <Polygon points={buildRadarPolygon(scores)} fill={colors.primary} fillOpacity="0.3" stroke={colors.primary} strokeWidth="2" />
+
+            {METRICS.map((m, i) => {
+              const { x, y } = getRadarCoordinates(scores[m.key as keyof typeof scores], i);
+              return <Circle key={i} cx={x} cy={y} r="4" fill={colors.primary} />;
+            })}
+
+            {METRICS.map((m, i) => {
+              const { x, y } = getRadarCoordinates(120, i);
+              return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
+            })}
+          </Svg>
         </View>
+      </View>
 
-        {/* Report Overview */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <View style={styles.overviewGrid}>
-            <View style={styles.overviewCard}>
-              <Ionicons name="calendar" size={28} color={Colors.primary} />
-              <Text style={styles.overviewValue}>{healthReports.length}</Text>
-              <Text style={styles.overviewLabel}>Total Reports</Text>
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
+        {scores.physical < 60 && (
+          <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
+            <Ionicons name="walk-outline" size={24} color={colors.warning} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
+              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
             </View>
-            <View style={styles.overviewCard}>
-              <Ionicons name="trending-up" size={28} color={Colors.success} />
-              <Text style={styles.overviewValue}>Good</Text>
-              <Text style={styles.overviewLabel}>Overall Trend</Text>
-            </View>
-            <View style={styles.overviewCard}>
-              <Ionicons name="alert-circle" size={28} color={Colors.warning} />
-              <Text style={styles.overviewValue}>2</Text>
-              <Text style={styles.overviewLabel}>Pending Actions</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* All Reports */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Reports</Text>
-          {healthReports.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="document-outline" size={48} color={Colors.mutedText} />
-              <Text style={styles.emptyStateText}>No health reports available yet.</Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => Alert.alert("Generate Report", "Feature coming soon!")}
-              >
-                <Text style={styles.emptyStateButtonText}>Generate New Report</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            healthReports.map((report) => (
-              <TouchableOpacity
-                key={report.id}
-                style={styles.reportCard}
-                onPress={() => setSelectedReport(report)}
-              >
-                <View style={styles.reportHeader}>
-                  <View style={styles.reportTypeBadge}>
-                    <Text style={[styles.reportTypeText, { color: getReportTypeColor(report.type) }]}>
-                      {report.type}
-                    </Text>
-                  </View>
-                  <Text style={styles.reportDate}>{report.date}</Text>
-                </View>
-                <Text style={styles.reportTitle}>{report.title}</Text>
-                <Text style={styles.reportSummary} numberOfLines={2}>
-                  {report.summary}
-                </Text>
-                <View style={styles.reportMetrics}>
-                  {report.keyMetrics.map((metric, index) => (
-                    <View key={index} style={styles.metricItem}>
-                      <Ionicons
-                        name={getTrendIcon(metric.trend) as any}
-                        size={14}
-                        color={getTrendColor(metric.trend)}
-                      />
-                      <Text style={styles.metricText}>
-                        {metric.name}: {metric.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Report Details Modal */}
-      <Modal visible={!!selectedReport} animationType="slide" presentationStyle="pageSheet">
-        {selectedReport && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Report Details</Text>
-              <TouchableOpacity onPress={() => setSelectedReport(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>{selectedReport.title}</Text>
-                <Text style={styles.detailDate}>{selectedReport.date}</Text>
-                <View style={[styles.reportTypeBadgeLarge, { backgroundColor: getReportTypeColor(selectedReport.type) + "20" }]}>
-                  <Text style={[styles.reportTypeTextLarge, { color: getReportTypeColor(selectedReport.type) }]}>
-                    {selectedReport.type}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Summary</Text>
-                <Text style={styles.detailText}>{selectedReport.summary}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Key Metrics</Text>
-                {selectedReport.keyMetrics.map((metric, index) => (
-                  <View key={index} style={styles.detailMetricItem}>
-                    <Ionicons
-                      name={getTrendIcon(metric.trend) as any}
-                      size={16}
-                      color={getTrendColor(metric.trend)}
-                    />
-                    <Text style={styles.detailMetricText}>
-                      {metric.name}: {metric.value}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Recommendations</Text>
-                {selectedReport.recommendations.map((rec, index) => (
-                  <View key={index} style={styles.recommendationItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                    <Text style={styles.recommendationText}>{rec}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={styles.downloadButton}
-                onPress={() => downloadReport(selectedReport.downloadLink)}
-              >
-                <Ionicons name="download" size={20} color={Colors.buttonText} />
-                <Text style={styles.downloadButtonText}>Download Full Report</Text>
-              </TouchableOpacity>
-            </ScrollView>
           </View>
         )}
-      </Modal>
-    </View>
+        {scores.social < 60 && (
+          <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+            <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
+            <View style={styles.insightContent}>
+              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
+              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.text,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    marginTop: 2,
-  },
-  addButton: {
-    backgroundColor: Colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 16,
-  },
-  overviewGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  overviewCard: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  overviewValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginTop: 8,
-  },
-  overviewLabel: {
-    fontSize: 12,
-    color: Colors.mutedText,
-    textAlign: "center",
-  },
-  emptyState: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 32,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: Colors.mutedText,
-    marginVertical: 16,
-  },
-  emptyStateButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: Colors.buttonText,
-    fontWeight: "600",
-  },
-  reportCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  reportHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  reportTypeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    backgroundColor: Colors.background,
-  },
-  reportTypeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  reportDate: {
-    fontSize: 12,
-    color: Colors.mutedText,
-  },
-  reportTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  reportSummary: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  reportMetrics: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  metricItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metricText: {
-    fontSize: 12,
-    color: Colors.text,
-    marginLeft: 4,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.text,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  detailSection: {
-    marginBottom: 20,
-  },
-  detailTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  detailDate: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    marginBottom: 8,
-  },
-  reportTypeBadgeLarge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: "flex-start",
-  },
-  reportTypeTextLarge: {
-    fontSize: 14,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
-  },
-  detailMetricItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  detailMetricText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginLeft: 8,
-  },
-  recommendationItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-  recommendationText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginLeft: 8,
-    flex: 1,
-  },
-  downloadButton: {
-    backgroundColor: Colors.primary,
-    padding: 16,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-  },
-  downloadButtonText: {
-    color: Colors.buttonText,
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 10,
-  },
+  container: { flex: 1, paddingHorizontal: 20 },
+  header: { marginBottom: 20, marginTop: 20 },
+  title: { fontSize: 32, fontWeight: "bold" },
+  subtitle: { fontSize: 16 },
+  pdfButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, marginBottom: 24, elevation: 2 },
+  pdfButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+  kgCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  kgLegend: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center' },
+  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
+  legendText: { fontSize: 12 },
+  graphCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, elevation: 2 },
+  cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, alignSelf: 'flex-start' },
+  section: { marginBottom: 20 },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
+  insightCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4 },
+  insightContent: { marginLeft: 16, flex: 1 },
+  insightTitle: { fontSize: 16, fontWeight: 'bold' },
+  insightText: { fontSize: 14, lineHeight: 20 }
 });
-
-

@@ -1,10 +1,13 @@
 // app/(tabs)/appointments.tsx
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +15,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Colors } from "../../constants/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get('window');
 
@@ -42,7 +45,11 @@ interface Doctor {
 }
 
 export default function AppointmentsScreen() {
+  const { colors, theme } = useTheme();
+  const { t, i18n } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
@@ -170,7 +177,7 @@ export default function AppointmentsScreen() {
 
   const addAppointment = () => {
     if (!newAppointment.title || !newAppointment.doctor || !newAppointment.date || !newAppointment.time) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+      Alert.alert(t("error"), t("fillAllFields"));
       return;
     }
 
@@ -201,23 +208,23 @@ export default function AppointmentsScreen() {
       notes: ''
     });
     setShowAddModal(false);
-    Alert.alert('Success', 'Appointment scheduled successfully!');
+    Alert.alert(t("success"), t("apptScheduledSuccess"));
   };
 
   const cancelAppointment = (appointmentId: string) => {
     Alert.alert(
-      'Cancel Appointment',
-      'Are you sure you want to cancel this appointment?',
+      t("cancel"),
+      t("cancelApptConfirm"),
       [
-        { text: 'No', style: 'cancel' },
-        { 
-          text: 'Yes, Cancel', 
+        { text: t("no"), style: 'cancel' },
+        {
+          text: t("yesCancel"),
           style: 'destructive',
           onPress: () => {
-            setAppointments(prev => prev.map(apt => 
+            setAppointments(prev => prev.map(apt =>
               apt.id === appointmentId ? { ...apt, status: 'cancelled' as const } : apt
             ));
-            Alert.alert('Cancelled', 'Appointment has been cancelled.');
+            Alert.alert(t("cancelled"), t("apptCancelledMsg"));
           }
         }
       ]
@@ -226,17 +233,17 @@ export default function AppointmentsScreen() {
 
   const rescheduleAppointment = (appointmentId: string) => {
     Alert.alert(
-      'Reschedule Appointment',
-      'Would you like to reschedule this appointment?',
+      t("reschedule"),
+      t("rescheduleApptConfirm"),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Reschedule', 
+        { text: t("cancel"), style: 'cancel' },
+        {
+          text: t("reschedule"),
           onPress: () => {
-            setAppointments(prev => prev.map(apt => 
+            setAppointments(prev => prev.map(apt =>
               apt.id === appointmentId ? { ...apt, status: 'rescheduled' as const } : apt
             ));
-            Alert.alert('Rescheduled', 'Please contact the office to set a new time.');
+            Alert.alert(t("rescheduled"), t("rescheduleContactMsg"));
           }
         }
       ]
@@ -247,11 +254,11 @@ export default function AppointmentsScreen() {
     const doctorInfo = doctors.find(d => d.name === doctor);
     if (doctorInfo) {
       Alert.alert(
-        'Call Doctor',
-        `Call ${doctorInfo.name}?`,
+        t("callDoctor"),
+        `${t("call")} ${doctorInfo.name}?`,
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Call', onPress: () => Alert.alert('Calling...', `Calling ${doctorInfo.phone}`) }
+          { text: t("cancel"), style: 'cancel' },
+          { text: t("call"), onPress: () => Alert.alert(t("calling"), `${t("calling")} ${doctorInfo.phone}`) }
         ]
       );
     }
@@ -259,11 +266,11 @@ export default function AppointmentsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return Colors.primary;
-      case 'completed': return Colors.success;
-      case 'cancelled': return Colors.error;
-      case 'rescheduled': return Colors.warning;
-      default: return Colors.mutedText;
+      case 'scheduled': return colors.primary;
+      case 'completed': return colors.success;
+      case 'cancelled': return colors.error;
+      case 'rescheduled': return colors.warning;
+      default: return colors.mutedText;
     }
   };
 
@@ -279,10 +286,10 @@ export default function AppointmentsScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString(i18n.language, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -298,36 +305,36 @@ export default function AppointmentsScreen() {
   };
 
   const getDateLabel = (dateString: string) => {
-    if (isToday(dateString)) return 'Today';
-    if (isTomorrow(dateString)) return 'Tomorrow';
+    if (isToday(dateString)) return t("today");
+    if (isTomorrow(dateString)) return t("tomorrow");
     return formatDate(dateString);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Appointments</Text>
-            <Text style={styles.headerSubtitle}>Manage your medical appointments</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("appointments")}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageMedicalAppts")}</Text>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.viewToggle}
+            <TouchableOpacity
+              style={[styles.viewToggle, { borderColor: colors.primary }]}
               onPress={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
             >
-              <Ionicons 
-                name={viewMode === 'list' ? 'calendar' : 'list'} 
-                size={20} 
-                color={Colors.primary} 
+              <Ionicons
+                name={viewMode === 'list' ? 'calendar' : 'list'}
+                size={20}
+                color={colors.primary}
               />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.addButton}
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={() => setShowAddModal(true)}
             >
-              <Ionicons name="add" size={24} color={Colors.buttonText} />
+              <Ionicons name="add" size={24} color={colors.buttonText} />
             </TouchableOpacity>
           </View>
         </View>
@@ -335,28 +342,28 @@ export default function AppointmentsScreen() {
         {/* Today's Appointments */}
         {todayAppointments.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today's Appointments</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todayAppts")}</Text>
             <View style={styles.todayContainer}>
               {todayAppointments.map((appointment) => (
                 <TouchableOpacity
                   key={appointment.id}
-                  style={styles.todayCard}
+                  style={[styles.todayCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
                   onPress={() => setSelectedAppointment(appointment)}
                 >
-                  <View style={styles.todayTime}>
+                  <View style={[styles.todayTime, { backgroundColor: colors.primary }]}>
                     <Text style={styles.todayTimeText}>{appointment.time}</Text>
                   </View>
                   <View style={styles.todayInfo}>
-                    <Text style={styles.todayTitle}>{appointment.title}</Text>
-                    <Text style={styles.todayDoctor}>{appointment.doctor}</Text>
-                    <Text style={styles.todayLocation}>{appointment.location}</Text>
+                    <Text style={[styles.todayTitle, { color: colors.text }]}>{appointment.title}</Text>
+                    <Text style={[styles.todayDoctor, { color: colors.primary }]}>{appointment.doctor}</Text>
+                    <Text style={[styles.todayLocation, { color: colors.mutedText }]}>{appointment.location}</Text>
                   </View>
                   <View style={styles.todayActions}>
-                    <TouchableOpacity 
-                      style={styles.todayActionButton}
+                    <TouchableOpacity
+                      style={[styles.todayActionButton, { backgroundColor: colors.primary + '10' }]}
                       onPress={() => callDoctor(appointment.doctor)}
                     >
-                      <Ionicons name="call" size={16} color={Colors.primary} />
+                      <Ionicons name="call" size={16} color={colors.primary} />
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -367,43 +374,43 @@ export default function AppointmentsScreen() {
 
         {/* Quick Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("overview")}</Text>
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Ionicons name="calendar" size={24} color={Colors.primary} />
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statIcon, { backgroundColor: colors.primary + '10' }]}>
+                <Ionicons name="calendar" size={24} color={colors.primary} />
               </View>
-              <Text style={styles.statValue}>{upcomingAppointments.length}</Text>
-              <Text style={styles.statLabel}>Upcoming</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{upcomingAppointments.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("upcoming")}</Text>
             </View>
-            
-            <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statIcon, { backgroundColor: colors.success + '10' }]}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
               </View>
-              <Text style={styles.statValue}>{pastAppointments.length}</Text>
-              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{pastAppointments.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("completed")}</Text>
             </View>
-            
-            <View style={styles.statCard}>
-              <View style={styles.statIcon}>
-                <Ionicons name="people" size={24} color={Colors.info} />
+
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statIcon, { backgroundColor: colors.info + '10' }]}>
+                <Ionicons name="people" size={24} color={colors.info} />
               </View>
-              <Text style={styles.statValue}>{doctors.length}</Text>
-              <Text style={styles.statLabel}>Doctors</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>{doctors.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>{t("doctorsTitle")}</Text>
             </View>
           </View>
         </View>
 
         {/* Upcoming Appointments */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("upcomingAppts")}</Text>
           {upcomingAppointments.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color={Colors.mutedText} />
-              <Text style={styles.emptyStateText}>No upcoming appointments</Text>
-              <TouchableOpacity 
-                style={styles.emptyStateButton}
+              <Ionicons name="calendar-outline" size={48} color={colors.mutedText} />
+              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>No upcoming appointments</Text>
+              <TouchableOpacity
+                style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
                 onPress={() => setShowAddModal(true)}
               >
                 <Text style={styles.emptyStateButtonText}>Schedule Appointment</Text>
@@ -413,56 +420,56 @@ export default function AppointmentsScreen() {
             upcomingAppointments.map((appointment) => (
               <TouchableOpacity
                 key={appointment.id}
-                style={styles.appointmentCard}
+                style={[styles.appointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setSelectedAppointment(appointment)}
               >
                 <View style={styles.appointmentHeader}>
                   <View style={styles.appointmentDate}>
-                    <Text style={styles.appointmentDateText}>
+                    <Text style={[styles.appointmentDateText, { color: colors.text }]}>
                       {getDateLabel(appointment.date)}
                     </Text>
-                    <Text style={styles.appointmentTimeText}>{appointment.time}</Text>
+                    <Text style={[styles.appointmentTimeText, { color: colors.primary }]}>{appointment.time}</Text>
                   </View>
                   <View style={[styles.appointmentType, { backgroundColor: getStatusColor(appointment.status) + '20' }]}>
-                    <Ionicons 
-                      name={getTypeIcon(appointment.type)} 
-                      size={16} 
-                      color={getStatusColor(appointment.status)} 
+                    <Ionicons
+                      name={getTypeIcon(appointment.type)}
+                      size={16}
+                      color={getStatusColor(appointment.status)}
                     />
                   </View>
                 </View>
-                
-                <Text style={styles.appointmentTitle}>{appointment.title}</Text>
-                <Text style={styles.appointmentDoctor}>{appointment.doctor} • {appointment.specialty}</Text>
-                <Text style={styles.appointmentLocation}>{appointment.location}</Text>
-                
+
+                <Text style={[styles.appointmentTitle, { color: colors.text }]}>{appointment.title}</Text>
+                <Text style={[styles.appointmentDoctor, { color: colors.mutedText }]}>{appointment.doctor} • {appointment.specialty}</Text>
+                <Text style={[styles.appointmentLocation, { color: colors.mutedText }]}>{appointment.location}</Text>
+
                 {appointment.notes && (
-                  <Text style={styles.appointmentNotes}>{appointment.notes}</Text>
+                  <Text style={[styles.appointmentNotes, { color: colors.mutedText, backgroundColor: colors.background }]}>{appointment.notes}</Text>
                 )}
-                
-                <View style={styles.appointmentActions}>
-                  <TouchableOpacity 
+
+                <View style={[styles.appointmentActions, { borderTopColor: colors.border }]}>
+                  <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => callDoctor(appointment.doctor)}
                   >
-                    <Ionicons name="call" size={16} color={Colors.primary} />
-                    <Text style={styles.actionButtonText}>Call</Text>
+                    <Ionicons name="call" size={16} color={colors.primary} />
+                    <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("call")}</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => rescheduleAppointment(appointment.id)}
                   >
-                    <Ionicons name="time" size={16} color={Colors.warning} />
-                    <Text style={styles.actionButtonText}>Reschedule</Text>
+                    <Ionicons name="time" size={16} color={colors.warning} />
+                    <Text style={[styles.actionButtonText, { color: colors.warning }]}>{t("reschedule")}</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
+
+                  <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => cancelAppointment(appointment.id)}
                   >
-                    <Ionicons name="close" size={16} color={Colors.error} />
-                    <Text style={styles.actionButtonText}>Cancel</Text>
+                    <Ionicons name="close" size={16} color={colors.error} />
+                    <Text style={[styles.actionButtonText, { color: colors.error }]}>{t("cancel")}</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -472,22 +479,22 @@ export default function AppointmentsScreen() {
 
         {/* My Doctors */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Doctors</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("doctorsTitle")}</Text>
           <View style={styles.doctorsGrid}>
             {doctors.map((doctor) => (
               <TouchableOpacity
                 key={doctor.id}
-                style={styles.doctorCard}
+                style={[styles.doctorCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setSelectedDoctor(doctor)}
               >
-                <View style={styles.doctorAvatar}>
-                  <Ionicons name="person" size={24} color={Colors.primary} />
+                <View style={[styles.doctorAvatar, { backgroundColor: colors.primary + '10' }]}>
+                  <Ionicons name="person" size={24} color={colors.primary} />
                 </View>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
-                <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+                <Text style={[styles.doctorName, { color: colors.text }]}>{doctor.name}</Text>
+                <Text style={[styles.doctorSpecialty, { color: colors.mutedText }]}>{doctor.specialty}</Text>
                 <View style={styles.doctorRating}>
-                  <Ionicons name="star" size={12} color={Colors.warning} />
-                  <Text style={styles.doctorRatingText}>{doctor.rating}</Text>
+                  <Ionicons name="star" size={12} color={colors.warning} />
+                  <Text style={[styles.doctorRatingText, { color: colors.text }]}>{doctor.rating}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -497,19 +504,19 @@ export default function AppointmentsScreen() {
         {/* Recent Appointments */}
         {pastAppointments.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Appointments</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("recentAppts")}</Text>
             {pastAppointments.slice(0, 3).map((appointment) => (
-              <View key={appointment.id} style={styles.pastAppointmentCard}>
+              <View key={appointment.id} style={[styles.pastAppointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.pastAppointmentHeader}>
-                  <Text style={styles.pastAppointmentDate}>
+                  <Text style={[styles.pastAppointmentDate, { color: colors.mutedText }]}>
                     {formatDate(appointment.date)} • {appointment.time}
                   </Text>
                   <View style={[styles.pastAppointmentStatus, { backgroundColor: getStatusColor(appointment.status) }]}>
                     <Text style={styles.pastAppointmentStatusText}>{appointment.status}</Text>
                   </View>
                 </View>
-                <Text style={styles.pastAppointmentTitle}>{appointment.title}</Text>
-                <Text style={styles.pastAppointmentDoctor}>{appointment.doctor}</Text>
+                <Text style={[styles.pastAppointmentTitle, { color: colors.text }]}>{appointment.title}</Text>
+                <Text style={[styles.pastAppointmentDoctor, { color: colors.mutedText }]}>{appointment.doctor}</Text>
               </View>
             ))}
           </View>
@@ -522,103 +529,142 @@ export default function AppointmentsScreen() {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Schedule Appointment</Text>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("scheduleAppt")}</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Appointment Title *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("apptTitle")} *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.title}
                 onChangeText={(text) => setNewAppointment(prev => ({ ...prev, title: text }))}
                 placeholder="e.g., Annual Physical Checkup"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Doctor *</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("doctor")} *</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.doctor}
                 onChangeText={(text) => setNewAppointment(prev => ({ ...prev, doctor: text }))}
                 placeholder="e.g., Dr. Sarah Johnson"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Specialty</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("specialty")}</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.specialty}
                 onChangeText={(text) => setNewAppointment(prev => ({ ...prev, specialty: text }))}
                 placeholder="e.g., Family Medicine"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputRow}>
               <View style={styles.inputHalf}>
-                <Text style={styles.inputLabel}>Date *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={newAppointment.date}
-                  onChangeText={(text) => setNewAppointment(prev => ({ ...prev, date: text }))}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={Colors.mutedText}
-                />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t("date")} *</Text>
+                <TouchableOpacity
+                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center' }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={{ color: newAppointment.date ? colors.text : colors.mutedText, fontSize: 16 }}>
+                    {newAppointment.date || "YYYY-MM-DD"}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={newAppointment.date ? new Date(newAppointment.date) : new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) {
+                        const year = selectedDate.getFullYear();
+                        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(selectedDate.getDate()).padStart(2, '0');
+                        setNewAppointment(prev => ({ ...prev, date: `${year}-${month}-${day}` }));
+                      }
+                    }}
+                  />
+                )}
               </View>
-              
+
               <View style={styles.inputHalf}>
-                <Text style={styles.inputLabel}>Time *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={newAppointment.time}
-                  onChangeText={(text) => setNewAppointment(prev => ({ ...prev, time: text }))}
-                  placeholder="10:00 AM"
-                  placeholderTextColor={Colors.mutedText}
-                />
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t("time")} *</Text>
+                <TouchableOpacity
+                  style={[styles.textInput, { borderColor: colors.border, backgroundColor: colors.card, justifyContent: 'center' }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={{ color: newAppointment.time ? colors.text : colors.mutedText, fontSize: 16 }}>
+                    {newAppointment.time || "10:00 AM"}
+                  </Text>
+                </TouchableOpacity>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={new Date()} // Current date, but picker will only return time
+                    mode="time"
+                    is24Hour={false}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                      setShowTimePicker(false);
+                      if (selectedTime) {
+                        let hours = selectedTime.getHours();
+                        const minutes = String(selectedTime.getMinutes()).padStart(2, '0');
+                        const ampm = hours >= 12 ? 'PM' : 'AM';
+                        hours = hours % 12;
+                        hours = hours ? hours : 12; // the hour '0' should be '12'
+                        const strTime = `${hours}:${minutes} ${ampm}`;
+                        setNewAppointment(prev => ({ ...prev, time: strTime }));
+                      }
+                    }}
+                  />
+                )}
               </View>
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Location</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("location")}</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.location}
                 onChangeText={(text) => setNewAppointment(prev => ({ ...prev, location: text }))}
                 placeholder="e.g., City Medical Center, Room 205"
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
               />
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Appointment Type</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("apptType")}</Text>
               <View style={styles.typeSelector}>
                 {[
-                  { key: 'checkup', label: 'Checkup' },
-                  { key: 'follow-up', label: 'Follow-up' },
-                  { key: 'consultation', label: 'Consultation' },
-                  { key: 'emergency', label: 'Emergency' }
+                  { key: 'checkup', label: t('checkup') },
+                  { key: 'follow-up', label: t('followUp') },
+                  { key: 'consultation', label: t('consultation') },
+                  { key: 'emergency', label: t('emergency') }
                 ].map((type) => (
                   <TouchableOpacity
                     key={type.key}
                     style={[
                       styles.typeButton,
-                      newAppointment.type === type.key && styles.selectedType
+                      { borderColor: colors.border },
+                      newAppointment.type === type.key && { backgroundColor: colors.primary, borderColor: colors.primary }
                     ]}
                     onPress={() => setNewAppointment(prev => ({ ...prev, type: type.key as any }))}
                   >
                     <Text style={[
                       styles.typeButtonText,
-                      newAppointment.type === type.key && styles.selectedTypeText
+                      { color: newAppointment.type === type.key ? "white" : colors.text }
                     ]}>
                       {type.label}
                     </Text>
@@ -626,22 +672,22 @@ export default function AppointmentsScreen() {
                 ))}
               </View>
             </View>
-            
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Notes</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("notes")}</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
+                style={[styles.textInput, styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
                 value={newAppointment.notes}
                 onChangeText={(text) => setNewAppointment(prev => ({ ...prev, notes: text }))}
                 placeholder="Any special instructions or notes..."
-                placeholderTextColor={Colors.mutedText}
+                placeholderTextColor={colors.mutedText}
                 multiline
                 numberOfLines={3}
               />
             </View>
-            
-            <TouchableOpacity style={styles.addAppointmentButton} onPress={addAppointment}>
-              <Text style={styles.addAppointmentButtonText}>Schedule Appointment</Text>
+
+            <TouchableOpacity style={[styles.addAppointmentButton, { backgroundColor: colors.primary }]} onPress={addAppointment}>
+              <Text style={styles.addAppointmentButtonText}>{t("scheduleAppt")}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -654,67 +700,67 @@ export default function AppointmentsScreen() {
         presentationStyle="pageSheet"
       >
         {selectedAppointment && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Appointment Details</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Appointment Details</Text>
               <TouchableOpacity onPress={() => setSelectedAppointment(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalContent}>
               <View style={styles.detailSection}>
-                <Text style={styles.detailTitle}>{selectedAppointment.title}</Text>
-                <Text style={styles.detailSubtitle}>
+                <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedAppointment.title}</Text>
+                <Text style={[styles.detailSubtitle, { color: colors.mutedText }]}>
                   {getDateLabel(selectedAppointment.date)} • {selectedAppointment.time}
                 </Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Doctor</Text>
-                <Text style={styles.detailText}>{selectedAppointment.doctor}</Text>
-                <Text style={styles.detailText}>{selectedAppointment.specialty}</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("doctor")}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.doctor}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.specialty}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Location</Text>
-                <Text style={styles.detailText}>{selectedAppointment.location}</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("location")}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.location}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Type</Text>
-                <Text style={styles.detailText}>{selectedAppointment.type}</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("apptType")}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.type}</Text>
               </View>
-              
+
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Status</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("status")}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedAppointment.status) }]}>
                   <Text style={styles.statusBadgeText}>{selectedAppointment.status}</Text>
                 </View>
               </View>
-              
+
               {selectedAppointment.notes && (
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>Notes</Text>
-                  <Text style={styles.detailText}>{selectedAppointment.notes}</Text>
+                  <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("notes")}</Text>
+                  <Text style={[styles.detailText, { color: colors.text }]}>{selectedAppointment.notes}</Text>
                 </View>
               )}
-              
+
               <View style={styles.detailActions}>
-                <TouchableOpacity 
-                  style={[styles.detailActionButton, { backgroundColor: Colors.primary }]}
+                <TouchableOpacity
+                  style={[styles.detailActionButton, { backgroundColor: colors.primary }]}
                   onPress={() => callDoctor(selectedAppointment.doctor)}
                 >
                   <Ionicons name="call" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Call Doctor</Text>
+                  <Text style={styles.detailActionButtonText}>{t("callDoctor")}</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.detailActionButton, { backgroundColor: Colors.warning }]}
+
+                <TouchableOpacity
+                  style={[styles.detailActionButton, { backgroundColor: colors.warning }]}
                   onPress={() => rescheduleAppointment(selectedAppointment.id)}
                 >
                   <Ionicons name="time" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Reschedule</Text>
+                  <Text style={styles.detailActionButtonText}>{t("reschedule")}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -729,62 +775,62 @@ export default function AppointmentsScreen() {
         presentationStyle="pageSheet"
       >
         {selectedDoctor && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Doctor Information</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Doctor Information</Text>
               <TouchableOpacity onPress={() => setSelectedDoctor(null)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.modalContent}>
               <View style={styles.doctorDetailHeader}>
-                <View style={styles.doctorDetailAvatar}>
-                  <Ionicons name="person" size={48} color={Colors.primary} />
+                <View style={[styles.doctorDetailAvatar, { backgroundColor: colors.primary + '10' }]}>
+                  <Ionicons name="person" size={48} color={colors.primary} />
                 </View>
-                <Text style={styles.doctorDetailName}>{selectedDoctor.name}</Text>
-                <Text style={styles.doctorDetailSpecialty}>{selectedDoctor.specialty}</Text>
+                <Text style={[styles.doctorDetailName, { color: colors.text }]}>{selectedDoctor.name}</Text>
+                <Text style={[styles.doctorDetailSpecialty, { color: colors.mutedText }]}>{selectedDoctor.specialty}</Text>
                 <View style={styles.doctorDetailRating}>
-                  <Ionicons name="star" size={16} color={Colors.warning} />
-                  <Text style={styles.doctorDetailRatingText}>{selectedDoctor.rating} rating</Text>
+                  <Ionicons name="star" size={16} color={colors.warning} />
+                  <Text style={[styles.doctorDetailRatingText, { color: colors.text }]}>{selectedDoctor.rating} rating</Text>
                 </View>
               </View>
-              
+
               <View style={styles.doctorDetailSection}>
-                <Text style={styles.detailLabel}>Contact Information</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("contactInfo")}</Text>
                 <TouchableOpacity style={styles.contactItem}>
-                  <Ionicons name="call" size={20} color={Colors.primary} />
-                  <Text style={styles.contactText}>{selectedDoctor.phone}</Text>
+                  <Ionicons name="call" size={20} color={colors.primary} />
+                  <Text style={[styles.contactText, { color: colors.text }]}>{selectedDoctor.phone}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.contactItem}>
-                  <Ionicons name="mail" size={20} color={Colors.primary} />
-                  <Text style={styles.contactText}>{selectedDoctor.email}</Text>
+                  <Ionicons name="mail" size={20} color={colors.primary} />
+                  <Text style={[styles.contactText, { color: colors.text }]}>{selectedDoctor.email}</Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.doctorDetailSection}>
-                <Text style={styles.detailLabel}>Address</Text>
-                <Text style={styles.detailText}>{selectedDoctor.address}</Text>
+                <Text style={[styles.detailLabel, { color: colors.mutedText }]}>{t("address")}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedDoctor.address}</Text>
               </View>
-              
+
               <View style={styles.detailActions}>
-                <TouchableOpacity 
-                  style={[styles.detailActionButton, { backgroundColor: Colors.primary }]}
+                <TouchableOpacity
+                  style={[styles.detailActionButton, { backgroundColor: colors.primary }]}
                   onPress={() => Alert.alert('Calling...', `Calling ${selectedDoctor.phone}`)}
                 >
                   <Ionicons name="call" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Call</Text>
+                  <Text style={styles.detailActionButtonText}>{t("call")}</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.detailActionButton, { backgroundColor: Colors.success }]}
+
+                <TouchableOpacity
+                  style={[styles.detailActionButton, { backgroundColor: colors.success }]}
                   onPress={() => {
                     setSelectedDoctor(null);
                     setShowAddModal(true);
                   }}
                 >
                   <Ionicons name="calendar" size={20} color="white" />
-                  <Text style={styles.detailActionButtonText}>Book Appointment</Text>
+                  <Text style={styles.detailActionButtonText}>{t("bookAppt")}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -798,7 +844,6 @@ export default function AppointmentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -809,27 +854,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 20,
+    marginTop: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: Colors.mutedText,
-    marginTop: 2,
+    marginTop: 4,
   },
   headerActions: {
     flexDirection: 'row',
-    alignItems: 'center',
   },
   viewToggle: {
-    padding: 8,
-    marginRight: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   addButton: {
-    backgroundColor: Colors.primary,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -842,58 +889,58 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 16,
   },
   todayContainer: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    // marginBottom: 16,
   },
   todayCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   todayTime: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 16,
+    height: 60,
+    width: 80,
   },
   todayTimeText: {
-    color: Colors.buttonText,
-    fontWeight: '600',
-    fontSize: 12,
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    textAlign: 'center',
   },
   todayInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   todayTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 2,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   todayDoctor: {
     fontSize: 14,
-    color: Colors.mutedText,
+    fontWeight: '500',
     marginBottom: 2,
   },
   todayLocation: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   todayActions: {
-    flexDirection: 'row',
+    justifyContent: 'center',
   },
   todayActionButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -901,116 +948,106 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: Colors.card,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: Colors.mutedText,
-    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '600',
   },
   emptyState: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 32,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    padding: 40,
+    opacity: 0.7,
   },
   emptyStateText: {
+    marginTop: 12,
+    marginBottom: 20,
     fontSize: 16,
-    color: Colors.mutedText,
-    marginVertical: 16,
   },
   emptyStateButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
   },
   emptyStateButtonText: {
-    color: Colors.buttonText,
+    color: 'white',
     fontWeight: '600',
   },
   appointmentCard: {
-    backgroundColor: Colors.card,
+    borderWidth: 1,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   appointmentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   appointmentDate: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   appointmentDateText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    marginRight: 8,
   },
   appointmentTimeText: {
-    fontSize: 12,
-    color: Colors.mutedText,
-    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '600',
   },
   appointmentType: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   appointmentTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   appointmentDoctor: {
     fontSize: 14,
-    color: Colors.mutedText,
     marginBottom: 4,
   },
   appointmentLocation: {
-    fontSize: 12,
-    color: Colors.mutedText,
-    marginBottom: 8,
-  },
-  appointmentNotes: {
-    fontSize: 12,
-    color: Colors.text,
+    fontSize: 14,
     fontStyle: 'italic',
     marginBottom: 12,
-    backgroundColor: Colors.background,
-    padding: 8,
-    borderRadius: 6,
+  },
+  appointmentNotes: {
+    fontSize: 14,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
   appointmentActions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
     paddingTop: 12,
+    justifyContent: 'space-between',
   },
   actionButton: {
     flexDirection: 'row',
@@ -1018,62 +1055,59 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   actionButtonText: {
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: 14,
+    marginLeft: 6,
+    fontWeight: '500',
   },
   doctorsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    marginHorizontal: -6,
   },
   doctorCard: {
-    width: (width - 60) / 2,
-    backgroundColor: Colors.card,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
+    width: (width - 52) / 2,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 6,
+    marginBottom: 12,
+    alignItems: 'center',
   },
   doctorAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   doctorName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 4,
   },
   doctorSpecialty: {
     fontSize: 12,
-    color: Colors.mutedText,
     textAlign: 'center',
     marginBottom: 8,
   },
   doctorRating: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   doctorRatingText: {
     fontSize: 12,
-    color: Colors.mutedText,
     marginLeft: 4,
+    fontWeight: '600',
   },
   pastAppointmentCard: {
-    backgroundColor: Colors.card,
+    borderWidth: 1,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    marginBottom: 12,
+    opacity: 0.8,
   },
   pastAppointmentHeader: {
     flexDirection: 'row',
@@ -1083,32 +1117,29 @@ const styles = StyleSheet.create({
   },
   pastAppointmentDate: {
     fontSize: 12,
-    color: Colors.mutedText,
+    fontWeight: '600',
   },
   pastAppointmentStatus: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   pastAppointmentStatusText: {
-    fontSize: 10,
     color: 'white',
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   pastAppointmentTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 2,
   },
   pastAppointmentDoctor: {
     fontSize: 12,
-    color: Colors.mutedText,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1116,12 +1147,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
   },
   modalContent: {
     flex: 1,
@@ -1130,32 +1159,24 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
   inputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
   },
   inputHalf: {
-    flex: 0.48,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.card,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
+    width: '48%',
   },
   typeSelector: {
     flexDirection: 'row',
@@ -1163,77 +1184,75 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typeButton: {
-    paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
+    marginBottom: 8,
   },
   selectedType: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    // backgroundColor handled inline
   },
   typeButtonText: {
-    fontSize: 12,
-    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '500',
   },
   selectedTypeText: {
-    color: Colors.buttonText,
+    color: 'white',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   addAppointmentButton: {
-    backgroundColor: Colors.primary,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
+    marginBottom: 40,
   },
   addAppointmentButtonText: {
-    color: Colors.buttonText,
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   detailSection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   detailTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   detailSubtitle: {
     fontSize: 16,
-    color: Colors.primary,
     marginBottom: 8,
   },
   detailLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   detailText: {
-    fontSize: 14,
-    color: Colors.mutedText,
-    lineHeight: 20,
+    fontSize: 16,
+    marginBottom: 4,
   },
   statusBadge: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    alignSelf: 'flex-start',
   },
   statusBadgeText: {
-    fontSize: 12,
     color: 'white',
-    fontWeight: '600',
+    fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   detailActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
+    marginBottom: 40,
   },
   detailActionButton: {
     flex: 0.48,
@@ -1241,12 +1260,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   detailActionButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginLeft: 8,
   },
   doctorDetailHeader: {
@@ -1254,23 +1272,20 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   doctorDetailAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   doctorDetailName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 4,
   },
   doctorDetailSpecialty: {
     fontSize: 16,
-    color: Colors.mutedText,
     marginBottom: 8,
   },
   doctorDetailRating: {
@@ -1278,9 +1293,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   doctorDetailRatingText: {
-    fontSize: 14,
-    color: Colors.mutedText,
     marginLeft: 4,
+    fontSize: 14,
   },
   doctorDetailSection: {
     marginBottom: 24,
@@ -1288,12 +1302,10 @@ const styles = StyleSheet.create({
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 12,
   },
   contactText: {
-    fontSize: 14,
-    color: Colors.text,
+    fontSize: 16,
     marginLeft: 12,
   },
 });
-
