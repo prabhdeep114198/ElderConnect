@@ -11,39 +11,17 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { HealthMetric, useHealth, VitalSign } from "../../context/HealthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get('window');
 
-interface HealthMetric {
-  id: string;
-  name: string;
-  value: number;
-  unit: string;
-  target?: number;
-  icon: string;
-  color: string;
-  trend: 'up' | 'down' | 'stable';
-  lastUpdated: string;
-  history: { date: string; value: number }[];
-}
-
-interface VitalSign {
-  id: string;
-  name: string;
-  systolic?: number;
-  diastolic?: number;
-  value?: number;
-  unit: string;
-  status: 'normal' | 'high' | 'low' | 'critical';
-  timestamp: string;
-  notes?: string;
-}
-
 export default function HealthTrackerScreen() {
   const { colors, theme } = useTheme();
+  const { healthMetrics, vitalSigns, weeklyGoals, updateMetric, addVitalSign: addVitalContext } = useHealth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<HealthMetric | null>(null);
+  const [editValue, setEditValue] = useState('');
   const [showVitalModal, setShowVitalModal] = useState(false);
   const [newVital, setNewVital] = useState({
     type: 'blood_pressure',
@@ -52,155 +30,6 @@ export default function HealthTrackerScreen() {
     value: '',
     notes: ''
   });
-
-  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([
-    {
-      id: '1',
-      name: 'Steps',
-      value: 6847,
-      unit: 'steps',
-      target: 8000,
-      icon: 'walk',
-      color: colors.primary,
-      trend: 'up',
-      lastUpdated: '2 hours ago',
-      history: [
-        { date: '2024-12-09', value: 5200 },
-        { date: '2024-12-10', value: 6100 },
-        { date: '2024-12-11', value: 7300 },
-        { date: '2024-12-12', value: 6847 }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Heart Rate',
-      value: 72,
-      unit: 'bpm',
-      target: 75,
-      icon: 'heart',
-      color: colors.error,
-      trend: 'stable',
-      lastUpdated: '30 minutes ago',
-      history: [
-        { date: '2024-12-09', value: 74 },
-        { date: '2024-12-10', value: 71 },
-        { date: '2024-12-11', value: 73 },
-        { date: '2024-12-12', value: 72 }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Sleep',
-      value: 7.5,
-      unit: 'hours',
-      target: 8,
-      icon: 'moon',
-      color: colors.info,
-      trend: 'up',
-      lastUpdated: 'This morning',
-      history: [
-        { date: '2024-12-09', value: 6.8 },
-        { date: '2024-12-10', value: 7.2 },
-        { date: '2024-12-11', value: 7.8 },
-        { date: '2024-12-12', value: 7.5 }
-      ]
-    },
-    {
-      id: '4',
-      name: 'Water Intake',
-      value: 6,
-      unit: 'glasses',
-      target: 8,
-      icon: 'water',
-      color: colors.info,
-      trend: 'down',
-      lastUpdated: '1 hour ago',
-      history: [
-        { date: '2024-12-09', value: 7 },
-        { date: '2024-12-10', value: 8 },
-        { date: '2024-12-11', value: 6 },
-        { date: '2024-12-12', value: 6 }
-      ]
-    },
-    {
-      id: '5',
-      name: 'Weight',
-      value: 68.5,
-      unit: 'kg',
-      icon: 'fitness',
-      color: colors.success,
-      trend: 'stable',
-      lastUpdated: 'Yesterday',
-      history: [
-        { date: '2024-12-09', value: 68.8 },
-        { date: '2024-12-10', value: 68.6 },
-        { date: '2024-12-11', value: 68.4 },
-        { date: '2024-12-12', value: 68.5 }
-      ]
-    },
-    {
-      id: '6',
-      name: 'Exercise',
-      value: 45,
-      unit: 'minutes',
-      target: 60,
-      icon: 'barbell',
-      color: colors.warning,
-      trend: 'up',
-      lastUpdated: '3 hours ago',
-      history: [
-        { date: '2024-12-09', value: 30 },
-        { date: '2024-12-10', value: 35 },
-        { date: '2024-12-11', value: 40 },
-        { date: '2024-12-12', value: 45 }
-      ]
-    }
-  ]);
-
-  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([
-    {
-      id: '1',
-      name: 'Blood Pressure',
-      systolic: 120,
-      diastolic: 80,
-      unit: 'mmHg',
-      status: 'normal',
-      timestamp: '2024-12-12 08:30',
-      notes: 'Measured after morning walk'
-    },
-    {
-      id: '2',
-      name: 'Blood Sugar',
-      value: 95,
-      unit: 'mg/dL',
-      status: 'normal',
-      timestamp: '2024-12-12 07:45',
-      notes: 'Fasting glucose level'
-    },
-    {
-      id: '3',
-      name: 'Temperature',
-      value: 98.6,
-      unit: '°F',
-      status: 'normal',
-      timestamp: '2024-12-12 09:00'
-    },
-    {
-      id: '4',
-      name: 'Oxygen Saturation',
-      value: 98,
-      unit: '%',
-      status: 'normal',
-      timestamp: '2024-12-12 08:45'
-    }
-  ]);
-
-  const weeklyGoals = [
-    { name: 'Steps', current: 45230, target: 56000, unit: 'steps' },
-    { name: 'Exercise', current: 280, target: 420, unit: 'minutes' },
-    { name: 'Sleep', current: 52.5, target: 56, unit: 'hours' },
-    { name: 'Water', current: 42, target: 56, unit: 'glasses' }
-  ];
 
   const addVitalSign = () => {
     if (newVital.type === 'blood_pressure' && (!newVital.systolic || !newVital.diastolic)) {
@@ -224,7 +53,7 @@ export default function HealthTrackerScreen() {
       notes: newVital.notes
     };
 
-    setVitalSigns(prev => [vital, ...prev]);
+    addVitalContext(vital);
     setNewVital({ type: 'blood_pressure', systolic: '', diastolic: '', value: '', notes: '' });
     setShowVitalModal(false);
     Alert.alert('Success', 'Vital sign recorded successfully!');
@@ -250,29 +79,7 @@ export default function HealthTrackerScreen() {
     }
   };
 
-  const updateMetric = (metricId: string, newValue: number) => {
-    setHealthMetrics(prev => prev.map(metric => {
-      if (metric.id === metricId) {
-        const today = new Date().toISOString().split('T')[0];
-        const updatedHistory = [...metric.history];
-        const todayIndex = updatedHistory.findIndex(h => h.date === today);
 
-        if (todayIndex >= 0) {
-          updatedHistory[todayIndex].value = newValue;
-        } else {
-          updatedHistory.push({ date: today, value: newValue });
-        }
-
-        return {
-          ...metric,
-          value: newValue,
-          history: updatedHistory,
-          lastUpdated: 'Just now'
-        };
-      }
-      return metric;
-    }));
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -307,6 +114,20 @@ export default function HealthTrackerScreen() {
 
   const showMetricDetails = (metric: HealthMetric) => {
     setSelectedMetric(metric);
+    setEditValue(metric.value.toString());
+  };
+
+  const handleUpdateMetric = () => {
+    if (selectedMetric && editValue) {
+      const val = parseFloat(editValue);
+      if (!isNaN(val)) {
+        updateMetric(selectedMetric.id, val);
+        setSelectedMetric(null);
+        Alert.alert('Success', 'Metric updated!');
+      } else {
+        Alert.alert('Error', 'Please enter a valid number');
+      }
+    }
   };
 
   const quickLogWater = () => {
@@ -678,6 +499,43 @@ export default function HealthTrackerScreen() {
                 <Text style={[styles.detailValue, { color: colors.primary }]}>
                   {selectedMetric.value} {selectedMetric.unit}
                 </Text>
+
+                {/* Manual Update Input */}
+                <View style={{ marginTop: 10, marginBottom: 10 }}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Update Value</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        {
+                          flex: 1,
+                          color: colors.text,
+                          borderColor: colors.border,
+                          backgroundColor: colors.card,
+                          marginRight: 10
+                        }
+                      ]}
+                      value={editValue}
+                      onChangeText={setEditValue}
+                      keyboardType="numeric"
+                      placeholder="Enter new value"
+                      placeholderTextColor={colors.mutedText}
+                    />
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: colors.primary,
+                        padding: 12,
+                        borderRadius: 8,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                      onPress={handleUpdateMetric}
+                    >
+                      <Text style={{ color: colors.buttonText, fontWeight: 'bold' }}>Update</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 {selectedMetric.target && (
                   <Text style={[styles.detailTarget, { color: colors.mutedText }]}>
                     Target: {selectedMetric.target} {selectedMetric.unit}

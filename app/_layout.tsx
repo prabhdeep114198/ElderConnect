@@ -12,6 +12,7 @@ import flagsmith from "react-native-flagsmith";
 import { FlagsmithProvider } from "react-native-flagsmith/react";
 import { Colors } from "../constants/colors";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { HealthProvider } from "../context/HealthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 
 import * as Notifications from "expo-notifications";
@@ -343,9 +344,11 @@ export default function RootLayout() {
     >
       <AuthProvider>
         <ThemeProvider>
-          <ActionSheetProvider>
-            <InitialLayout />
-          </ActionSheetProvider>
+          <HealthProvider>
+            <ActionSheetProvider>
+              <InitialLayout />
+            </ActionSheetProvider>
+          </HealthProvider>
         </ThemeProvider>
       </AuthProvider>
     </FlagsmithProvider>
