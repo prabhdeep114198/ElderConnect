@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   StyleSheet,
@@ -32,18 +33,19 @@ interface ButtonConfig {
 
 export default function LoginModal({ onClose }: LoginModalProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Dynamic form fields
   const formFields: FormField[] = [
     {
       key: "email",
-      placeholder: "Email",
+      placeholder: t("email"),
       keyboardType: "email-address",
       autoCapitalize: "none",
     },
     {
       key: "password",
-      placeholder: "Password",
+      placeholder: t("password"),
       secure: true,
     },
   ];
@@ -66,18 +68,18 @@ export default function LoginModal({ onClose }: LoginModalProps) {
         onClose();
         // Redirection will be handled by the global layout effect
       } else {
-        Alert.alert("Error", "Please fill in all fields");
+        Alert.alert(t("error"), t("pleaseFillFields"));
       }
     } catch (err: any) {
-      Alert.alert("Login Failed", err.message || "An error occurred");
+      Alert.alert(t("loginFailed"), err.message || t("botDefault"));
     }
   };
 
   // Dynamic buttons
   const buttons: ButtonConfig[] = [
-    { text: "Login", onPress: handleLogin, primary: true },
+    { text: t("login"), onPress: handleLogin, primary: true },
     {
-      text: "Create Account",
+      text: t("createAccount"),
       onPress: () => {
         onClose();
         router.push("/auth/login");
@@ -86,7 +88,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
       textColor: Colors.primary,
     },
     {
-      text: "Close",
+      text: t("close"),
       onPress: onClose,
       primary: false,
       textColor: Colors.mutedText,
@@ -96,7 +98,7 @@ export default function LoginModal({ onClose }: LoginModalProps) {
   return (
     <View style={styles.overlay}>
       <View style={styles.modal}>
-        <Text style={styles.title}>Login to ElderConnect</Text>
+        <Text style={styles.title}>{t("loginToElderConnect")}</Text>
 
         {formFields.map((field) => (
           <TextInput

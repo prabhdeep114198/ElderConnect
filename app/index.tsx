@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Dimensions,
@@ -58,6 +59,7 @@ const AnimatedFeatureCard = ({ feature, index, colors }: { feature: Feature, ind
 export default function LandingScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { t } = useTranslation();
   const { user } = useAuth(); // Check auth state to adjust buttons if needed
   const [showLogin, setShowLogin] = useState(false);
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -79,17 +81,17 @@ export default function LandingScreen() {
         await new Promise(resolve => setTimeout(resolve, 800));
 
         setFeatures([
-          { title: "Health Tracker", description: "Monitor vitals & steps", icon: "pulse", color: "#FF5252" },
-          { title: "Appointments", description: "Never miss a visit", icon: "calendar", color: "#448AFF" },
-          { title: "Medications", description: "Pill reminders", icon: "medkit", color: "#69F0AE" },
-          { title: "Magnifier", description: "Read small text", icon: "eye", color: "#FFD740" },
-          { title: "Mood Diary", description: "Track wellbeing", icon: "book", color: "#E040FB" },
-          { title: "Reports", description: "Visualize health", icon: "pie-chart", color: "#536DFE" },
+          { title: t("featureHealthTracker"), description: t("featureHealthTrackerDesc"), icon: "pulse", color: "#FF5252" },
+          { title: t("featureAppointments"), description: t("featureAppointmentsDesc"), icon: "calendar", color: "#448AFF" },
+          { title: t("featureMedications"), description: t("featureMedicationsDesc"), icon: "medkit", color: "#69F0AE" },
+          { title: t("featureMagnifier"), description: t("featureMagnifierDesc"), icon: "eye", color: "#FFD740" },
+          { title: t("featureMoodDiary"), description: t("featureMoodDiaryDesc"), icon: "book", color: "#E040FB" },
+          { title: t("featureReports"), description: t("featureReportsDesc"), icon: "pie-chart", color: "#536DFE" },
         ]);
 
         const btns: ButtonItem[] = [
           {
-            title: "Get Started",
+            title: t("getStarted"),
             actionType: "route",
             route: user && !user.isOnboarded ? "/onboarding" : "/(tabs)/home",
             primary: true
@@ -99,7 +101,7 @@ export default function LandingScreen() {
         // Add Login button only if not logged in
         if (!user) {
           btns.push({
-            title: "Login",
+            title: t("login"),
             actionType: "route",
             route: "/auth/login",
             primary: false
@@ -144,10 +146,10 @@ export default function LandingScreen() {
           <Ionicons name="heart-circle" size={80} color={colors.primary} />
         </View>
         <Text style={[styles.title, { color: colors.text }]}>
-          Welcome to <Text style={{ color: colors.primary }}>ElderConnect</Text>
+          {t("landingTitle")} <Text style={{ color: colors.primary }}>ElderConnect</Text>
         </Text>
         <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-          Empowering your golden years with smart health tracking and effortless care.
+          {t("landingSubtitle")}
         </Text>
       </Animated.View>
 
