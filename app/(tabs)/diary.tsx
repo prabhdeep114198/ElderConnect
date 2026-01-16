@@ -34,7 +34,7 @@ interface DiaryEntry {
   activity: ActivityValue[];
 }
 
-const API_URL = "http://localhost:3000"; // Replace with your backend URL
+const API_URL = "http://192.168.29.13:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();
@@ -113,7 +113,7 @@ export default function DiaryScreen() {
     }
   };
 
-  const moodOptions: Array<{ icon: string; label: string; value: Mood; color: string }> = [
+  const moodOptions: { icon: string; label: string; value: Mood; color: string }[] = [
     { icon: "happy", label: t("happy"), value: "happy", color: colors.success },
     { icon: "happy-outline", label: t("neutral"), value: "neutral", color: colors.info },
     { icon: "sad", label: t("sad"), value: "sad", color: colors.primary },
@@ -121,14 +121,14 @@ export default function DiaryScreen() {
     { icon: "sad-outline", label: t("angry"), value: "angry", color: colors.error },
   ];
 
-  const weatherOptions: Array<{ icon: string; label: string; value: Weather }> = [
+  const weatherOptions: { icon: string; label: string; value: Weather }[] = [
     { icon: "sunny", label: t("sunny"), value: "sunny" },
     { icon: "cloudy", label: t("cloudy"), value: "cloudy" },
     { icon: "rainy", label: t("rainy"), value: "rainy" },
     { icon: "snow", label: t("snowy"), value: "snowy" },
   ];
 
-  const activityOptions: Array<{ icon: string; label: string; value: ActivityValue }> = [
+  const activityOptions: { icon: string; label: string; value: ActivityValue }[] = [
     { icon: "walk", label: t("walk"), value: "walk" },
     { icon: "book", label: t("reading"), value: "reading" },
     { icon: "people", label: t("social"), value: "social" },
