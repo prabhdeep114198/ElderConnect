@@ -17,20 +17,25 @@ export const ReminderService = {
     /**
      * Schedules a new notification and saves it to local storage.
      */
-    async scheduleReminder(reminder: Omit<Reminder, 'id' | 'status'>): Promise<Reminder> {
+    async scheduleReminder(
+        reminder: Omit<Reminder, 'id' | 'status'>,
+        notifyFamily: boolean = false,
+        userData?: any
+    ): Promise<Reminder> {
         const triggerDate = new Date(reminder.date);
 
         if (triggerDate <= new Date()) {
             throw new Error("Cannot set a reminder in the past.");
         }
 
-        // Schedule notification
+        // Schedule local notification
         const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
                 title: `⏰ ${reminder.title}`,
                 body: reminder.body,
                 sound: Platform.OS === 'android' ? 'default' : 'alarm.wav',
                 data: { type: reminder.type },
+                priority: Notifications.AndroidNotificationPriority.MAX,
             },
             trigger: {
                 date: triggerDate,
@@ -42,6 +47,16 @@ export const ReminderService = {
             id: notificationId,
             status: 'active',
         };
+
+        // If notify family is enabled, ping n8n
+        if (notifyFamily && userData) {
+            try {
+                const { N8NService } = require('../services/N8NService');
+                await N8NService.sendReminderAlert(userData, newReminder);
+            } catch (err) {
+                console.error("N8N Notification failed", err);
+            }
+        }
 
         // Save to storage
         const existingReminders = await this.getAllReminders();

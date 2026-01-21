@@ -1,8 +1,8 @@
+import { authService } from "@/services/api/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Alert } from "react-native";
-import { authService } from "@/services/api/auth";
 
 // =====================
 // Types
@@ -54,7 +54,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedUser = await AsyncStorage.getItem("user_session");
 
       if (token && savedUser) {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+
+        // Double check onboarding status from its dedicated key
+        const onboardingStatus = await AsyncStorage.getItem(`user_onboarded_${parsedUser.id}`);
+        if (onboardingStatus === "true") {
+          parsedUser.isOnboarded = true;
+        }
+
+        setUser(parsedUser);
+
         // Optionally refresh profile from backend
         try {
           const response: any = await authService.getProfile();
@@ -64,7 +73,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               id: userData.id,
               name: `${userData.firstName} ${userData.lastName}`.trim(),
               email: userData.email,
-              isOnboarded: user?.isOnboarded || false,
+              isOnboarded: parsedUser.isOnboarded || false,
+              plan_level: userData.plan_level || parsedUser.plan_level,
             };
             setUser(updatedUser);
             await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));

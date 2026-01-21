@@ -14,13 +14,18 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    StatusBar,
+    ScrollView,
+    Switch
 } from "react-native";
+import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { Reminder, ReminderService } from "../utils/reminderService";
 
 export default function RemindersScreen() {
     const router = useRouter();
     const { colors, theme } = useTheme();
+    const { user } = useAuth();
     const { t } = useTranslation();
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -28,8 +33,9 @@ export default function RemindersScreen() {
 
     // New reminder form state
     const [title, setTitle] = useState("");
-    const [date, setDate] = useState(new Date(Date.now() + 10 * 60 * 1000)); // Default 10 mins from now
-    const [mode, setMode] = useState<"date" | "time">("date");
+    const [date, setDate] = useState(new Date(Date.now() + 10 * 60 * 1000));
+    const [type, setType] = useState<'general' | 'medication' | 'appointment'>('general');
+    const [notifyFamily, setNotifyFamily] = useState(false);
 
     useEffect(() => {
         loadReminders();
@@ -55,13 +61,13 @@ export default function RemindersScreen() {
         try {
             await ReminderService.scheduleReminder({
                 title,
-                body: "This is your scheduled reminder from ElderConnect.",
+                body: type === 'medication' ? `Time for your medicine: ${title}` : `Reminder: ${title}`,
                 date: date.toISOString(),
-                type: 'general',
-            });
+                type,
+            }, notifyFamily, user);
+
             setShowAddModal(false);
-            setTitle("");
-            setDate(new Date(Date.now() + 10 * 60 * 1000));
+            resetForm();
             loadReminders();
             Alert.alert("Success", "Reminder set successfully!");
         } catch (error: any) {
@@ -71,14 +77,21 @@ export default function RemindersScreen() {
         }
     };
 
+    const resetForm = () => {
+        setTitle("");
+        setDate(new Date(Date.now() + 10 * 60 * 1000));
+        setType('general');
+        setNotifyFamily(false);
+    };
+
     const handleDeleteReminder = async (id: string) => {
         Alert.alert(
-            "Delete Reminder",
+            "Delete",
             "Are you sure you want to cancel this reminder?",
             [
-                { text: "No", style: "cancel" },
+                { text: "Cancel", style: "cancel" },
                 {
-                    text: "Yes, Delete",
+                    text: "Delete",
                     style: "destructive",
                     onPress: async () => {
                         await ReminderService.cancelReminder(id);
@@ -92,74 +105,66 @@ export default function RemindersScreen() {
     const onDateChange = (event: any, selectedDate?: Date) => {
         const currentDate = selectedDate || date;
         setDate(currentDate);
-        if (Platform.OS === 'android' && mode === 'date') {
-            setMode('time');
-        }
     };
 
-    const renderReminderItem = ({ item }: { item: Reminder }) => (
-        <View style={[styles.reminderCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.reminderInfo}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.primary + '15' }]}>
-                    <Ionicons
-                        name={item.type === 'medication' ? 'medkit' : item.type === 'appointment' ? 'calendar' : 'alarm'}
-                        size={24}
-                        color={colors.primary}
-                    />
-                </View>
-                <View style={styles.textContainer}>
-                    <Text style={[styles.reminderTitle, { color: colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.reminderTime, { color: colors.mutedText }]}>
-                        {new Date(item.date).toLocaleString([], {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })}
-                    </Text>
-                </View>
+    const ReminderItem = ({ item, isLast }: { item: Reminder; isLast: boolean }) => (
+        <View style={[styles.reminderItem, { borderBottomWidth: isLast ? 0 : 0.5, borderBottomColor: colors.border }]}>
+            <View style={[styles.iconBox, { backgroundColor: item.type === 'medication' ? '#FF3B3015' : colors.primary + '10' }]}>
+                <Ionicons
+                    name={item.type === 'medication' ? 'medkit' : item.type === 'appointment' ? 'calendar' : 'alarm'}
+                    size={20}
+                    color={item.type === 'medication' ? '#FF3B30' : colors.primary}
+                />
+            </View>
+            <View style={styles.reminderContent}>
+                <Text style={[styles.reminderTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.reminderTime, { color: colors.mutedText }]}>
+                    {new Date(item.date).toLocaleString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </Text>
             </View>
             <TouchableOpacity onPress={() => handleDeleteReminder(item.id)} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={22} color={colors.error} />
+                <Ionicons name="trash-outline" size={18} color="#FF3B30" />
             </TouchableOpacity>
         </View>
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={[styles.header, { backgroundColor: colors.primary }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t("reminders")}</Text>
-                <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerAddBtn}>
-                    <Ionicons name="add" size={28} color="#FFF" />
-                </TouchableOpacity>
-            </View>
-
-            {reminders.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <Ionicons name="notifications-off-outline" size={80} color={colors.mutedText} />
-                    <Text style={[styles.emptyText, { color: colors.mutedText }]}>No reminders set.</Text>
-                    <TouchableOpacity
-                        style={[styles.emptyAddBtn, { backgroundColor: colors.primary }]}
-                        onPress={() => setShowAddModal(true)}
-                    >
-                        <Text style={styles.emptyAddBtnText}>Add Reminder</Text>
+        <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
+            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                        <Text style={{ color: colors.primary, fontSize: 17 }}>Done</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
+                        <Ionicons name="add" size={26} color={colors.primary} />
+                    </TouchableOpacity>
+                    <Text style={[styles.largeTitle, { color: colors.text }]}>Reminders</Text>
                 </View>
-            ) : (
-                <FlatList
-                    data={reminders}
-                    renderItem={renderReminderItem}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
-            )}
 
-            {/* ADD REMINDER MODAL */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>SCHEDULED</Text>
+                    <View style={[styles.card, { backgroundColor: colors.card }]}>
+                        {reminders.length > 0 ? (
+                            reminders.map((item, index) => (
+                                <ReminderItem key={item.id} item={item} isLast={index === reminders.length - 1} />
+                            ))
+                        ) : (
+                            <View style={styles.emptyCard}>
+                                <Ionicons name="notifications-off" size={40} color="#8E8E93" />
+                                <Text style={[styles.emptyText, { color: colors.mutedText }]}>No Reminders</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={styles.footerText}>Stay on top of your medications, appointments, and daily routines with smart notifications.</Text>
+                </View>
+            </ScrollView>
+
             <Modal visible={showAddModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <KeyboardAvoidingView
@@ -167,57 +172,77 @@ export default function RemindersScreen() {
                         style={[styles.modalContent, { backgroundColor: theme === 'dark' ? colors.card : '#FFF' }]}
                     >
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>New Reminder</Text>
                             <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                                <Ionicons name="close" size={28} color={colors.text} />
+                                <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>Add Reminder</Text>
+                            <TouchableOpacity onPress={handleAddReminder} disabled={loading}>
+                                <Text style={{ color: colors.primary, fontSize: 17, fontWeight: '600' }}>Add</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.modalBody}>
-                            <View style={styles.inputGroup}>
-                                <Text style={[styles.label, { color: colors.text }]}>What should we remind you about?</Text>
-                                <TextInput
-                                    style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                                    value={title}
-                                    onChangeText={setTitle}
-                                    placeholder="e.g. Call my daughter, Evening walk"
-                                    placeholderTextColor={colors.mutedText}
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={[styles.label, { color: colors.text }]}>When?</Text>
-                                <View style={styles.pickerContainer}>
-                                    <DateTimePicker
-                                        value={date}
-                                        mode={Platform.OS === 'ios' ? 'datetime' : mode}
-                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                        onChange={onDateChange}
-                                        minimumDate={new Date()}
-                                        themeVariant={theme}
-                                        style={{ height: 120 }}
+                        <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', paddingLeft: 16 }]}>
+                                <View style={styles.inputRow}>
+                                    <TextInput
+                                        style={[styles.input, { color: colors.text }]}
+                                        value={title}
+                                        onChangeText={setTitle}
+                                        placeholder="Reminder title (e.g. Antibiotics 500mg)"
+                                        placeholderTextColor={colors.mutedText}
                                     />
-                                    {Platform.OS === 'android' && (
-                                        <TouchableOpacity
-                                            style={[styles.modeToggle, { backgroundColor: colors.primary + '20' }]}
-                                            onPress={() => setMode(mode === 'date' ? 'time' : 'date')}
-                                        >
-                                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
-                                                Switch to {mode === 'date' ? 'Time' : 'Date'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
                                 </View>
                             </View>
 
-                            <TouchableOpacity
-                                style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
-                                onPress={handleAddReminder}
-                                disabled={loading}
-                            >
-                                <Text style={styles.saveBtnText}>{loading ? "Saving..." : "Set Reminder"}</Text>
-                            </TouchableOpacity>
-                        </View>
+                            <Text style={[styles.sectionHeader, { color: colors.mutedText, marginTop: 20 }]}>REMINDER TYPE</Text>
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
+                                <View style={[styles.typeSelectorRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+                                    <TouchableOpacity
+                                        style={[styles.typeBtn, type === 'medication' && { backgroundColor: '#FF3B3020' }]}
+                                        onPress={() => setType('medication')}
+                                    >
+                                        <Ionicons name="medkit" size={20} color={type === 'medication' ? '#FF3B30' : '#8E8E93'} />
+                                        <Text style={[styles.typeBtnText, { color: type === 'medication' ? '#FF3B30' : colors.text }]}>Medication</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.typeBtn, type === 'appointment' && { backgroundColor: colors.primary + '20' }]}
+                                        onPress={() => setType('appointment')}
+                                    >
+                                        <Ionicons name="calendar" size={20} color={type === 'appointment' ? colors.primary : '#8E8E93'} />
+                                        <Text style={[styles.typeBtnText, { color: type === 'appointment' ? colors.primary : colors.text }]}>Appointment</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.typeBtn, type === 'general' && { backgroundColor: '#8E8E9320' }]}
+                                        onPress={() => setType('general')}
+                                    >
+                                        <Ionicons name="alarm" size={20} color={type === 'general' ? colors.text : '#8E8E93'} />
+                                        <Text style={[styles.typeBtnText, { color: colors.text }]}>General</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', marginTop: 20 }]}>
+                                <View style={styles.modalSwitchRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.switchLabel, { color: colors.text }]}>Notify Family</Text>
+                                        <Text style={styles.switchSublabel}>Alert contacts via n8n (WhatsApp/SMS)</Text>
+                                    </View>
+                                    <Switch value={notifyFamily} onValueChange={setNotifyFamily} />
+                                </View>
+                            </View>
+
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', marginTop: 20, marginBottom: 40 }]}>
+                                <DateTimePicker
+                                    value={date}
+                                    mode="datetime"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={onDateChange}
+                                    minimumDate={new Date()}
+                                    themeVariant={theme}
+                                    style={{ height: 180 }}
+                                />
+                            </View>
+                        </ScrollView>
                     </KeyboardAvoidingView>
                 </View>
             </Modal>
@@ -227,63 +252,36 @@ export default function RemindersScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: {
-        paddingTop: 60,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-    },
-    headerTitle: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
-    backButton: { padding: 5 },
-    headerAddBtn: { padding: 5 },
-    listContent: { padding: 20, paddingBottom: 40 },
-    reminderCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderRadius: 20,
-        marginBottom: 15,
-        borderWidth: 1,
-        justifyContent: 'space-between',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    reminderInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    iconCircle: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    textContainer: { flex: 1 },
-    reminderTitle: { fontSize: 18, fontWeight: 'bold' },
-    reminderTime: { fontSize: 14, marginTop: 2 },
-    deleteBtn: { padding: 10 },
-    emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-    emptyText: { fontSize: 18, marginTop: 20, textAlign: 'center' },
-    emptyAddBtn: { marginTop: 30, paddingHorizontal: 30, paddingVertical: 15, borderRadius: 15 },
-    emptyAddBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    scrollContent: { paddingBottom: 40 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+    closeButton: { alignSelf: 'flex-start', position: 'absolute', top: 20, left: 20, zIndex: 1 },
+    addButton: { alignSelf: 'flex-end', position: 'absolute', top: 20, right: 20, zIndex: 1 },
+    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5, marginTop: 40 },
+    section: { marginTop: 25, paddingHorizontal: 20 },
+    sectionHeader: { fontSize: 13, fontWeight: '400', marginBottom: 8, marginLeft: 16 },
+    card: { borderRadius: 12, overflow: 'hidden' },
+    reminderItem: { flexDirection: 'row', alignItems: 'center', padding: 12, marginLeft: 16, paddingLeft: 0 },
+    iconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    reminderContent: { flex: 1 },
+    reminderTitle: { fontSize: 17, fontWeight: '400' },
+    reminderTime: { fontSize: 13, marginTop: 1 },
+    deleteBtn: { padding: 8 },
+    emptyCard: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+    emptyText: { marginTop: 10, fontSize: 15 },
+    footerText: { color: '#8E8E93', fontSize: 13, paddingHorizontal: 16, marginTop: 10, lineHeight: 18 },
 
-    // Modal
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, minHeight: 400 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-    modalTitle: { fontSize: 22, fontWeight: 'bold' },
-    modalBody: { gap: 20 },
-    inputGroup: { gap: 10 },
-    label: { fontSize: 16, fontWeight: '600' },
-    input: { height: 55, borderRadius: 15, borderWidth: 1, paddingHorizontal: 16, fontSize: 16 },
-    pickerContainer: { alignItems: 'center', justifyContent: 'center' },
-    saveBtn: { height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
-    saveBtnText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-    modeToggle: { padding: 10, borderRadius: 10, marginTop: 10 }
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 15, borderTopRightRadius: 15, padding: 16, minHeight: 450 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 17, fontWeight: '600' },
+    modalBody: { flex: 1 },
+    inputRow: { padding: 12, paddingLeft: 0 },
+    input: { fontSize: 17, height: 24 },
+    typeSelectorRow: { flexDirection: 'row', padding: 10, justifyContent: 'space-around' },
+    typeBtn: { alignItems: 'center', padding: 10, borderRadius: 10, flex: 1 },
+    typeBtnText: { fontSize: 12, marginTop: 4, fontWeight: '500' },
+    modalSwitchRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    switchLabel: { fontSize: 17 },
+    switchSublabel: { fontSize: 12, color: '#8E8E93', marginTop: 2 }
 });
+

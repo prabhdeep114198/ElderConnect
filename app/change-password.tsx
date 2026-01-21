@@ -12,6 +12,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    StatusBar
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -61,121 +62,73 @@ export default function ChangePasswordScreen() {
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={[styles.container, { backgroundColor: colors.background }]}
+            style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}
         >
-            <View style={[styles.topBranding, { backgroundColor: colors.primary }]}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                >
-                    <Ionicons name="chevron-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.brandingTitle}>{t("changePassword")}</Text>
-            </View>
-
+            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <View style={styles.iconHeaderSection}>
-                    <View style={[styles.iconCircle, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-                        <Ionicons name="lock-closed" size={50} color={colors.primary} />
-                    </View>
-                    <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>
-                        Create a strong password to keep your account secure
-                    </Text>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                        <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.largeTitle, { color: colors.text }]}>Security</Text>
                 </View>
 
-                <View style={styles.content}>
+                <View style={styles.section}>
+                    <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>PASSWORD</Text>
                     <View style={[styles.card, { backgroundColor: colors.card }]}>
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: colors.text }]}>{t("currentPassword")}</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: theme === 'dark' ? colors.background : '#F9FCFF',
-                                            color: colors.text,
-                                            borderColor: colors.border,
-                                        },
-                                    ]}
-                                    value={currentPassword}
-                                    onChangeText={setCurrentPassword}
-                                    placeholder={t("currentPassword")}
-                                    placeholderTextColor={colors.mutedText}
-                                    secureTextEntry={!showCurrent}
-                                />
-                                <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowCurrent(!showCurrent)}>
-                                    <Ionicons name={showCurrent ? "eye-off" : "eye"} size={22} color={colors.mutedText} />
-                                </TouchableOpacity>
-                            </View>
+                        <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+                            <Text style={[styles.label, { color: colors.text }]}>Current</Text>
+                            <TextInput
+                                style={[styles.input, { color: colors.text }]}
+                                value={currentPassword}
+                                onChangeText={setCurrentPassword}
+                                secureTextEntry={!showCurrent}
+                                placeholder="Required"
+                                placeholderTextColor={colors.mutedText}
+                            />
+                            <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)}>
+                                <Ionicons name={showCurrent ? "eye-off" : "eye"} size={20} color={colors.primary} />
+                            </TouchableOpacity>
                         </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, { color: colors.text }]}>{t("newPassword")}</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: theme === 'dark' ? colors.background : '#F9FCFF',
-                                            color: colors.text,
-                                            borderColor: colors.border,
-                                        },
-                                    ]}
-                                    value={newPassword}
-                                    onChangeText={setNewPassword}
-                                    placeholder={t("newPassword")}
-                                    placeholderTextColor={colors.mutedText}
-                                    secureTextEntry={!showNew}
-                                />
-                                <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowNew(!showNew)}>
-                                    <Ionicons name={showNew ? "eye-off" : "eye"} size={22} color={colors.mutedText} />
-                                </TouchableOpacity>
-                            </View>
+                        <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+                            <Text style={[styles.label, { color: colors.text }]}>New</Text>
+                            <TextInput
+                                style={[styles.input, { color: colors.text }]}
+                                value={newPassword}
+                                onChangeText={setNewPassword}
+                                secureTextEntry={!showNew}
+                                placeholder="At least 8 chars"
+                                placeholderTextColor={colors.mutedText}
+                            />
+                            <TouchableOpacity onPress={() => setShowNew(!showNew)}>
+                                <Ionicons name={showNew ? "eye-off" : "eye"} size={20} color={colors.primary} />
+                            </TouchableOpacity>
                         </View>
-
-                        <View style={[styles.inputGroup, { marginBottom: 10 }]}>
-                            <Text style={[styles.label, { color: colors.text }]}>{t("confirmPassword")}</Text>
-                            <View style={styles.inputWrapper}>
-                                <TextInput
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: theme === 'dark' ? colors.background : '#F9FCFF',
-                                            color: colors.text,
-                                            borderColor: colors.border,
-                                        },
-                                    ]}
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                    placeholder={t("confirmPassword")}
-                                    placeholderTextColor={colors.mutedText}
-                                    secureTextEntry={!showConfirm}
-                                />
-                                <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowConfirm(!showConfirm)}>
-                                    <Ionicons name={showConfirm ? "eye-off" : "eye"} size={22} color={colors.mutedText} />
-                                </TouchableOpacity>
-                            </View>
+                        <View style={styles.inputRow}>
+                            <Text style={[styles.label, { color: colors.text }]}>Confirm</Text>
+                            <TextInput
+                                style={[styles.input, { color: colors.text }]}
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                secureTextEntry={!showConfirm}
+                                placeholder="Verify new"
+                                placeholderTextColor={colors.mutedText}
+                            />
+                            <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+                                <Ionicons name={showConfirm ? "eye-off" : "eye"} size={20} color={colors.primary} />
+                            </TouchableOpacity>
                         </View>
                     </View>
+                    <Text style={styles.footerText}>A strong password helps prevent unauthorized access to your health data and personal information.</Text>
+                </View>
 
+                <View style={styles.buttonContainer}>
                     <TouchableOpacity
-                        style={[
-                            styles.saveButton,
-                            { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 },
-                        ]}
+                        style={[styles.saveButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
                         onPress={handleChangePassword}
                         disabled={loading}
                     >
-                        <Text style={styles.saveButtonText}>{loading ? t("updating") : t("updatePassword")}</Text>
-                        {!loading && <Ionicons name="shield-checkmark" size={20} color="#FFF" style={{ marginLeft: 8 }} />}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.cancelButton, { borderStyle: 'dashed', borderColor: colors.border }]}
-                        onPress={() => router.back()}
-                        disabled={loading}
-                    >
-                        <Text style={[styles.cancelButtonText, { color: colors.mutedText }]}>{t("cancel")}</Text>
+                        <Text style={styles.saveButtonText}>{loading ? "Updating..." : "Update Password"}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -185,106 +138,19 @@ export default function ChangePasswordScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    topBranding: {
-        paddingTop: 60,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    brandingTitle: {
-        color: '#FFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
-    scrollContent: { flexGrow: 1, paddingBottom: 40 },
-    iconHeaderSection: {
-        alignItems: 'center',
-        marginTop: 30,
-        marginBottom: 30,
-        paddingHorizontal: 40,
-    },
-    iconCircle: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 3,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 15,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    headerSubtitle: {
-        fontSize: 16,
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    content: { paddingHorizontal: 20 },
-    card: {
-        borderRadius: 24,
-        padding: 24,
-        marginBottom: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    inputGroup: { marginBottom: 20 },
-    label: { fontSize: 14, fontWeight: "600", marginBottom: 8, marginLeft: 4 },
-    inputWrapper: {
-        position: 'relative',
-        justifyContent: 'center',
-    },
-    input: {
-        height: 55,
-        borderRadius: 15,
-        borderWidth: 1,
-        paddingHorizontal: 16,
-        paddingRight: 50,
-        fontSize: 16,
-    },
-    eyeBtn: {
-        position: 'absolute',
-        right: 15,
-        height: '100%',
-        justifyContent: 'center',
-    },
-    saveButton: {
-        height: 60,
-        borderRadius: 18,
-        flexDirection: 'row',
-        justifyContent: "center",
-        alignItems: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 10,
-    },
-    saveButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-    cancelButton: {
-        height: 55,
-        borderRadius: 18,
-        borderWidth: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: 15,
-    },
-    cancelButtonText: { fontSize: 16, fontWeight: "600" },
+    scrollContent: { paddingBottom: 40 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+    closeButton: { alignSelf: 'flex-start', paddingBottom: 10 },
+    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5 },
+    section: { marginTop: 25, paddingHorizontal: 20 },
+    sectionHeader: { fontSize: 13, fontWeight: '400', marginBottom: 8, marginLeft: 16 },
+    card: { borderRadius: 12, overflow: 'hidden' },
+    inputRow: { flexDirection: 'row', alignItems: 'center', padding: 12, marginLeft: 16, paddingLeft: 0 },
+    label: { fontSize: 17, width: 100 },
+    input: { flex: 1, fontSize: 17, textAlign: 'right', paddingRight: 10 },
+    footerText: { color: '#8E8E93', fontSize: 13, paddingHorizontal: 16, marginTop: 10, lineHeight: 18 },
+    buttonContainer: { marginTop: 40, paddingHorizontal: 20 },
+    saveButton: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    saveButtonText: { color: "#FFF", fontSize: 17, fontWeight: "600" },
 });
+

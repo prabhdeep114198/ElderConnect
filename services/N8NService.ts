@@ -1,12 +1,17 @@
-// services/N8NService.ts
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// 🟢 CONFIGURATION: Replace this with your actual n8n Webhook URL
-// If you are testing on Android Emulator, use 'http://10.0.2.2:5678/webhook/...' 
-// If specific IP, use 'http://192.168.x.x:5678/webhook/...'
-// For Cloud n8n, use your https link.
-const N8N_WEBHOOK_URL = "https://your-n8n-instance.com/webhook/elder-connect-report";
+// Detect host for local n8n development
+const getHostIP = () => {
+    const debuggerHost = Constants.expoConfig?.hostUri;
+    return debuggerHost ? debuggerHost.split(':')[0] : 'localhost';
+};
+
+const host = getHostIP();
+const N8N_WEBHOOK_URL = `http://${host}:5678/webhook/elder-connect-report`;
 
 export const N8NService = {
+
     /**
      * Sends the full health report data to n8n for processing and WhatsApp delivery
      * @param userData User profile data containing contacts
@@ -78,6 +83,43 @@ export const N8NService = {
         } catch (error) {
             console.error("❌ [N8N Service] Error:", error);
             return { success: false, error: error };
+        }
+    },
+
+    /**
+     * Sends a reminder alert to n8n.
+     * n8n can then schedule a secondary notification (e.g., WhatsApp to family)
+     * @param userData User profile
+     * @param reminder Reminder details
+     */
+    async sendReminderAlert(userData: any, reminder: any) {
+        try {
+            const payload = {
+                action: "SCHEDULE_EXTERNAL_REMINDER",
+                timestamp: new Date().toISOString(),
+                user: {
+                    name: userData?.name || "Elder",
+                    email: userData?.email
+                },
+                reminder: {
+                    title: reminder.title,
+                    type: reminder.type,
+                    scheduledTime: reminder.date,
+                    message: `Reminder for ${userData?.name}: ${reminder.title} at ${new Date(reminder.date).toLocaleTimeString()}`
+                },
+                contacts: userData?.emergencyContacts || []
+            };
+
+            const response = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error("❌ [N8N Service] Reminder Error:", error);
+            return false;
         }
     }
 };

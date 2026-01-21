@@ -40,7 +40,19 @@
         }
       ],
       "expo-audio",
-      "expo-video"
+      "expo-video",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "peripheral",
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow ElderConnect to connect to your health devices.",
+          "bluetoothPeripheralPermission": "Allow ElderConnect to be discovered by other devices."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
