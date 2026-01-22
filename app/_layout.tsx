@@ -89,21 +89,23 @@ function InitialLayout() {
     const segment = segments[0];
     const inAuthGroup = segment === "auth";
     const inOnboarding = segment === "onboarding";
-    const isLandingPage = !segment;
 
     // NOT AUTHENTICATED
     if (!user) {
+      if (!inAuthGroup) {
+        router.replace("/auth/login");
+      }
       return;
     }
 
-    // AUTHENTICATED BUT NOT ONBOARDED
-    if (!user.isOnboarded && !inOnboarding) {
-      router.replace("/onboarding");
+    if (!user.isOnboarded) {
+      if (!inOnboarding) {
+        router.replace("/onboarding");
+      }
       return;
     }
 
-    // AUTHENTICATED AND ONBOARDED BUT ON AUTH SCREENS
-    if (inAuthGroup) {
+    if (inAuthGroup || inOnboarding) {
       router.replace("/(tabs)/home");
     }
   }, [user, loading, segments, router]);

@@ -25,9 +25,11 @@ const fetchSettings = (t: any): SettingsSectionType[] => [
     title: t("account"),
     data: [
       { type: "item", title: t("profile"), subtitle: t("profileSubtitle"), action: "profile" },
+      { type: "item", title: t("myDevices"), subtitle: t("myDevicesSubtitle") || "Connect your watch or monitor", action: "devices" },
       { type: "item", title: t("changePassword"), subtitle: t("changePasswordSubtitle"), action: "changePassword" },
       { type: "item", title: t("emailPreferences"), subtitle: t("emailPreferencesSubtitle"), action: "emailPreferences" },
     ],
+
   },
   {
     title: t("subscription"),
@@ -108,7 +110,11 @@ export default function SettingsScreen() {
       case "profile":
         requireAuth(() => router.push("/profile"));
         break;
+      case "devices":
+        requireAuth(() => router.push("/DevicesScreen"));
+        break;
       case "changePassword":
+
         requireAuth(() => router.push("/change-password"));
         break;
       case "manageSubscription":

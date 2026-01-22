@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Alert,
   Dimensions,
@@ -9,9 +9,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator,
+  RefreshControl
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { deviceService } from "../../services/api/device";
 
 const { width } = Dimensions.get('window');
 
@@ -42,6 +46,9 @@ interface VitalSign {
 
 export default function HealthTrackerScreen() {
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<HealthMetric | null>(null);
   const [showVitalModal, setShowVitalModal] = useState(false);
@@ -53,156 +60,196 @@ export default function HealthTrackerScreen() {
     notes: ''
   });
 
+
+  const loadHealthData = useCallback(async (isRefresh = false) => {
+    if (!user?.id) return;
+
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      // 1. Fetch Vitals List (Manual entries)
+      const vitalsResponse: any = await deviceService.getVitals(user.id, { limit: 50 });
+      const backendVitals = vitalsResponse?.data?.vitals || [];
+
+      const mappedVitals = backendVitals.map((v: any) => ({
+        id: v.id,
+        name: getVitalName(v.vitalType),
+        systolic: v.reading?.systolic,
+        diastolic: v.reading?.diastolic,
+        value: v.vitalType !== 'blood_pressure' ? extractNumericReading(v) : undefined,
+        unit: getVitalUnit(v.vitalType),
+        status: v.isAbnormal ? 'high' : 'normal',
+        timestamp: v.recordedAt,
+        notes: v.notes
+      }));
+      setVitalSigns(mappedVitals);
+
+      // 2. Fetch Latest Telemetry (Automated tracking)
+      const telemetryMetrics = ['steps', 'heart_rate', 'sleep', 'water', 'exercise', 'weight'];
+      const telemetryData: Record<string, any> = {};
+
+      await Promise.all(telemetryMetrics.map(async (type) => {
+        try {
+          const res: any = await deviceService.getLatestTelemetry(user.id, type);
+          if (res?.data?.telemetry) {
+            telemetryData[type] = res.data.telemetry;
+          }
+        } catch (e) { /* ignore individual failures */ }
+      }));
+
+      // 3. Update Dashboard Metrics (Merge Vitals & Telemetry)
+      const updatedMetrics = [...healthMetrics];
+      const metricMap: Record<string, string> = {
+        'steps': 'Steps',
+        'heart_rate': 'Heart Rate',
+        'sleep': 'Sleep',
+        'water': 'Water Intake',
+        'weight': 'Weight',
+        'exercise': 'Exercise',
+        'oxygen_saturation': 'Oxygen'
+      };
+
+      for (const [vType, mName] of Object.entries(metricMap)) {
+        const mIndex = updatedMetrics.findIndex(m => m.name === mName || (mName === 'Oxygen' && m.name === 'Oxygen Saturation'));
+        if (mIndex === -1) continue;
+
+        // Try telemetry first for automated metrics, then fall back to manual vitals
+        const latestTelemetry = telemetryData[vType];
+        const latestVital = backendVitals.find((v: any) => v.vitalType === vType);
+
+        if (latestTelemetry || latestVital) {
+          const source = (latestTelemetry && (!latestVital || new Date(latestTelemetry.timestamp) > new Date(latestVital.recordedAt)))
+            ? latestTelemetry
+            : latestVital;
+
+          const timestamp = source.timestamp || source.recordedAt;
+
+          updatedMetrics[mIndex].value = source.vitalType === 'blood_pressure'
+            ? source.reading.systolic
+            : extractNumericReading(source);
+          updatedMetrics[mIndex].lastUpdated = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      }
+      setHealthMetrics(updatedMetrics);
+
+      // 4. Calculate Weekly Goals (Mocking logic for now since we'd need a grouped API endpoint)
+      // In a real app, you'd fetch /telemetry/summary or similar
+      const updatedGoals = [...weeklyGoals];
+      updatedGoals[0].current = mappedVitals.filter((v: VitalSign) => v.name === 'Steps').reduce((sum: number, v: VitalSign) => sum + (v.value || 0), 0) || 5200 * 7; // Mock fallback
+      setWeeklyGoals(updatedGoals);
+
+    } catch (error) {
+      console.error("Failed to load health data", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadHealthData();
+  }, [loadHealthData]);
+
+  const extractNumericReading = (v: any) => {
+    const data = v.reading || v.value;
+    if (!data) return 0;
+
+    // Telemetry uses 'value' directly if it's a number, or a nested object
+    if (typeof data === 'number') return data;
+
+    return data.bpm || data.fahrenheit || data.celsius || data.mgdl ||
+      data.percentage || data.value || data.kg || data.lbs ||
+      data.steps || data.hours || data.minutes || 0;
+  };
+
   const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([
     {
       id: '1',
       name: 'Steps',
-      value: 6847,
+      value: 0,
       unit: 'steps',
       target: 8000,
       icon: 'walk',
       color: colors.primary,
       trend: 'up',
-      lastUpdated: '2 hours ago',
-      history: [
-        { date: '2024-12-09', value: 5200 },
-        { date: '2024-12-10', value: 6100 },
-        { date: '2024-12-11', value: 7300 },
-        { date: '2024-12-12', value: 6847 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     },
     {
       id: '2',
       name: 'Heart Rate',
-      value: 72,
+      value: 0,
       unit: 'bpm',
       target: 75,
       icon: 'heart',
       color: colors.error,
       trend: 'stable',
-      lastUpdated: '30 minutes ago',
-      history: [
-        { date: '2024-12-09', value: 74 },
-        { date: '2024-12-10', value: 71 },
-        { date: '2024-12-11', value: 73 },
-        { date: '2024-12-12', value: 72 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     },
     {
       id: '3',
       name: 'Sleep',
-      value: 7.5,
+      value: 0,
       unit: 'hours',
       target: 8,
       icon: 'moon',
       color: colors.info,
       trend: 'up',
-      lastUpdated: 'This morning',
-      history: [
-        { date: '2024-12-09', value: 6.8 },
-        { date: '2024-12-10', value: 7.2 },
-        { date: '2024-12-11', value: 7.8 },
-        { date: '2024-12-12', value: 7.5 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     },
     {
       id: '4',
       name: 'Water Intake',
-      value: 6,
+      value: 0,
       unit: 'glasses',
       target: 8,
       icon: 'water',
       color: colors.info,
       trend: 'down',
-      lastUpdated: '1 hour ago',
-      history: [
-        { date: '2024-12-09', value: 7 },
-        { date: '2024-12-10', value: 8 },
-        { date: '2024-12-11', value: 6 },
-        { date: '2024-12-12', value: 6 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     },
     {
       id: '5',
       name: 'Weight',
-      value: 68.5,
+      value: 0,
       unit: 'kg',
       icon: 'fitness',
       color: colors.success,
       trend: 'stable',
-      lastUpdated: 'Yesterday',
-      history: [
-        { date: '2024-12-09', value: 68.8 },
-        { date: '2024-12-10', value: 68.6 },
-        { date: '2024-12-11', value: 68.4 },
-        { date: '2024-12-12', value: 68.5 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     },
     {
       id: '6',
       name: 'Exercise',
-      value: 45,
+      value: 0,
       unit: 'minutes',
       target: 60,
       icon: 'barbell',
       color: colors.warning,
       trend: 'up',
-      lastUpdated: '3 hours ago',
-      history: [
-        { date: '2024-12-09', value: 30 },
-        { date: '2024-12-10', value: 35 },
-        { date: '2024-12-11', value: 40 },
-        { date: '2024-12-12', value: 45 }
-      ]
+      lastUpdated: 'Never',
+      history: []
     }
   ]);
 
-  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([
-    {
-      id: '1',
-      name: 'Blood Pressure',
-      systolic: 120,
-      diastolic: 80,
-      unit: 'mmHg',
-      status: 'normal',
-      timestamp: '2024-12-12 08:30',
-      notes: 'Measured after morning walk'
-    },
-    {
-      id: '2',
-      name: 'Blood Sugar',
-      value: 95,
-      unit: 'mg/dL',
-      status: 'normal',
-      timestamp: '2024-12-12 07:45',
-      notes: 'Fasting glucose level'
-    },
-    {
-      id: '3',
-      name: 'Temperature',
-      value: 98.6,
-      unit: '°F',
-      status: 'normal',
-      timestamp: '2024-12-12 09:00'
-    },
-    {
-      id: '4',
-      name: 'Oxygen Saturation',
-      value: 98,
-      unit: '%',
-      status: 'normal',
-      timestamp: '2024-12-12 08:45'
-    }
+  const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
+
+  const [weeklyGoals, setWeeklyGoals] = useState([
+    { name: 'Steps', current: 0, target: 56000, unit: 'steps' },
+    { name: 'Exercise', current: 0, target: 420, unit: 'minutes' },
+    { name: 'Sleep', current: 0, target: 56, unit: 'hours' },
+    { name: 'Water', current: 0, target: 56, unit: 'glasses' }
   ]);
 
-  const weeklyGoals = [
-    { name: 'Steps', current: 45230, target: 56000, unit: 'steps' },
-    { name: 'Exercise', current: 280, target: 420, unit: 'minutes' },
-    { name: 'Sleep', current: 52.5, target: 56, unit: 'hours' },
-    { name: 'Water', current: 42, target: 56, unit: 'glasses' }
-  ];
 
-  const addVitalSign = () => {
+  const addVitalSign = async () => {
+    if (!user?.id) return;
+
     if (newVital.type === 'blood_pressure' && (!newVital.systolic || !newVital.diastolic)) {
       Alert.alert('Error', 'Please enter both systolic and diastolic values.');
       return;
@@ -212,22 +259,53 @@ export default function HealthTrackerScreen() {
       return;
     }
 
-    const vital: VitalSign = {
-      id: Date.now().toString(),
-      name: getVitalName(newVital.type),
-      systolic: newVital.type === 'blood_pressure' ? parseInt(newVital.systolic) : undefined,
-      diastolic: newVital.type === 'blood_pressure' ? parseInt(newVital.diastolic) : undefined,
-      value: newVital.type !== 'blood_pressure' ? parseFloat(newVital.value) : undefined,
-      unit: getVitalUnit(newVital.type),
-      status: 'normal',
-      timestamp: new Date().toISOString(),
-      notes: newVital.notes
-    };
+    try {
+      const payload: any = {
+        vitalType: newVital.type,
+        recordedAt: new Date().toISOString(),
+        recordedBy: 'manual',
+        notes: newVital.notes,
+        reading: {}
+      };
 
-    setVitalSigns(prev => [vital, ...prev]);
-    setNewVital({ type: 'blood_pressure', systolic: '', diastolic: '', value: '', notes: '' });
-    setShowVitalModal(false);
-    Alert.alert('Success', 'Vital sign recorded successfully!');
+      if (newVital.type === 'blood_pressure') {
+        payload.reading = {
+          systolic: parseInt(newVital.systolic),
+          diastolic: parseInt(newVital.diastolic)
+        };
+        payload.unit = 'mmHg';
+      } else {
+        switch (newVital.type) {
+          case 'heart_rate':
+            payload.reading = { bpm: parseInt(newVital.value) };
+            payload.unit = 'bpm';
+            break;
+          case 'temperature':
+            payload.reading = { fahrenheit: parseFloat(newVital.value) };
+            payload.unit = '°F';
+            break;
+          case 'blood_sugar':
+            payload.reading = { mgdl: parseInt(newVital.value) };
+            payload.unit = 'mg/dL';
+            break;
+          case 'oxygen':
+            payload.vitalType = 'oxygen_saturation';
+            payload.reading = { percentage: parseInt(newVital.value) };
+            payload.unit = '%';
+            break;
+        }
+      }
+
+      await deviceService.recordVitals(user.id, payload);
+
+      Alert.alert('Success', 'Vital sign recorded successfully!');
+      setShowVitalModal(false);
+      setNewVital({ type: 'blood_pressure', systolic: '', diastolic: '', value: '', notes: '' });
+      loadHealthData();
+    } catch (error) {
+      console.error("Failed to record vitals", error);
+      Alert.alert('Error', 'Failed to save vital sign. Please try again.');
+    }
   };
 
   const getVitalName = (type: string) => {
@@ -235,8 +313,11 @@ export default function HealthTrackerScreen() {
       case 'blood_pressure': return 'Blood Pressure';
       case 'blood_sugar': return 'Blood Sugar';
       case 'temperature': return 'Temperature';
-      case 'oxygen': return 'Oxygen Saturation';
-      default: return 'Unknown';
+      case 'oxygen':
+      case 'oxygen_saturation': return 'Oxygen Saturation';
+      case 'heart_rate': return 'Heart Rate';
+      case 'weight': return 'Weight';
+      default: return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
   };
 
@@ -245,34 +326,19 @@ export default function HealthTrackerScreen() {
       case 'blood_pressure': return 'mmHg';
       case 'blood_sugar': return 'mg/dL';
       case 'temperature': return '°F';
-      case 'oxygen': return '%';
+      case 'oxygen':
+      case 'oxygen_saturation': return '%';
+      case 'heart_rate': return 'bpm';
+      case 'weight': return 'kg';
+      case 'steps': return 'steps';
+      case 'exercise': return 'min';
+      case 'water': return 'glasses';
+      case 'sleep': return 'hours';
       default: return '';
     }
   };
 
-  const updateMetric = (metricId: string, newValue: number) => {
-    setHealthMetrics(prev => prev.map(metric => {
-      if (metric.id === metricId) {
-        const today = new Date().toISOString().split('T')[0];
-        const updatedHistory = [...metric.history];
-        const todayIndex = updatedHistory.findIndex(h => h.date === today);
 
-        if (todayIndex >= 0) {
-          updatedHistory[todayIndex].value = newValue;
-        } else {
-          updatedHistory.push({ date: today, value: newValue });
-        }
-
-        return {
-          ...metric,
-          value: newValue,
-          history: updatedHistory,
-          lastUpdated: 'Just now'
-        };
-      }
-      return metric;
-    }));
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -309,11 +375,21 @@ export default function HealthTrackerScreen() {
     setSelectedMetric(metric);
   };
 
-  const quickLogWater = () => {
+  const quickLogWater = async () => {
     const waterMetric = healthMetrics.find(m => m.name === 'Water Intake');
-    if (waterMetric) {
-      updateMetric(waterMetric.id, waterMetric.value + 1);
-      Alert.alert('Water Logged', 'Added 1 glass of water to your daily intake!');
+    if (waterMetric && user?.id) {
+      try {
+        await deviceService.recordVitals(user.id, {
+          vitalType: 'water',
+          recordedAt: new Date().toISOString(),
+          recordedBy: 'manual',
+          reading: { value: waterMetric.value + 1 }
+        });
+        loadHealthData();
+        Alert.alert('Water Logged', 'Added 1 glass of water to your daily intake!');
+      } catch (e) {
+        console.error("Failed to log water", e);
+      }
     }
   };
 
@@ -324,30 +400,71 @@ export default function HealthTrackerScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: '15 min', onPress: () => {
+          text: '15 min', onPress: async () => {
             const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 15);
+            if (exerciseMetric && user?.id) {
+              await deviceService.recordVitals(user.id, {
+                vitalType: 'exercise',
+                recordedAt: new Date().toISOString(),
+                recordedBy: 'manual',
+                reading: { value: exerciseMetric.value + 15 }
+              });
+              loadHealthData();
+            }
           }
         },
         {
-          text: '30 min', onPress: () => {
+          text: '30 min', onPress: async () => {
             const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 30);
+            if (exerciseMetric && user?.id) {
+              await deviceService.recordVitals(user.id, {
+                vitalType: 'exercise',
+                recordedAt: new Date().toISOString(),
+                recordedBy: 'manual',
+                reading: { value: exerciseMetric.value + 30 }
+              });
+              loadHealthData();
+            }
           }
         },
         {
-          text: '60 min', onPress: () => {
+          text: '60 min', onPress: async () => {
             const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric) updateMetric(exerciseMetric.id, exerciseMetric.value + 60);
+            if (exerciseMetric && user?.id) {
+              await deviceService.recordVitals(user.id, {
+                vitalType: 'exercise',
+                recordedAt: new Date().toISOString(),
+                recordedBy: 'manual',
+                reading: { value: exerciseMetric.value + 60 }
+              });
+              loadHealthData();
+            }
           }
         }
       ]
     );
   };
 
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.text }}>Loading health data...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadHealthData(true)} />
+        }
+      >
+
         {/* Header */}
         <View style={styles.header}>
           <View>

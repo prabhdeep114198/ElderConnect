@@ -12,6 +12,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    StatusBar
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -45,97 +46,54 @@ export default function ProfileScreen() {
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={[styles.container, { backgroundColor: colors.background }]}
+            style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}
         >
-            <View style={[styles.topBranding, { backgroundColor: colors.primary }]}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                >
-                    <Ionicons name="chevron-back" size={28} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.brandingTitle}>{t("profile")}</Text>
-            </View>
-
+            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                        <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.largeTitle, { color: colors.text }]}>Profile</Text>
+                </View>
+
                 <View style={styles.avatarSection}>
-                    <View style={[styles.avatarCircle, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.card }]}>
                         <Ionicons name="person" size={80} color={colors.primary} />
                         <TouchableOpacity style={styles.editAvatarBtn}>
                             <Ionicons name="camera" size={20} color="#FFF" />
                         </TouchableOpacity>
                     </View>
-                    <Text style={[styles.profileNamePrimary, { color: colors.text }]}>{user?.name}</Text>
-                    <Text style={[styles.profileEmailSecondary, { color: colors.mutedText }]}>{user?.email}</Text>
                 </View>
 
-                <View style={styles.content}>
+                <View style={styles.section}>
+                    <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>PERSONAL INFORMATION</Text>
                     <View style={[styles.card, { backgroundColor: colors.card }]}>
-                        <View style={styles.inputGroup}>
-                            <View style={styles.labelRow}>
-                                <Ionicons name="person-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-                                <Text style={[styles.label, { color: colors.text }]}>{t("fullName")}</Text>
-                            </View>
+                        <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+                            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
                             <TextInput
-                                style={[
-                                    styles.input,
-                                    {
-                                        backgroundColor: theme === 'dark' ? colors.background : '#F9FCFF',
-                                        color: colors.text,
-                                        borderColor: colors.border,
-                                    },
-                                ]}
+                                style={[styles.input, { color: colors.text }]}
                                 value={name}
                                 onChangeText={setName}
-                                placeholder={t("fullName")}
+                                placeholder="Full Name"
                                 placeholderTextColor={colors.mutedText}
                             />
                         </View>
-
-                        <View style={[styles.inputGroup, { marginBottom: 10 }]}>
-                            <View style={styles.labelRow}>
-                                <Ionicons name="mail-outline" size={18} color={colors.mutedText} style={{ marginRight: 8 }} />
-                                <Text style={[styles.label, { color: colors.mutedText }]}>{t("emailAddress")}</Text>
-                            </View>
-                            <TextInput
-                                style={[
-                                    styles.input,
-                                    styles.disabledInput,
-                                    {
-                                        backgroundColor: theme === 'dark' ? colors.background : '#F0F0F0',
-                                        color: colors.mutedText,
-                                        borderColor: colors.border,
-                                    },
-                                ]}
-                                value={user?.email}
-                                editable={false}
-                                placeholder={t("emailAddress")}
-                            />
-                            <View style={styles.infoRow}>
-                                <Ionicons name="information-circle-outline" size={14} color={colors.mutedText} style={{ marginRight: 4 }} />
-                                <Text style={[styles.infoText, { color: colors.mutedText }]}>{t("emailCannotBeChanged")}</Text>
-                            </View>
+                        <View style={styles.inputRow}>
+                            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+                            <Text style={[styles.readOnlyText, { color: colors.mutedText }]}>{user?.email}</Text>
                         </View>
                     </View>
+                    <Text style={styles.footerText}>Your email address cannot be changed. It is used for account recovery and security notifications.</Text>
+                </View>
 
+                <View style={styles.buttonContainer}>
                     <TouchableOpacity
-                        style={[
-                            styles.saveButton,
-                            { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 },
-                        ]}
+                        style={[styles.saveButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
                         onPress={handleSave}
                         disabled={loading}
                     >
-                        <Text style={styles.saveButtonText}>{loading ? t("saving") : t("saveChanges")}</Text>
-                        {!loading && <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginLeft: 8 }} />}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.cancelButton, { borderStyle: 'dashed', borderColor: colors.border }]}
-                        onPress={() => router.back()}
-                        disabled={loading}
-                    >
-                        <Text style={[styles.cancelButtonText, { color: colors.mutedText }]}>{t("cancel")}</Text>
+                        <Text style={styles.saveButtonText}>{loading ? "Saving..." : "Save Changes"}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -145,125 +103,46 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    topBranding: {
-        paddingTop: 60,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    brandingTitle: {
-        color: '#FFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
-    scrollContent: { flexGrow: 1, paddingBottom: 40 },
-    avatarSection: {
-        alignItems: 'center',
-        marginTop: -40,
-        marginBottom: 20,
-    },
+    scrollContent: { paddingBottom: 40 },
+    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+    closeButton: { alignSelf: 'flex-start', paddingBottom: 10 },
+    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5 },
+    avatarSection: { alignItems: 'center', marginVertical: 30 },
     avatarCircle: {
         width: 120,
         height: 120,
         borderRadius: 60,
-        borderWidth: 4,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
         shadowRadius: 10,
-        elevation: 8,
+        elevation: 5,
     },
     editAvatarBtn: {
         position: 'absolute',
-        bottom: 5,
-        right: 5,
-        backgroundColor: '#2E5EAA',
-        width: 34,
-        height: 34,
-        borderRadius: 17,
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#007AFF',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: '#FFF',
     },
-    profileNamePrimary: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginTop: 15,
-    },
-    profileEmailSecondary: {
-        fontSize: 16,
-        marginTop: 4,
-    },
-    content: { paddingHorizontal: 20 },
-    card: {
-        borderRadius: 24,
-        padding: 24,
-        marginBottom: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    inputGroup: { marginBottom: 20 },
-    labelRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    label: { fontSize: 14, fontWeight: "600" },
-    input: {
-        height: 55,
-        borderRadius: 15,
-        borderWidth: 1,
-        paddingHorizontal: 16,
-        fontSize: 16,
-    },
-    disabledInput: { opacity: 0.8 },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    infoText: {
-        fontSize: 12,
-        fontStyle: "italic",
-    },
-    saveButton: {
-        height: 60,
-        borderRadius: 18,
-        flexDirection: 'row',
-        justifyContent: "center",
-        alignItems: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 10,
-    },
-    saveButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-    cancelButton: {
-        height: 55,
-        borderRadius: 18,
-        borderWidth: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: 15,
-    },
-    cancelButtonText: { fontSize: 16, fontWeight: "600" },
+    section: { marginTop: 10, paddingHorizontal: 20 },
+    sectionHeader: { fontSize: 13, fontWeight: '400', marginBottom: 8, marginLeft: 16 },
+    card: { borderRadius: 12, overflow: 'hidden' },
+    inputRow: { flexDirection: 'row', alignItems: 'center', padding: 12, marginLeft: 16, paddingLeft: 0 },
+    label: { fontSize: 17, width: 80 },
+    input: { flex: 1, fontSize: 17, textAlign: 'right' },
+    readOnlyText: { flex: 1, fontSize: 17, textAlign: 'right' },
+    footerText: { color: '#8E8E93', fontSize: 13, paddingHorizontal: 16, marginTop: 10, lineHeight: 18 },
+    buttonContainer: { marginTop: 40, paddingHorizontal: 20 },
+    saveButton: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    saveButtonText: { color: "#FFF", fontSize: 17, fontWeight: "600" },
 });
+
