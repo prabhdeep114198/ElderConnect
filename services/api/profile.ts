@@ -23,7 +23,21 @@ export const profileService = {
     },
 
     // Reports
-    getHealthSummary: (userId: string) => api.get(`/v1/users/${userId}/health-summary`),
-    getComplianceReport: (userId: string, days = 30) => api.get(`/v1/users/${userId}/medication-compliance`, { params: { days: String(days) } }),
-    getReminders: (userId: string) => api.get(`/v1/users/${userId}/medication-reminders`),
+    getHealthSummary: (userId: string) => api.get(`/v1/users/${userId}/reports/health-summary`),
+    getComplianceReport: (userId: string, days = 30) => api.get(`/v1/users/${userId}/reports/medication-compliance`, { params: { days: String(days) } }),
+    getMedicationReminders: (userId: string) => api.get(`/v1/users/${userId}/medication-reminders`),
+
+    // Health Metrics
+    updateHealthMetric: (userId: string, data: { type: string; value: number; timestamp?: string }) => api.post(`/v1/users/${userId}/health/metrics`, data),
+    getDailyMetrics: (userId: string, date?: string) => {
+        const params: any = {};
+        if (date) params.date = date;
+        return api.get(`/v1/users/${userId}/health/metrics`, { params });
+    },
+
+    // Appointments
+    getAppointments: (userId: string) => api.get(`/v1/users/${userId}/appointments`),
+    createAppointment: (userId: string, data: any) => api.post(`/v1/users/${userId}/appointments`, data),
+    updateAppointment: (userId: string, appId: string, data: any) => api.put(`/v1/users/${userId}/appointments/${appId}`, data),
+    deleteAppointment: (userId: string, appId: string) => api.delete(`/v1/users/${userId}/appointments/${appId}`),
 };

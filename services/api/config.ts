@@ -39,4 +39,4 @@ export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
 
 export const API_TIMEOUT = 10000; // 10 seconds
 
-export const HUGGING_FACE_API_KEY = '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';
+export const DEVICE_API_KEY = 'dev-device-key-123';
