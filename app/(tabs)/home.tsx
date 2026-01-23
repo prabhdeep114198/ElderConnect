@@ -25,18 +25,13 @@ import { useTheme } from "../../context/ThemeContext";
 const { width } = Dimensions.get("window");
 
 const API_CONFIG = {
-  BASE_URL: 'https://your-api.com/api', // Change this to your backend URL
+  BASE_URL: 'http://192.168.29.13:3000/api/v1',
   ENDPOINTS: {
-    HEALTH_METRICS: '/health/metrics',
     SCHEDULE: '/schedule/today',
     EMERGENCY_CONTACT: '/emergency/sos',
     FAMILY_CALL: '/family/call',
     REMINDERS: '/reminders',
-    AI_COMPANION: '/ai/message',
-    UPDATE_HEALTH: '/health/update'
   },
-  // Add your auth token here if needed
-  AUTH_TOKEN: 'your-auth-token-here'
 };
 
 // NOTIFICATION HANDLER
@@ -103,44 +98,18 @@ export default function HomeScreen() {
   // API FUNCTIONS
   // ============================================
   const fetchFromAPI = async (endpoint: string, options: RequestInit = {}) => {
-    // If we're using a placeholder URL, don't even try to fetch to avoid console noise
-    if (API_CONFIG.BASE_URL.includes('your-api.com')) {
-      // Return some realistic mock data based on the endpoint
-      switch (endpoint) {
-        case API_CONFIG.ENDPOINTS.HEALTH_METRICS:
-          return {
-            metrics: [
-              { label: t("stepsToday") || "Steps Today", value: "3,452", icon: "walk", trend: "up" },
-              { label: t("heartRate") || "Heart Rate", value: `75 ${t("bpm") || "bpm"}`, icon: "heart", trend: "stable" },
-              { label: t("sleepQuality") || "Sleep Quality", value: `7.2 ${t("hrs") || "hrs"}`, icon: "moon", trend: "up" },
-              { label: t("hydration") || "Hydration", value: `5/8 ${t("cups") || "cups"}`, icon: "water", trend: "down" },
-            ]
-          };
-        case API_CONFIG.ENDPOINTS.SCHEDULE:
-          return {
-            events: [
-              { time: "09:00 AM", title: t("takeMorningMedication"), type: "medication" },
-              { time: "11:30 AM", title: t("physiotherapySession") || "Physiotherapy Session", type: "activity" },
-              { time: "04:30 PM", title: t("eveningWalkReminder"), type: "activity" },
-            ]
-          };
-        case API_CONFIG.ENDPOINTS.AI_COMPANION:
-          return {
-            message: "I've checked your health metrics. You're doing great with your steps today! Don't forget to drink a bit more water."
-          };
-        case API_CONFIG.ENDPOINTS.REMINDERS:
-          return {
-            reminders: []
-          };
-        default:
-          return null;
-      }
-    }
-
     try {
+      if (!user && !(options.headers as any)?.['Authorization']) {
+        // Handle guest mode or no user - skip fetching user-specific data
+        if (endpoint.includes('/users/')) return null;
+      }
+
+      // Get token dynamically
+      const token = await AsyncStorage.getItem("auth_token");
+
       const mergedHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...(options.headers as Record<string, string> | undefined),
       };
 
@@ -173,16 +142,20 @@ export default function HomeScreen() {
   };
 
   const fetchHealthMetrics = async () => {
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.HEALTH_METRICS);
-    if (data && data.metrics) {
-      setHealthMetrics(data.metrics);
-      // Update individual values
-      data.metrics.forEach((metric: any) => {
-        if (metric.label === "Steps Today") setSteps(parseInt(metric.value.replace(/,/g, '')));
-        if (metric.label === "Heart Rate") setHeartRate(parseInt(metric.value));
-        if (metric.label === "Sleep Quality") setSleepHours(parseFloat(metric.value));
-        if (metric.label === "Hydration") setWaterIntake(parseInt(metric.value.split('/')[0]));
-      });
+    if (!user) return;
+    const data = await fetchFromAPI(`/users/${user.id}/health/metrics`);
+    if (data && data.data && data.data.metrics) {
+      setHealthMetrics(data.data.metrics);
+      // Sync local state if remote has data (optional, maybe we trust local more for steps?)
+      // Actually, we should probably merge or trust remote if it's the source of truth
+      // But for steps, Pedometer is source of truth.
+      const raw = data.data.raw;
+      if (raw) {
+        // setSteps(raw.steps); // Don't overwrite live steps from pedometer
+        if (raw.heartRate) setHeartRate(raw.heartRate);
+        if (raw.sleepHours) setSleepHours(raw.sleepHours);
+        if (raw.waterIntake) setWaterIntake(raw.waterIntake);
+      }
     }
   };
 
@@ -193,18 +166,18 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchAIMessage = async () => {
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.AI_COMPANION);
-    if (data && data.message) {
-      setAiMessage(data.message);
-    }
-  };
 
   const updateHealthData = async (type: string, value: any) => {
-    await fetchFromAPI(API_CONFIG.ENDPOINTS.UPDATE_HEALTH, {
+    if (!user) return;
+    await fetchFromAPI(`/users/${user.id}/health/metrics`, {
       method: 'POST',
       body: JSON.stringify({ type, value, timestamp: new Date().toISOString() })
     });
+  };
+
+  const fetchAIMessage = async () => {
+    // Placeholder for AI message fetch
+    // Implementation would go here
   };
 
   // ============================================
@@ -434,6 +407,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     updateHealthMetrics();
+
+    // Sync to backend periodically or on change (debounced)
+    const timeoutId = setTimeout(() => {
+      if (user) {
+        updateHealthData('steps', steps);
+        updateHealthData('heartRate', heartRate);
+        updateHealthData('sleep', sleepHours);
+        updateHealthData('water', waterIntake);
+      }
+    }, 5000); // 5 second debounce to avoid spamming API on every step
+
+    return () => clearTimeout(timeoutId);
   }, [steps, heartRate, sleepHours, waterIntake]);
 
   // ============================================

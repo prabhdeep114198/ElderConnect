@@ -133,7 +133,7 @@ export default function DiaryScreen() {
     { icon: "book", label: t("reading"), value: "reading" },
     { icon: "people", label: t("social"), value: "social" },
     { icon: "fitness", label: t("exercise"), value: "exercise" },
-    { icon: "meditation", label: t("meditation"), value: "meditation" },
+    { icon: "leaf", label: t("meditation"), value: "meditation" },
     { icon: "brush", label: t("hobby"), value: "hobby" },
   ];
 

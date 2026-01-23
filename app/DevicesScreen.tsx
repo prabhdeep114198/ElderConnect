@@ -21,8 +21,8 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { authService } from "../services/api/auth";
 
-// Initialize BleManager outside of component to persist across re-renders
-const bleManager = new BleManager();
+// Initialize BleManager lazily
+let bleManager: BleManager | null = null;
 
 export default function DevicesScreen() {
     const router = useRouter();
@@ -67,12 +67,16 @@ export default function DevicesScreen() {
     useEffect(() => {
         loadConnectedDevices();
         return () => {
-            bleManager.stopDeviceScan();
+            if (bleManager) bleManager.stopDeviceScan();
         };
     }, []);
 
     useEffect(() => {
-        if (isScanning) {
+        if (!bleManager && Platform.OS !== 'web') {
+            bleManager = new BleManager();
+        }
+
+        if (isScanning && bleManager) {
             startScan();
             Animated.loop(
                 Animated.sequence([
@@ -81,12 +85,14 @@ export default function DevicesScreen() {
                 ])
             ).start();
         } else {
-            bleManager.stopDeviceScan();
+            if (bleManager) bleManager.stopDeviceScan();
             scanAnim.setValue(0);
         }
     }, [isScanning]);
 
     const startScan = async () => {
+        if (!bleManager) return;
+
         const hasPermission = await requestPermissions();
         if (!hasPermission) {
             Alert.alert("Permissions Required", "This app needs Bluetooth and Location access to find health devices.");
@@ -116,6 +122,7 @@ export default function DevicesScreen() {
     };
 
     const handleConnect = async (device: any) => {
+        if (!bleManager) return;
         setConnecting(device.id);
         try {
             const connected = await bleManager.connectToDevice(device.id);

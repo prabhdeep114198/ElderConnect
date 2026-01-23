@@ -14,6 +14,7 @@ export interface User {
   avatar?: string;
   isOnboarded?: boolean;
   plan_level?: "free" | "premium" | "enterprise";
+  isSubscribed?: boolean;
 }
 
 interface AuthContextType {
@@ -27,6 +28,7 @@ interface AuthContextType {
   updateProfile: (name: string) => Promise<void>;
   updatePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
   requireAuth: (action: () => void) => void;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               email: userData.email,
               isOnboarded: parsedUser.isOnboarded || false,
               plan_level: userData.plan_level || parsedUser.plan_level,
+              isSubscribed: userData.isSubscribed || false,
             };
             setUser(updatedUser);
             await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
@@ -103,6 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: `${apiUser.firstName} ${apiUser.lastName}`.trim(),
           email: apiUser.email,
           isOnboarded: false,
+          isSubscribed: apiUser.isSubscribed || false,
         };
 
         // Check onboarding status
@@ -148,6 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: `${apiUser.firstName} ${apiUser.lastName}`.trim(),
           email: apiUser.email,
           isOnboarded: false,
+          isSubscribed: apiUser.isSubscribed || false,
         };
 
         await AsyncStorage.setItem("auth_token", token);
@@ -241,6 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updateProfile,
         updatePassword,
         requireAuth,
+        refreshSubscription: checkSession,
       }}
     >
       {children}
