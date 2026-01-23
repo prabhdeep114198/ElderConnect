@@ -77,6 +77,7 @@ function InitialLayout() {
     if (user) {
       flagsmith.identify(user.id, {
         plan_level: user.plan_level ?? "free",
+        is_subscribed: user.isSubscribed ?? false,
       });
     } else {
       flagsmith.logout();
@@ -341,6 +342,10 @@ export default function RootLayout() {
       flagsmith={flagsmith}
       options={{
         environmentID: process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID!,
+        defaultFlags: {
+          premium_feature_1: { enabled: false, value: null },
+          premium_feature_2: { enabled: false, value: null },
+        }
       }}
     >
       <AuthProvider>

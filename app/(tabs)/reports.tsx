@@ -3,9 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from 'expo-print';
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Animated, Pressable, TouchableWithoutFeedback } from "react-native";
 import { useFlags } from "react-native-flagsmith/react";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { useAuth } from "../../context/AuthContext";
@@ -41,6 +41,8 @@ export default function ReportsScreen() {
     diet: 55,
     exercise: 60
   });
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const flags = useFlags(["download_reports"]);
   const canDownload = flags.download_reports.enabled;
@@ -48,6 +50,12 @@ export default function ReportsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadUserProfile();
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
     }, [])
   );
 
@@ -300,6 +308,95 @@ export default function ReportsScreen() {
     });
   };
 
+  const getDetailContent = () => {
+    if (!selectedNode) return null;
+
+    switch (selectedNode.type) {
+      case 'exercise':
+        return (
+          <View>
+            <Text style={styles.modalTitle}>{t("exerciseDetails") || "Exercise Details"}</Text>
+            <View style={styles.modalRow}>
+              <Ionicons name="footsteps" size={24} color={selectedNode.color} />
+              <Text style={styles.modalValue}>{selectedNode.label}</Text>
+            </View>
+            <Text style={styles.modalSubtext}>
+              {selectedNode.sublabel === 'Steps'
+                ? "Daily step count target: 8000"
+                : "Recommended active minutes: 30-60m"}
+            </Text>
+            {exerciseData && (
+              <View style={styles.historyContainer}>
+                <Text style={styles.historyTitle}>Recent History:</Text>
+                {exerciseData[0]?.history?.slice(0, 3).map((h: any, i: number) => (
+                  <View key={i} style={styles.historyRow}>
+                    <Text style={styles.historyDate}>{new Date(h.date).toLocaleDateString()}</Text>
+                    <Text style={styles.historyVal}>{h.value}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      case 'vital':
+        return (
+          <View>
+            <Text style={styles.modalTitle}>{selectedNode.sublabel}</Text>
+            <View style={styles.modalRow}>
+              <Ionicons name="pulse" size={24} color={selectedNode.color} />
+              <Text style={styles.modalValue}>{selectedNode.label}</Text>
+            </View>
+            <View style={[styles.statusBadge, {
+              backgroundColor: selectedNode.status === 'normal' ? '#E8F5E9' : '#FFEBEE'
+            }]}>
+              <Text style={[styles.statusText, {
+                color: selectedNode.status === 'normal' ? '#2E7D32' : '#C62828'
+              }]}>
+                {selectedNode.status?.toUpperCase() || 'NORMAL'}
+              </Text>
+            </View>
+            <Text style={styles.modalSubtext}>Last recorded: Today</Text>
+          </View>
+        );
+      case 'mood':
+        const latestEntry = diaryEntries[0];
+        return (
+          <View>
+            <Text style={styles.modalTitle}>{t("emotionalStatus") || "Emotional Status"}</Text>
+            <View style={styles.modalRow}>
+              <Text style={{ fontSize: 40 }}>{selectedNode.label}</Text>
+              <Text style={[styles.modalValue, { marginLeft: 10 }]}>{selectedNode.sublabel}</Text>
+            </View>
+            {latestEntry && (
+              <View style={styles.noteContainer}>
+                <Text style={styles.noteText}>"{latestEntry.notes}"</Text>
+                <Text style={styles.noteDate}>{new Date(latestEntry.date).toLocaleDateString()}</Text>
+              </View>
+            )}
+          </View>
+        );
+      case 'summary':
+        return (
+          <View>
+            <Text style={styles.modalTitle}>{t("healthScore") || "Health Score"}</Text>
+            <View style={styles.modalRow}>
+              <View style={[styles.scoreCircle, { borderColor: selectedNode.color }]}>
+                <Text style={[styles.scoreText, { color: selectedNode.color }]}>{selectedNode.label}</Text>
+              </View>
+            </View>
+            <Text style={styles.modalSubtext}>Combined score from physical, mental, and social metrics.</Text>
+          </View>
+        );
+      default:
+        return (
+          <View>
+            <Text style={styles.modalTitle}>{selectedNode.label}</Text>
+            <Text style={styles.modalSubtext}>{selectedNode.sublabel || selectedNode.type}</Text>
+          </View>
+        );
+    }
+  };
+
   // Function to trigger n8n automation
   const sendWhatsAppReport = async () => {
     if (!userData) return;
@@ -505,85 +602,87 @@ export default function ReportsScreen() {
         <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph") || "Health Knowledge Graph"}</Text>
         <Text style={[styles.cardSubtitle, { color: colors.mutedText }]}>Live data from your health ecosystem</Text>
 
-        <Svg height={kgSize} width={kgSize}>
-          {/* Draw edges from center to all other nodes */}
-          {nodes.map((node, i) => {
-            if (i === 0) return null;
-            const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
-            const nx = kgCenter + nodeDist * Math.cos(angle);
-            const ny = kgCenter + nodeDist * Math.sin(angle);
-            return (
-              <G key={`edge_${node.id}`}>
-                <Line
-                  x1={kgCenter}
-                  y1={kgCenter}
-                  x2={nx}
-                  y2={ny}
-                  stroke={node.color}
-                  strokeWidth="2"
-                  strokeDasharray="5,5"
-                  opacity={0.6}
-                />
-              </G>
-            );
-          })}
-
-          {/* Draw nodes */}
-          {nodes.map((node, i) => {
-            let nx = kgCenter;
-            let ny = kgCenter;
-            if (i > 0) {
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: fadeAnim }] }}>
+          <Svg height={kgSize} width={kgSize}>
+            {/* Draw edges from center to all other nodes */}
+            {nodes.map((node, i) => {
+              if (i === 0) return null;
               const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
-              nx = kgCenter + nodeDist * Math.cos(angle);
-              ny = kgCenter + nodeDist * Math.sin(angle);
-            }
+              const nx = kgCenter + nodeDist * Math.cos(angle);
+              const ny = kgCenter + nodeDist * Math.sin(angle);
+              return (
+                <G key={`edge_${node.id}`}>
+                  <Line
+                    x1={kgCenter}
+                    y1={kgCenter}
+                    x2={nx}
+                    y2={ny}
+                    stroke={node.color}
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    opacity={0.6}
+                  />
+                </G>
+              );
+            })}
 
-            const r = i === 0 ? 40 : 30;
-            const fontSize = i === 0 ? 13 : 11;
+            {/* Draw nodes */}
+            {nodes.map((node, i) => {
+              let nx = kgCenter;
+              let ny = kgCenter;
+              if (i > 0) {
+                const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
+                nx = kgCenter + nodeDist * Math.cos(angle);
+                ny = kgCenter + nodeDist * Math.sin(angle);
+              }
 
-            return (
-              <G key={node.id}>
-                {/* Node circle with gradient effect */}
-                <Circle cx={nx} cy={ny} r={r + 3} fill={node.color} opacity={0.2} />
-                <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={i === 0 ? 1 : 0.9} />
+              const r = i === 0 ? 40 : 30;
+              const fontSize = i === 0 ? 13 : 11;
 
-                {/* Status indicator for vitals */}
-                {node.status && node.status === 'normal' && (
-                  <Circle cx={nx + r - 8} cy={ny - r + 8} r={5} fill="#4CAF50" stroke="#fff" strokeWidth="1" />
-                )}
+              return (
+                <G key={node.id} onPress={() => setSelectedNode(node)}>
+                  {/* Node circle with gradient effect */}
+                  <Circle cx={nx} cy={ny} r={r + 3} fill={node.color} opacity={0.2} />
+                  <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={i === 0 ? 1 : 0.9} />
 
-                {/* Main label */}
-                <SvgText
-                  x={nx}
-                  y={node.sublabel ? ny - 3 : ny}
-                  fill="#fff"
-                  fontSize={fontSize}
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  alignmentBaseline="middle"
-                >
-                  {node.label.length > 8 ? node.label.substring(0, 8) + '...' : node.label}
-                </SvgText>
+                  {/* Status indicator for vitals */}
+                  {node.status && node.status === 'normal' && (
+                    <Circle cx={nx + r - 8} cy={ny - r + 8} r={5} fill="#4CAF50" stroke="#fff" strokeWidth="1" />
+                  )}
 
-                {/* Sublabel */}
-                {node.sublabel && (
+                  {/* Main label */}
                   <SvgText
                     x={nx}
-                    y={ny + 10}
+                    y={node.sublabel ? ny - 3 : ny}
                     fill="#fff"
-                    fontSize={8}
-                    fontWeight="normal"
+                    fontSize={fontSize}
+                    fontWeight="bold"
                     textAnchor="middle"
                     alignmentBaseline="middle"
-                    opacity={0.9}
                   >
-                    {node.sublabel}
+                    {node.label.length > 8 ? node.label.substring(0, 8) + '...' : node.label}
                   </SvgText>
-                )}
-              </G>
-            );
-          })}
-        </Svg>
+
+                  {/* Sublabel */}
+                  {node.sublabel && (
+                    <SvgText
+                      x={nx}
+                      y={ny + 10}
+                      fill="#fff"
+                      fontSize={8}
+                      fontWeight="normal"
+                      textAnchor="middle"
+                      alignmentBaseline="middle"
+                      opacity={0.9}
+                    >
+                      {node.sublabel}
+                    </SvgText>
+                  )}
+                </G>
+              );
+            })}
+          </Svg>
+        </Animated.View>
 
         {/* Enhanced Legend */}
         <View style={styles.kgLegend}>
@@ -622,6 +721,28 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={!!selectedNode}
+        onRequestClose={() => setSelectedNode(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContent}>
+                {getDetailContent()}
+                <Pressable
+                  style={{ marginTop: 20, padding: 10 }}
+                  onPress={() => setSelectedNode(null)}
+                >
+                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Close</Text>
+                </Pressable>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
         <Text style={[styles.subtitle, { color: colors.mutedText }]}>
@@ -726,5 +847,24 @@ const styles = StyleSheet.create({
   insightCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4 },
   insightContent: { marginLeft: 16, flex: 1 },
   insightTitle: { fontSize: 16, fontWeight: 'bold' },
-  insightText: { fontSize: 14, lineHeight: 20 }
+  insightText: { fontSize: 14, lineHeight: 20 },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', padding: 25, borderRadius: 20, width: '85%', alignItems: 'center', elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#2D3748' },
+  modalRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+  modalValue: { fontSize: 24, fontWeight: 'bold', marginLeft: 10, color: '#2D3748' },
+  modalSubtext: { fontSize: 14, color: '#718096', textAlign: 'center', marginBottom: 10 },
+  historyContainer: { marginTop: 15, width: '100%' },
+  historyTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: '#4A5568' },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#EDF2F7' },
+  historyDate: { fontSize: 12, color: '#718096' },
+  historyVal: { fontSize: 12, fontWeight: 'bold', color: '#2D3748' },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 15 },
+  statusText: { fontSize: 12, fontWeight: 'bold' },
+  noteContainer: { backgroundColor: '#F7FAFC', padding: 15, borderRadius: 12, marginTop: 10, width: '100%' },
+  noteText: { fontSize: 14, fontStyle: 'italic', color: '#4A5568', textAlign: 'center' },
+  noteDate: { fontSize: 10, color: '#A0AEC0', textAlign: 'right', marginTop: 5 },
+  scoreCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 6, justifyContent: 'center', alignItems: 'center' },
+  scoreText: { fontSize: 22, fontWeight: 'bold' }
 });

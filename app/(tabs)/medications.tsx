@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
@@ -10,9 +10,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ActivityIndicator
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { profileService } from "../../services/api/profile";
 import { ReminderService } from "../../utils/reminderService";
 
 const { width } = Dimensions.get('window');
@@ -35,6 +38,18 @@ interface Medication {
 export default function MedicationsScreen() {
   const { colors, theme } = useTheme();
   const { t } = useTranslation();
+  const { user } = useAuth();
+
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [stats, setStats] = useState({
+    totalMeds: 0,
+    takenMeds: 0,
+    totalDoses: 0,
+    compliance: 0,
+    missed: 0
+  });
+  const [weeklyCompliance, setWeeklyCompliance] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
   const [newMedication, setNewMedication] = useState({
@@ -44,116 +59,107 @@ export default function MedicationsScreen() {
     instructions: ''
   });
 
-  const [medications, setMedications] = useState<Medication[]>([
-    {
-      id: '1',
-      name: 'Lisinopril',
-      dosage: '10mg',
-      frequency: 'Once daily',
-      times: ['8:00 AM'],
-      taken: [true],
-      color: '#3B82F6',
-      instructions: 'Take with food. Avoid potassium supplements.',
-      sideEffects: ['Dizziness', 'Dry cough', 'Fatigue'],
-      prescribedBy: 'Dr. Sarah Johnson',
-      startDate: '2024-01-15',
-      endDate: '2024-07-15'
-    },
-    {
-      id: '2',
-      name: 'Metformin',
-      dosage: '500mg',
-      frequency: 'Twice daily',
-      times: ['8:00 AM', '8:00 PM'],
-      taken: [true, false],
-      color: '#10B981',
-      instructions: 'Take with meals to reduce stomach upset.',
-      sideEffects: ['Nausea', 'Diarrhea', 'Metallic taste'],
-      prescribedBy: 'Dr. Michael Chen',
-      startDate: '2024-02-01'
-    },
-    {
-      id: '3',
-      name: 'Vitamin D3',
-      dosage: '1000 IU',
-      frequency: 'Once daily',
-      times: ['8:00 AM'],
-      taken: [false],
-      color: '#F59E0B',
-      instructions: 'Take with fat-containing meal for better absorption.',
-      sideEffects: ['Rare: Kidney stones with high doses'],
-      prescribedBy: 'Dr. Sarah Johnson',
-      startDate: '2024-01-01'
-    },
-    {
-      id: '4',
-      name: 'Aspirin',
-      dosage: '81mg',
-      frequency: 'Once daily',
-      times: ['8:00 AM'],
-      taken: [true],
-      color: '#EF4444',
-      instructions: 'Take with food to prevent stomach irritation.',
-      sideEffects: ['Stomach upset', 'Bleeding risk'],
-      prescribedBy: 'Dr. Michael Chen',
-      startDate: '2024-01-10'
-    }
-  ]);
-
-  const todayStats = {
-    totalMeds: medications.length,
-    takenMeds: medications.reduce((sum, med) => sum + med.taken.filter(t => t).length, 0),
-    totalDoses: medications.reduce((sum, med) => sum + med.times.length, 0),
-    compliance: 0
-  };
-
-  todayStats.compliance = Math.round((todayStats.takenMeds / todayStats.totalDoses) * 100);
-
-  const weeklyCompliance = [92, 88, 95, 90, 85, 93, todayStats.compliance];
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  const markAsTaken = (medId: string, timeIndex: number) => {
-    setMedications(prev => prev.map(med => {
-      if (med.id === medId) {
-        const newTaken = [...med.taken];
-        newTaken[timeIndex] = !newTaken[timeIndex];
-        return { ...med, taken: newTaken };
-      }
-      return med;
-    }));
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-    Alert.alert(
-      'Medication Logged',
-      'Your medication has been marked as taken.',
-      [{ text: 'OK' }]
-    );
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const [medsRes, complianceRes]: any = await Promise.all([
+        profileService.getMedications(user.id),
+        profileService.getComplianceReport(user.id, 7)
+      ]);
+
+      if (medsRes && medsRes.data) {
+        // Map backend medication to frontend interface
+        const mapped: Medication[] = medsRes.data.medications.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          dosage: m.dosage || '',
+          frequency: m.frequency || '',
+          times: m.schedule || ['08:00 AM'],
+          taken: (m.schedule || ['08:00 AM']).map(() => false),
+          color: m.color || '#6366F1',
+          instructions: m.instructions || '',
+          sideEffects: m.sideEffects ? m.sideEffects.split(',') : [],
+          prescribedBy: m.prescribedBy || 'Self',
+          startDate: m.startDate || new Date().toISOString(),
+          endDate: m.endDate
+        }));
+        setMedications(mapped);
+      }
+
+      if (complianceRes && complianceRes.data) {
+        setWeeklyCompliance(complianceRes.data.daily || [0, 0, 0, 0, 0, 0, 0]);
+        setStats({
+          totalMeds: medsRes.data.medications.length,
+          takenMeds: complianceRes.data.takenToday || 0,
+          totalDoses: complianceRes.data.totalToday || 1,
+          compliance: complianceRes.data.overallCompliance || 0,
+          missed: complianceRes.data.missedToday || 0
+        });
+      }
+    } catch (error) {
+      console.log("Failed to fetch medication data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addMedication = () => {
+  const markAsTaken = async (medId: string, timeIndex: number) => {
+    if (!user) return;
+    try {
+      await profileService.logMedication(user.id, medId, {
+        scheduledTime: new Date().toISOString(),
+        status: 'taken'
+      });
+
+      setMedications(prev => prev.map(med => {
+        if (med.id === medId) {
+          const newTaken = [...med.taken];
+          newTaken[timeIndex] = true;
+          return { ...med, taken: newTaken };
+        }
+        return med;
+      }));
+
+      Alert.alert(t('success'), t('medicationLogged') || 'Medication logged!');
+      fetchData();
+    } catch (error) {
+      console.log("Failed to log medication:", error);
+    }
+  };
+
+  const addMedication = async () => {
+    if (!user) return;
     if (!newMedication.name || !newMedication.dosage) {
-      Alert.alert('Error', 'Please fill in medication name and dosage.');
+      Alert.alert(t('error'), t('fillRequiredFields') || 'Please fill required fields');
       return;
     }
 
-    const newMed: Medication = {
-      id: Date.now().toString(),
-      name: newMedication.name,
-      dosage: newMedication.dosage,
-      frequency: newMedication.frequency || 'Once daily',
-      times: ['8:00 AM'],
-      taken: [false],
-      color: '#6366F1',
-      instructions: newMedication.instructions,
-      sideEffects: [],
-      prescribedBy: 'Self-added',
-      startDate: new Date().toISOString().split('T')[0]
-    };
+    try {
+      await profileService.addMedication(user.id, {
+        name: newMedication.name,
+        dosage: newMedication.dosage,
+        frequency: newMedication.frequency || 'Once daily',
+        instructions: newMedication.instructions,
+        schedule: ['08:00 AM'],
+        startDate: new Date().toISOString()
+      });
 
-    setMedications(prev => [...prev, newMed]);
-    setNewMedication({ name: '', dosage: '', frequency: '', instructions: '' });
-    setShowAddModal(false);
-
-    Alert.alert('Success', 'Medication added successfully!');
+      fetchData();
+      setNewMedication({ name: '', dosage: '', frequency: '', instructions: '' });
+      setShowAddModal(false);
+      Alert.alert(t('success'), t('medicationAdded') || 'Medication added!');
+    } catch (error) {
+      console.log("Failed to add medication:", error);
+    }
   };
 
   const showMedicationDetails = (med: Medication) => {
@@ -170,7 +176,6 @@ export default function MedicationsScreen() {
           text: 'Set Reminder',
           onPress: async () => {
             try {
-              // For simplicity, we'll set it for tomorrow at the first time mentioned
               const tomorrow = new Date();
               tomorrow.setDate(tomorrow.getDate() + 1);
               const [hour, minutePart] = med.times[0].split(':');
@@ -204,202 +209,187 @@ export default function MedicationsScreen() {
     return colors.error;
   };
 
-  const getTimeStatus = (med: Medication, timeIndex: number) => {
-    const currentTime = new Date();
-    const [hours, minutes] = med.times[timeIndex].split(':');
-    const medTime = new Date();
-    medTime.setHours(parseInt(hours.replace(/[^\d]/g, '')));
-    medTime.setMinutes(parseInt(minutes.replace(/[^\d]/g, '')));
-
+  const getTimeStatus = (med: Medication, timeIndex: number): 'taken' | 'missed' | 'upcoming' => {
     if (med.taken[timeIndex]) return 'taken';
-    if (currentTime > medTime) return 'missed';
+    // Simplified missed logic for now
+    const now = new Date();
+    if (now.getHours() > 12) return 'missed';
     return 'upcoming';
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{t("medications")}</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageDailyMeds")}</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowAddModal(true)}
-          >
-            <Ionicons name="add" size={24} color={colors.buttonText} />
-          </TouchableOpacity>
+      {loading && !medications.length ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-
-        {/* Today's Summary */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSummary")}</Text>
-          <View style={styles.summaryGrid}>
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="medical" size={24} color={colors.primary} />
-              </View>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>{todayStats.takenMeds}/{todayStats.totalDoses}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("dosesTaken")}</Text>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>{t("medications")}</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>{t("manageDailyMeds")}</Text>
             </View>
-
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="checkmark-circle" size={24} color={getComplianceColor(todayStats.compliance)} />
-              </View>
-              <Text style={[styles.summaryValue, { color: getComplianceColor(todayStats.compliance) }]}>
-                {todayStats.compliance}%
-              </Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("compliance")}</Text>
-            </View>
-
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="time" size={24} color={colors.warning} />
-              </View>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>
-                {medications.filter(med =>
-                  med.taken.some((taken, i) => !taken && getTimeStatus(med, i) === 'missed')
-                ).length}
-              </Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("missed")}</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowAddModal(true)}
+            >
+              <Ionicons name="add" size={24} color={colors.buttonText} />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Weekly Compliance Chart */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
-          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.chartContainer}>
-              {weeklyCompliance.map((compliance, index) => (
-                <View key={index} style={styles.chartBar}>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: `${compliance}%`,
-                        backgroundColor: getComplianceColor(compliance)
-                      }
-                    ]}
-                  />
-                  <Text style={[styles.chartLabel, { color: colors.mutedText }]}>{weekDays[index]}</Text>
-                  <Text style={[styles.chartValue, { color: colors.mutedText }]}>{compliance}%</Text>
+          {/* Today's Summary */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSummary")}</Text>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="medical" size={24} color={colors.primary} />
                 </View>
-              ))}
+                <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.takenMeds}/{stats.totalDoses}</Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("dosesTaken")}</Text>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="checkmark-circle" size={24} color={getComplianceColor(stats.compliance)} />
+                </View>
+                <Text style={[styles.summaryValue, { color: getComplianceColor(stats.compliance) }]}>
+                  {stats.compliance}%
+                </Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("compliance")}</Text>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.summaryIcon}>
+                  <Ionicons name="time" size={24} color={colors.warning} />
+                </View>
+                <Text style={[styles.summaryValue, { color: colors.text }]}>
+                  {stats.missed}
+                </Text>
+                <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>{t("missed")}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Today's Medications */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysMedications")}</Text>
-          {medications.map((med) => (
-            <View key={med.id} style={[styles.medicationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.medicationHeader}>
-                <View style={styles.medicationInfo}>
-                  <View style={[styles.medicationColor, { backgroundColor: med.color }]} />
-                  <View style={styles.medicationDetails}>
-                    <Text style={[styles.medicationName, { color: colors.text }]}>{med.name}</Text>
-                    <Text style={[styles.medicationDosage, { color: colors.mutedText }]}>{med.dosage} • {med.frequency}</Text>
-                    <Text style={[styles.medicationDoctor, { color: colors.mutedText }]}>{t("prescribedBy")} {med.prescribedBy}</Text>
+          {/* Weekly Compliance Chart */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
+            <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.chartContainer}>
+                {weeklyCompliance.map((compliance, index) => (
+                  <View key={index} style={styles.chartBar}>
+                    <View
+                      style={[
+                        styles.chartBarFill,
+                        {
+                          height: `${Math.max(5, compliance)}%`,
+                          backgroundColor: getComplianceColor(compliance)
+                        }
+                      ]}
+                    />
+                    <Text style={[styles.chartLabel, { color: colors.mutedText }]}>{weekDays[index]}</Text>
+                    <Text style={[styles.chartValue, { color: colors.mutedText }]}>{compliance}%</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Today's Medications */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysMedications")}</Text>
+            {medications.length === 0 ? (
+              <Text style={{ color: colors.mutedText, textAlign: 'center' }}>No medications added yet.</Text>
+            ) : (
+              medications.map((med) => (
+                <View key={med.id} style={[styles.medicationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.medicationHeader}>
+                    <View style={styles.medicationInfo}>
+                      <View style={[styles.medicationColor, { backgroundColor: med.color }]} />
+                      <View style={styles.medicationDetails}>
+                        <Text style={[styles.medicationName, { color: colors.text }]}>{med.name}</Text>
+                        <Text style={[styles.medicationDosage, { color: colors.mutedText }]}>{med.dosage} • {med.frequency}</Text>
+                        <Text style={[styles.medicationDoctor, { color: colors.mutedText }]}>{t("prescribedBy")} {med.prescribedBy}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.infoButton}
+                      onPress={() => showMedicationDetails(med)}
+                    >
+                      <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.medicationTimes}>
+                    {med.times.map((time, timeIndex) => {
+                      const status = getTimeStatus(med, timeIndex);
+                      return (
+                        <TouchableOpacity
+                          key={timeIndex}
+                          style={[
+                            styles.timeSlot,
+                            { borderColor: status === 'taken' ? colors.success : status === 'missed' ? colors.error : colors.warning },
+                            status === 'taken' && { backgroundColor: colors.success + '20' },
+                            status === 'missed' && { backgroundColor: colors.error + '20' },
+                            status === 'upcoming' && { backgroundColor: colors.warning + '20' }
+                          ]}
+                          onPress={() => markAsTaken(med.id, timeIndex)}
+                        >
+                          <Text style={[styles.timeText, { color: colors.text }]}>{time}</Text>
+                          <View style={styles.timeStatus}>
+                            <Ionicons
+                              name={
+                                status === 'taken' ? 'checkmark-circle' :
+                                  status === 'missed' ? 'close-circle' : 'time'
+                              }
+                              size={16}
+                              color={
+                                status === 'taken' ? colors.success :
+                                  status === 'missed' ? colors.error : colors.warning
+                              }
+                            />
+                            <Text style={[
+                              styles.statusText,
+                              {
+                                color:
+                                  status === 'taken' ? colors.success :
+                                    status === 'missed' ? colors.error : colors.warning
+                              }
+                            ]}>
+                              {status === 'taken' ? 'Taken' :
+                                status === 'missed' ? 'Missed' : 'Pending'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.medicationActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => setReminder(med)}
+                    >
+                      <Ionicons name="alarm" size={16} color={colors.primary} />
+                      <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("setReminder")}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => Alert.alert('Refill', `Order refill for ${med.name}?`)}
+                    >
+                      <Ionicons name="refresh" size={16} color={colors.success} />
+                      <Text style={[styles.actionButtonText, { color: colors.success }]}>{t("refill")}</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={styles.infoButton}
-                  onPress={() => showMedicationDetails(med)}
-                >
-                  <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.medicationTimes}>
-                {med.times.map((time, timeIndex) => {
-                  const status = getTimeStatus(med, timeIndex);
-                  return (
-                    <TouchableOpacity
-                      key={timeIndex}
-                      style={[
-                        styles.timeSlot,
-                        { borderColor: status === 'taken' ? colors.success : status === 'missed' ? colors.error : colors.warning },
-                        status === 'taken' && { backgroundColor: colors.success + '20' },
-                        status === 'missed' && { backgroundColor: colors.error + '20' },
-                        status === 'upcoming' && { backgroundColor: colors.warning + '20' }
-                      ]}
-                      onPress={() => markAsTaken(med.id, timeIndex)}
-                    >
-                      <Text style={[styles.timeText, { color: colors.text }]}>{time}</Text>
-                      <View style={styles.timeStatus}>
-                        <Ionicons
-                          name={
-                            status === 'taken' ? 'checkmark-circle' :
-                              status === 'missed' ? 'close-circle' : 'time'
-                          }
-                          size={16}
-                          color={
-                            status === 'taken' ? colors.success :
-                              status === 'missed' ? colors.error : colors.warning
-                          }
-                        />
-                        <Text style={[
-                          styles.statusText,
-                          {
-                            color:
-                              status === 'taken' ? colors.success :
-                                status === 'missed' ? colors.error : colors.warning
-                          }
-                        ]}>
-                          {status === 'taken' ? 'Taken' :
-                            status === 'missed' ? 'Missed' : 'Pending'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.medicationActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => setReminder(med)}
-                >
-                  <Ionicons name="alarm" size={16} color={colors.primary} />
-                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t("setReminder")}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => Alert.alert('Refill', `Order refill for ${med.name}?`)}
-                >
-                  <Ionicons name="refresh" size={16} color={colors.success} />
-                  <Text style={[styles.actionButtonText, { color: colors.success }]}>{t("refill")}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Medication Tips */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("medicationTips")}</Text>
-          <View style={[styles.tipsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.tipItem}>
-              <Ionicons name="bulb" size={20} color={colors.warning} />
-              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip1")}</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="water" size={20} color={colors.info} />
-              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip2")}</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <Ionicons name="warning" size={20} color={colors.error} />
-              <Text style={[styles.tipText, { color: colors.text }]}>{t("tip3")}</Text>
-            </View>
+              ))
+            )}
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Add Medication Modal */}
       <Modal
@@ -529,6 +519,11 @@ export default function MedicationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   content: {
     flex: 1,

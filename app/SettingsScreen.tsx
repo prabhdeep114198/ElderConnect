@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
@@ -74,7 +75,7 @@ const LANGUAGES = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { theme, colors, toggleTheme } = useTheme();
-  const { user, logout, requireAuth } = useAuth();
+  const { user, logout, requireAuth, refreshSubscription } = useAuth();
   const { t, i18n } = useTranslation();
   const [settingsSections, setSettingsSections] = useState<SettingsSectionType[]>([]);
   const [toggles, setToggles] = useState<{ [key: string]: boolean }>({
@@ -117,10 +118,14 @@ export default function SettingsScreen() {
 
         requireAuth(() => router.push("/change-password"));
         break;
-      case "manageSubscription":
       case "upgradePlan":
+        requireAuth(() => router.push("/upgrade-plan"));
+        break;
+      case "manageSubscription":
+        requireAuth(() => router.push("/manage-subscription"));
+        break;
       case "billingHistory":
-        requireAuth(() => Alert.alert("Action", `Perform ${action}`));
+        requireAuth(() => router.push("/billing-history"));
         break;
       case "language":
         setIsLanguageModalVisible(true);

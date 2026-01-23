@@ -1,4 +1,4 @@
-import { API_BASE_URL, API_TIMEOUT, HUGGING_FACE_API_KEY } from './config';
+import { API_BASE_URL, API_TIMEOUT, DEVICE_API_KEY } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -47,7 +47,7 @@ export const apiClient = async <T>(
     const configHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-API-KEY': HUGGING_FACE_API_KEY,
+        'X-API-KEY': DEVICE_API_KEY,
         ...headers,
     };
 

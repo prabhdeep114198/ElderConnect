@@ -24,20 +24,8 @@ import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-const API_CONFIG = {
-  BASE_URL: 'https://your-api.com/api', // Change this to your backend URL
-  ENDPOINTS: {
-    HEALTH_METRICS: '/health/metrics',
-    SCHEDULE: '/schedule/today',
-    EMERGENCY_CONTACT: '/emergency/sos',
-    FAMILY_CALL: '/family/call',
-    REMINDERS: '/reminders',
-    AI_COMPANION: '/ai/message',
-    UPDATE_HEALTH: '/health/update'
-  },
-  // Add your auth token here if needed
-  AUTH_TOKEN: 'your-auth-token-here'
-};
+import { profileService } from "../../services/api/profile";
+import { deviceService } from "../../services/api/device";
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -82,129 +70,83 @@ export default function HomeScreen() {
   const [sleepHours, setSleepHours] = useState(7.5);
   const [waterIntake, setWaterIntake] = useState(6);
 
-  const [healthMetrics, setHealthMetrics] = useState([
-    { label: t("stepsToday"), value: "0", icon: "walk", trend: "up" },
-    { label: t("heartRate"), value: `72 ${t("bpm")}`, icon: "heart", trend: "stable" },
-    { label: t("sleepQuality"), value: `7.5 ${t("hrs")}`, icon: "moon", trend: "up" },
-    { label: t("hydration"), value: `6/8 ${t("cups")}`, icon: "water", trend: "down" },
-  ]);
+  const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
 
-  const [upcomingEvents, setUpcomingEvents] = useState([
-    { time: "10:00 AM", title: t("takeMorningMedication"), type: "medication" },
-    { time: "2:00 PM", title: t("doctorAppointment"), type: "appointment" },
-    { time: "6:00 PM", title: t("eveningWalkReminder"), type: "activity" },
-  ]);
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
-  const [aiMessage, setAiMessage] = useState(
-    "Remember to take your afternoon medication in 2 hours. Would you like me to set a reminder?"
-  );
+  const [aiMessage, setAiMessage] = useState<string>(t("aiGreeting") || "Select a feature to get started.");
 
   // ============================================
   // API FUNCTIONS
   // ============================================
-  const fetchFromAPI = async (endpoint: string, options: RequestInit = {}) => {
-    // If we're using a placeholder URL, don't even try to fetch to avoid console noise
-    if (API_CONFIG.BASE_URL.includes('your-api.com')) {
-      // Return some realistic mock data based on the endpoint
-      switch (endpoint) {
-        case API_CONFIG.ENDPOINTS.HEALTH_METRICS:
-          return {
-            metrics: [
-              { label: t("stepsToday") || "Steps Today", value: "3,452", icon: "walk", trend: "up" },
-              { label: t("heartRate") || "Heart Rate", value: `75 ${t("bpm") || "bpm"}`, icon: "heart", trend: "stable" },
-              { label: t("sleepQuality") || "Sleep Quality", value: `7.2 ${t("hrs") || "hrs"}`, icon: "moon", trend: "up" },
-              { label: t("hydration") || "Hydration", value: `5/8 ${t("cups") || "cups"}`, icon: "water", trend: "down" },
-            ]
-          };
-        case API_CONFIG.ENDPOINTS.SCHEDULE:
-          return {
-            events: [
-              { time: "09:00 AM", title: t("takeMorningMedication"), type: "medication" },
-              { time: "11:30 AM", title: t("physiotherapySession") || "Physiotherapy Session", type: "activity" },
-              { time: "04:30 PM", title: t("eveningWalkReminder"), type: "activity" },
-            ]
-          };
-        case API_CONFIG.ENDPOINTS.AI_COMPANION:
-          return {
-            message: "I've checked your health metrics. You're doing great with your steps today! Don't forget to drink a bit more water."
-          };
-        case API_CONFIG.ENDPOINTS.REMINDERS:
-          return {
-            reminders: []
-          };
-        default:
-          return null;
-      }
-    }
-
+  const fetchHealthMetrics = async () => {
+    if (!user) return;
     try {
-      const mergedHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`,
-        ...(options.headers as Record<string, string> | undefined),
-      };
-
-      const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`, {
-        ...options,
-        headers: mergedHeaders,
-      });
-
-      if (!response.ok) {
-        console.log(`API Error: ${response.status}`);
-        return null;
-      }
-
-      const text = await response.text();
-      if (!text) return null;
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
+      const response: any = await profileService.getDailyMetrics(user.id);
+      if (response && response.data && response.data.metrics) {
+        setHealthMetrics(response.data.metrics);
+        const raw = response.data.raw;
+        if (raw) {
+          if (raw.heartRate) setHeartRate(raw.heartRate);
+          if (raw.sleepHours) setSleepHours(raw.sleepHours);
+          if (raw.waterIntake) setWaterIntake(raw.waterIntake);
+        }
       }
     } catch (error) {
-      // Suppress network request failed logs for better UX during development
-      if (error instanceof TypeError && error.message === 'Network request failed') {
-        // console.log(`API Fetch Suppressed (Network Error) for ${endpoint}`);
-      } else {
-        console.log(`API Fetch Error (${endpoint}):`, error);
-      }
-      return null;
-    }
-  };
-
-  const fetchHealthMetrics = async () => {
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.HEALTH_METRICS);
-    if (data && data.metrics) {
-      setHealthMetrics(data.metrics);
-      // Update individual values
-      data.metrics.forEach((metric: any) => {
-        if (metric.label === "Steps Today") setSteps(parseInt(metric.value.replace(/,/g, '')));
-        if (metric.label === "Heart Rate") setHeartRate(parseInt(metric.value));
-        if (metric.label === "Sleep Quality") setSleepHours(parseFloat(metric.value));
-        if (metric.label === "Hydration") setWaterIntake(parseInt(metric.value.split('/')[0]));
-      });
+      console.log("Failed to fetch health metrics:", error);
     }
   };
 
   const fetchSchedule = async () => {
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.SCHEDULE);
-    if (data && data.events) {
-      setUpcomingEvents(data.events);
+    if (!user) return;
+    try {
+      // Get medications and appointments and merge them for the schedule
+      const [medsRes, apptsRes]: any = await Promise.all([
+        profileService.getMedicationReminders(user.id),
+        profileService.getAppointments(user.id)
+      ]);
+
+      const events: any[] = [];
+
+      if (medsRes && medsRes.data && medsRes.data.reminders) {
+        medsRes.data.reminders.forEach((r: any) => {
+          events.push({
+            time: new Date(r.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            title: r.medicationName,
+            type: 'medication'
+          });
+        });
+      }
+
+      if (apptsRes && apptsRes.data && apptsRes.data.appointments) {
+        apptsRes.data.appointments.forEach((a: any) => {
+          events.push({
+            time: new Date(a.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            title: a.title,
+            type: 'appointment'
+          });
+        });
+      }
+
+      setUpcomingEvents(events.sort((a, b) => a.time.localeCompare(b.time)));
+    } catch (error) {
+      console.log("Failed to fetch schedule:", error);
+    }
+  };
+
+
+  const updateHealthData = async (type: string, value: any) => {
+    if (!user) return;
+    try {
+      await profileService.updateHealthMetric(user.id, { type, value });
+    } catch (error) {
+      console.log("Failed to update health metric:", error);
     }
   };
 
   const fetchAIMessage = async () => {
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.AI_COMPANION);
-    if (data && data.message) {
-      setAiMessage(data.message);
-    }
-  };
-
-  const updateHealthData = async (type: string, value: any) => {
-    await fetchFromAPI(API_CONFIG.ENDPOINTS.UPDATE_HEALTH, {
-      method: 'POST',
-      body: JSON.stringify({ type, value, timestamp: new Date().toISOString() })
-    });
+    // This could call a specialized AI service or use the companion chat history
+    setAiMessage(t("aiDefaultTip") || "Staying active is the key to longevity. Have you taken your steps today?");
   };
 
   // ============================================
@@ -248,11 +190,14 @@ export default function HomeScreen() {
   // REMINDER FUNCTIONS
   // ============================================
   const loadReminders = async () => {
-    // Try API first
-    const data = await fetchFromAPI(API_CONFIG.ENDPOINTS.REMINDERS);
-    if (data && data.reminders) {
-      setSavedReminders(data.reminders);
-    } else {
+    if (!user) return;
+    try {
+      const response: any = await profileService.getMedicationReminders(user.id);
+      if (response && response.data && response.data.reminders) {
+        setSavedReminders(response.data.reminders);
+      }
+    } catch (error) {
+      console.log("Failed to load reminders:", error);
       // Fallback to local storage
       const localData = await AsyncStorage.getItem("reminders");
       if (localData) setSavedReminders(JSON.parse(localData));
@@ -260,11 +205,8 @@ export default function HomeScreen() {
   };
 
   const saveReminder = async (reminder: any) => {
-    // Save to API
-    await fetchFromAPI(API_CONFIG.ENDPOINTS.REMINDERS, {
-      method: 'POST',
-      body: JSON.stringify(reminder)
-    });
+    // Reminders are managed via medications or system-wide alerts now
+    // This is a local helper for the temporary manual reminder
 
     // Save locally as backup
     const updated = [...savedReminders, reminder];
@@ -329,18 +271,15 @@ export default function HomeScreen() {
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Call Now",
+          text: t("Call Now"),
           style: "destructive",
           onPress: async () => {
-            // Send to API
-            await fetchFromAPI(API_CONFIG.ENDPOINTS.EMERGENCY_CONTACT, {
-              method: 'POST',
-              body: JSON.stringify({
+            if (user) {
+              await deviceService.createSOS(user.id, {
                 location: 'Home',
-                timestamp: new Date().toISOString(),
                 type: 'manual_trigger'
-              })
-            });
+              });
+            }
 
             // Make actual emergency call
             const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:911' : 'tel:911';
@@ -353,11 +292,10 @@ export default function HomeScreen() {
 
   const handleFamilyCall = async () => {
     requireAuth(async () => {
-      // Send to API
-      await fetchFromAPI(API_CONFIG.ENDPOINTS.FAMILY_CALL, {
-        method: 'POST',
-        body: JSON.stringify({ callType: 'video' })
-      });
+      // Typically would notify family/system of the call
+      if (user) {
+        // Optional: record call event
+      }
 
       // Navigate to video call screen
       router.push("/VideoCallScreen");
@@ -434,6 +372,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     updateHealthMetrics();
+
+    // Sync to backend periodically or on change (debounced)
+    const timeoutId = setTimeout(() => {
+      if (user) {
+        updateHealthData('steps', steps);
+        updateHealthData('heartRate', heartRate);
+        updateHealthData('sleep', sleepHours);
+        updateHealthData('water', waterIntake);
+      }
+    }, 5000); // 5 second debounce to avoid spamming API on every step
+
+    return () => clearTimeout(timeoutId);
   }, [steps, heartRate, sleepHours, waterIntake]);
 
   // ============================================
