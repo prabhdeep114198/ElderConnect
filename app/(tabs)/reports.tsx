@@ -6,7 +6,7 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Animated, Pressable, TouchableWithoutFeedback } from "react-native";
-import { useFlags } from "react-native-flagsmith/react";
+import { useFeatureFlags } from "../../hooks/useFeatureFlags";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -44,8 +44,8 @@ export default function ReportsScreen() {
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const flags = useFlags(["download_reports"]);
-  const canDownload = flags.download_reports.enabled;
+  const flags = useFeatureFlags(["download_reports"]);
+  const canDownload = flags.download_reports?.enabled ?? false;
 
   useFocusEffect(
     useCallback(() => {

@@ -40,4 +40,9 @@ export const profileService = {
     createAppointment: (userId: string, data: any) => api.post(`/v1/users/${userId}/appointments`, data),
     updateAppointment: (userId: string, appId: string, data: any) => api.put(`/v1/users/${userId}/appointments/${appId}`, data),
     deleteAppointment: (userId: string, appId: string) => api.delete(`/v1/users/${userId}/appointments/${appId}`),
+
+    // Social Events
+    getSocialEvents: (userId: string) => api.get(`/v1/users/${userId}/events`),
+    createSocialEvent: (userId: string, data: any) => api.post(`/v1/users/${userId}/events`, data),
+    joinSocialEvent: (userId: string, eventId: string) => api.post(`/v1/users/${userId}/events/${eventId}/join`, {}),
 };

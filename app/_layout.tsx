@@ -16,6 +16,7 @@ import { ThemeProvider, useTheme } from "../context/ThemeContext";
 
 import * as Notifications from "expo-notifications";
 import "../i18n";
+import { VoiceAssistant } from "../components/VoiceAssistant";
 
 // NOTIFICATION HANDLER CONFIG
 Notifications.setNotificationHandler({
@@ -74,12 +75,27 @@ function InitialLayout() {
   useEffect(() => {
     if (loading) return;
 
-    if (user) {
+    // Check if Flagsmith is configured
+    const flagsmithEnvId = process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID;
+    if (!flagsmithEnvId) {
+      // Flagsmith not configured - ensure flags are false
+      flagsmith.logout();
+      return;
+    }
+
+    // Only initialize Flagsmith if user has a valid subscription
+    const hasValidSubscription = user?.isSubscribed === true ||
+      (user?.plan_level && user.plan_level !== "free");
+
+    if (user && hasValidSubscription) {
+      // User has subscription - initialize Flagsmith and fetch flags
       flagsmith.identify(user.id, {
-        plan_level: user.plan_level ?? "free",
-        is_subscribed: user.isSubscribed ?? false,
+        plan_level: user.plan_level ?? "premium",
+        is_subscribed: true,
       });
     } else {
+      // No subscription - logout from Flagsmith to ensure flags are false
+      // This prevents any flag fetching and ensures all flags default to false
       flagsmith.logout();
     }
   }, [user, loading]);
@@ -195,91 +211,94 @@ function InitialLayout() {
 
   /* ------------------------------ App Drawer ------------------------------- */
   return (
-    <Drawer
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: colors.background,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          fontSize: 18,
-        },
-        drawerActiveTintColor: colors.primary,
-        drawerInactiveTintColor: colors.mutedText,
-        drawerActiveBackgroundColor: colors.primary + '10',
-        drawerLabelStyle: {
-          marginLeft: -10,
-          fontWeight: '600',
-          fontSize: 16,
-        },
-        drawerStyle: {
-          width: 280,
-          backgroundColor: colors.background,
-        }
-      }}
-    >
-      <Drawer.Screen
-        name="(tabs)"
-        options={{
-          title: "Home",
-          drawerIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />
+    <>
+      <Drawer
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          headerTintColor: colors.text,
+          headerTitleStyle: {
+            fontWeight: 'bold',
+            fontSize: 18,
+          },
+          drawerActiveTintColor: colors.primary,
+          drawerInactiveTintColor: colors.mutedText,
+          drawerActiveBackgroundColor: colors.primary + '10',
+          drawerLabelStyle: {
+            marginLeft: -10,
+            fontWeight: '600',
+            fontSize: 16,
+          },
+          drawerStyle: {
+            width: 280,
+            backgroundColor: colors.background,
+          }
         }}
-      />
+      >
+        <Drawer.Screen
+          name="(tabs)"
+          options={{
+            title: "Home",
+            drawerIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />
+          }}
+        />
 
-      <Drawer.Screen
-        name="events"
-        options={{
-          headerShown: false,
-          drawerIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />
-        }}
-      />
+        <Drawer.Screen
+          name="events"
+          options={{
+            headerShown: false,
+            drawerIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />
+          }}
+        />
 
-      <Drawer.Screen
-        name="MagnifierScreen"
-        options={{
-          title: "Magnifier",
-          drawerIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />
-        }}
-      />
+        <Drawer.Screen
+          name="MagnifierScreen"
+          options={{
+            title: "Magnifier",
+            drawerIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />
+          }}
+        />
 
-      <Drawer.Screen
-        name="reminders"
-        options={{
-          title: "Reminders",
-          drawerIcon: ({ color, size }) => <Ionicons name="notifications" size={size} color={color} />
-        }}
-      />
+        <Drawer.Screen
+          name="reminders"
+          options={{
+            title: "Reminders",
+            drawerIcon: ({ color, size }) => <Ionicons name="notifications" size={size} color={color} />
+          }}
+        />
 
-      <Drawer.Screen
-        name="SettingsScreen"
-        options={{
-          title: "Settings",
-          drawerIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />
-        }}
-      />
+        <Drawer.Screen
+          name="SettingsScreen"
+          options={{
+            title: "Settings",
+            drawerIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />
+          }}
+        />
 
-      {/* Hidden Routes */}
-      <Drawer.Screen
-        name="auth/login"
-        options={{
-          drawerItemStyle: { display: "none" },
-          headerShown: false,
-        }}
-      />
+        {/* Hidden Routes */}
+        <Drawer.Screen
+          name="auth/login"
+          options={{
+            drawerItemStyle: { display: "none" },
+            headerShown: false,
+          }}
+        />
 
-      <Drawer.Screen
-        name="onboarding/index"
-        options={{
-          drawerItemStyle: { display: "none" },
-          headerShown: false,
-        }}
-      />
-    </Drawer>
+        <Drawer.Screen
+          name="onboarding/index"
+          options={{
+            drawerItemStyle: { display: "none" },
+            headerShown: false,
+          }}
+        />
+      </Drawer>
+      <VoiceAssistant />
+    </>
   );
 }
 
@@ -342,10 +361,15 @@ export default function RootLayout() {
       flagsmith={flagsmith}
       options={{
         environmentID: process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID!,
+        // All flags default to false when user doesn't have subscription
         defaultFlags: {
           premium_feature_1: { enabled: false, value: null },
           premium_feature_2: { enabled: false, value: null },
-        }
+          download_reports: { enabled: false, value: null },
+          unlimited_video: { enabled: false, value: null },
+        },
+        // Disable automatic flag fetching - we'll control it manually based on subscription
+        enableAnalytics: false,
       }}
     >
       <AuthProvider>

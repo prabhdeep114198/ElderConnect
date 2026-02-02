@@ -107,28 +107,39 @@ export default function HomeScreen() {
       ]);
 
       const events: any[] = [];
+      const now = new Date();
 
       if (medsRes && medsRes.data && medsRes.data.reminders) {
         medsRes.data.reminders.forEach((r: any) => {
-          events.push({
-            time: new Date(r.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            title: r.medicationName,
-            type: 'medication'
-          });
+          const scheduledTime = new Date(r.scheduledTime);
+          // Only show if it's today or in the future
+          if (scheduledTime >= now || scheduledTime.toDateString() === now.toDateString()) {
+            events.push({
+              time: scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              title: r.medicationName,
+              type: 'medication',
+              timestamp: scheduledTime.getTime()
+            });
+          }
         });
       }
 
       if (apptsRes && apptsRes.data && apptsRes.data.appointments) {
         apptsRes.data.appointments.forEach((a: any) => {
-          events.push({
-            time: new Date(a.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            title: a.title,
-            type: 'appointment'
-          });
+          const scheduledAt = new Date(a.scheduledAt);
+          // Only show if it's today or in the future
+          if (scheduledAt >= now || scheduledAt.toDateString() === now.toDateString()) {
+            events.push({
+              time: scheduledAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              title: a.title,
+              type: 'appointment',
+              timestamp: scheduledAt.getTime()
+            });
+          }
         });
       }
 
-      setUpcomingEvents(events.sort((a, b) => a.time.localeCompare(b.time)));
+      setUpcomingEvents(events.sort((a, b) => a.timestamp - b.timestamp));
     } catch (error) {
       console.log("Failed to fetch schedule:", error);
     }
