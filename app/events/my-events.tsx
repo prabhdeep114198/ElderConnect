@@ -4,6 +4,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { getTicketsKey } from "../../utils/userStorageKeys";
 
 interface Ticket {
   ticketId: string;
@@ -18,12 +20,18 @@ interface Ticket {
 export default function MyTicketsPage() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadTickets = async () => {
+    if (!user?.id) {
+      setTickets([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const stored = await AsyncStorage.getItem("user_tickets");
+      const stored = await AsyncStorage.getItem(getTicketsKey(user.id));
       const userTickets = stored ? JSON.parse(stored) : [];
       setTickets(userTickets.reverse()); // Show newest first
     } catch (err) {
@@ -36,7 +44,7 @@ export default function MyTicketsPage() {
   useFocusEffect(
     useCallback(() => {
       loadTickets();
-    }, [])
+    }, [user?.id])
   );
 
   if (loading) {

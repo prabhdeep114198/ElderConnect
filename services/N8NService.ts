@@ -63,11 +63,11 @@ export const N8NService = {
                 action: "SEND_WHATSAPP_REPORT"
             };
 
-            console.log("🚀 [N8N Service] Sending payload:", JSON.stringify(payload, null, 2));
+            console.log("[N8N Service] Sending payload:", JSON.stringify(payload, null, 2));
 
             // 2. Mock Request for Demo (Remove this block when you have a real URL)
             if (N8N_REPORT_WEBHOOK.includes("your-n8n-instance")) {
-                console.log("⚠️ [N8N Service] Simulation Mode: No real URL configured.");
+                console.log("[N8N Service] Simulation Mode: No real URL configured.");
                 await new Promise(r => setTimeout(r, 1000)); // Fake network delay
                 return { success: true, message: "Simulation: Report Sent Successfully" };
             }
@@ -90,7 +90,7 @@ export const N8NService = {
             return { success: true, message: result };
 
         } catch (error) {
-            console.error("❌ [N8N Service] Error:", error);
+            console.error("[N8N Service] Error:", error);
             return { success: false, error: error };
         }
     },
@@ -130,7 +130,7 @@ export const N8NService = {
 
             return response.ok;
         } catch (error) {
-            console.error("❌ [N8N Service] Reminder Error:", error);
+            console.error("[N8N Service] Reminder Error:", error);
             return false;
         }
     },
@@ -149,7 +149,7 @@ export const N8NService = {
             const payload = {
                 action: 'PROCESS_TEXT_COMMAND',
                 text: transcript,
-                jwt: jwt, // Added JWT here
+                jwt: jwt,
                 userContext: JSON.stringify({
                     userId: userContext.userId,
                     name: userContext.name,

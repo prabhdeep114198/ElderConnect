@@ -55,7 +55,9 @@ export default function MedicationsScreen() {
   const [newMedication, setNewMedication] = useState({
     name: '',
     dosage: '',
-    frequency: '',
+    frequency: 'Once daily',
+    frequencyCount: '1',
+    timing: 'After Breakfast',
     instructions: ''
   });
 
@@ -83,11 +85,11 @@ export default function MedicationsScreen() {
           name: m.name,
           dosage: m.dosage || '',
           frequency: m.frequency || '',
-          times: m.schedule || ['08:00 AM'],
-          taken: (m.schedule || ['08:00 AM']).map(() => false),
+          times: Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM']),
+          taken: (Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM'])).map(() => false),
           color: m.color || '#6366F1',
           instructions: m.instructions || '',
-          sideEffects: m.sideEffects ? m.sideEffects.split(',') : [],
+          sideEffects: Array.isArray(m.sideEffects) ? m.sideEffects : (m.sideEffects ? m.sideEffects.split(',') : []),
           prescribedBy: m.prescribedBy || 'Self',
           startDate: m.startDate || new Date().toISOString(),
           endDate: m.endDate
@@ -143,18 +145,27 @@ export default function MedicationsScreen() {
       return;
     }
 
+    const generateSchedule = (count: string) => {
+      const num = parseInt(count);
+      if (num === 1) return ['08:00 AM'];
+      if (num === 2) return ['08:00 AM', '08:00 PM'];
+      if (num === 3) return ['08:00 AM', '02:00 PM', '08:00 PM'];
+      if (num === 4) return ['08:00 AM', '12:00 PM', '04:00 PM', '08:00 PM'];
+      return ['08:00 AM'];
+    };
+
     try {
       await profileService.addMedication(user.id, {
         name: newMedication.name,
         dosage: newMedication.dosage,
-        frequency: newMedication.frequency || 'Once daily',
-        instructions: newMedication.instructions,
-        schedule: ['08:00 AM'],
+        frequency: `${newMedication.frequencyCount} times daily`,
+        instructions: `${newMedication.timing}. ${newMedication.instructions}`,
+        schedule: generateSchedule(newMedication.frequencyCount),
         startDate: new Date().toISOString()
       });
 
       fetchData();
-      setNewMedication({ name: '', dosage: '', frequency: '', instructions: '' });
+      setNewMedication({ name: '', dosage: '', frequency: 'Once daily', frequencyCount: '1', timing: 'After Breakfast', instructions: '' });
       setShowAddModal(false);
       Alert.alert(t('success'), t('medicationAdded') || 'Medication added!');
     } catch (error) {
@@ -429,14 +440,49 @@ export default function MedicationsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("frequency")}</Text>
-              <TextInput
-                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                value={newMedication.frequency}
-                onChangeText={(text) => setNewMedication(prev => ({ ...prev, frequency: text }))}
-                placeholder="e.g., Once daily, Twice daily"
-                placeholderTextColor={colors.mutedText}
-              />
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("howManyTimes") || "How many times daily?"}</Text>
+              <View style={styles.optionsGrid}>
+                {['1', '2', '3', '4'].map(count => (
+                  <TouchableOpacity
+                    key={count}
+                    style={[
+                      styles.optionButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newMedication.frequencyCount === count && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setNewMedication(prev => ({ ...prev, frequencyCount: count }))}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { color: colors.text },
+                      newMedication.frequencyCount === count && { color: colors.buttonText }
+                    ]}>{count}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("whenToTake") || "When to take?"}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalOptions}>
+                {['Before Breakfast', 'After Breakfast', 'Before Lunch', 'After Lunch', 'Before Dinner', 'After Dinner', 'Before Sleep', 'Empty Stomach'].map(time => (
+                  <TouchableOpacity
+                    key={time}
+                    style={[
+                      styles.timingButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newMedication.timing === time && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setNewMedication(prev => ({ ...prev, timing: time }))}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { color: colors.text },
+                      newMedication.timing === time && { color: colors.buttonText }
+                    ]}>{time}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.inputGroup}>
@@ -740,6 +786,32 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  optionsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  optionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  horizontalOptions: {
+    flexDirection: 'row',
+  },
+  timingButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+    alignItems: 'center',
   },
   addMedicationButton: {
     padding: 16,
