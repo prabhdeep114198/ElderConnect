@@ -18,6 +18,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import { N8NService } from '../services/N8NService';
 import { SpeechToTextService } from '../services/SpeechToTextService';
 
@@ -26,6 +27,7 @@ const { width } = Dimensions.get('window');
 export const VoiceAssistant = () => {
     const { colors } = useTheme();
     const { user } = useAuth();
+    const isVoiceEnabled = useFeatureFlag('voice_assistant');
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [pulseAnim] = useState(new Animated.Value(1));
@@ -140,7 +142,7 @@ export const VoiceAssistant = () => {
         }
     }
 
-    if (!user) return null;
+    if (!user || !isVoiceEnabled) return null;
 
     return (
         <View style={styles.container}>

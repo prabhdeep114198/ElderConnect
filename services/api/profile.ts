@@ -45,4 +45,8 @@ export const profileService = {
     getSocialEvents: (userId: string) => api.get(`/v1/users/${userId}/events`),
     createSocialEvent: (userId: string, data: any) => api.post(`/v1/users/${userId}/events`, data),
     joinSocialEvent: (userId: string, eventId: string) => api.post(`/v1/users/${userId}/events/${eventId}/join`, {}),
+
+    // Gamification
+    getStreaks: (userId: string) => api.get(`/v1/users/${userId}/gamification/streaks`),
+    getAchievements: (userId: string) => api.get(`/v1/users/${userId}/gamification/achievements`),
 };

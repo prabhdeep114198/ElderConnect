@@ -26,6 +26,7 @@ const { width } = Dimensions.get("window");
 
 import { profileService } from "../../services/api/profile";
 import { deviceService } from "../../services/api/device";
+import { getRemindersKey } from "../../utils/userStorageKeys";
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -51,9 +52,16 @@ if (Platform.OS === "android") {
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const router = useRouter();
-  const { colors, theme } = useTheme();
+  const { colors, theme, uiMode, fontSize } = useTheme();
   const { t, i18n } = useTranslation();
   const { user, requireAuth } = useAuth();
+
+  const isSenior = uiMode === "senior";
+
+  const getFontSize = (base: number) => {
+    const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
+    return base * (scales[fontSize] || 1);
+  };
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState("");
@@ -210,7 +218,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.log("Failed to load reminders:", error);
       // Fallback to local storage
-      const localData = await AsyncStorage.getItem("reminders");
+      const localData = await AsyncStorage.getItem(getRemindersKey(user.id));
       if (localData) setSavedReminders(JSON.parse(localData));
     }
   };
@@ -221,7 +229,7 @@ export default function HomeScreen() {
 
     // Save locally as backup
     const updated = [...savedReminders, reminder];
-    await AsyncStorage.setItem("reminders", JSON.stringify(updated));
+    await AsyncStorage.setItem(getRemindersKey(user?.id || ''), JSON.stringify(updated));
     setSavedReminders(updated);
   };
 
@@ -276,29 +284,69 @@ export default function HomeScreen() {
   // ACTION HANDLERS
   // ============================================
   const handleEmergencySOS = async () => {
-    Alert.alert(
-      "Emergency SOS",
-      "Calling emergency services and notifying family...",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: t("Call Now"),
-          style: "destructive",
-          onPress: async () => {
-            if (user) {
-              await deviceService.createSOS(user.id, {
-                location: 'Home',
-                type: 'manual_trigger'
-              });
-            }
+    try {
+      // Fetch user profile to get emergency contacts
+      let emergencyContacts: any[] = [];
 
-            // Make actual emergency call
-            const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:911' : 'tel:911';
-            Linking.openURL(emergencyNumber);
-          },
-        },
-      ]
-    );
+      if (user?.id) {
+        try {
+          const profileResponse: any = await profileService.getProfile(user.id);
+          if (profileResponse?.data?.profile?.emergencyContacts) {
+            emergencyContacts = profileResponse.data.profile.emergencyContacts;
+          }
+        } catch (error) {
+          console.log("Failed to fetch emergency contacts:", error);
+        }
+      }
+
+      // Log SOS event to backend
+      if (user) {
+        await deviceService.createSOS(user.id, {
+          location: 'Home',
+          type: 'manual_trigger'
+        });
+      }
+
+      // Build alert options
+      const alertButtons: any[] = [
+        { text: "Cancel", style: "cancel" }
+      ];
+
+      // Add caregiver/family contact options
+      if (emergencyContacts.length > 0) {
+        emergencyContacts.slice(0, 2).forEach((contact) => {
+          alertButtons.unshift({
+            text: `📞 Call ${contact.name} (${contact.relation})`,
+            onPress: () => {
+              const phoneNumber = contact.phone.replace(/[^0-9+]/g, '');
+              const telUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
+              Linking.openURL(telUrl);
+            }
+          });
+        });
+      }
+
+      // Add 911 option
+      alertButtons.unshift({
+        text: "🚨 Call 911 Emergency",
+        style: "destructive",
+        onPress: () => {
+          const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:911' : 'tel:911';
+          Linking.openURL(emergencyNumber);
+        }
+      });
+
+      Alert.alert(
+        "🆘 Emergency SOS",
+        emergencyContacts.length > 0
+          ? "Who would you like to call for help?"
+          : "Emergency services will be notified immediately.",
+        alertButtons
+      );
+    } catch (error) {
+      console.error("SOS Error:", error);
+      Alert.alert("Error", "Failed to activate SOS. Please call emergency services directly.");
+    }
   };
 
   const handleFamilyCall = async () => {
@@ -430,18 +478,20 @@ export default function HomeScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
-        <Text style={[styles.greeting, { color: colors.primary }]}>{greeting}!</Text>
-        <Text style={[styles.time, { color: colors.text }]}>
+        <Text style={[styles.greeting, { color: colors.primary, fontSize: getFontSize(isSenior ? 34 : 28) }]}>{greeting}!</Text>
+        <Text style={[styles.time, { color: colors.text, fontSize: getFontSize(isSenior ? 48 : 36) }]}>
           {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </Text>
-        <Text style={[styles.date, { color: colors.mutedText }]}>
-          {currentTime.toLocaleDateString(i18n.language, {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </Text>
+        {!isSenior && (
+          <Text style={[styles.date, { color: colors.mutedText, fontSize: getFontSize(16) }]}>
+            {currentTime.toLocaleDateString(i18n.language, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </Text>
+        )}
       </View>
 
       {!user && (
@@ -462,16 +512,26 @@ export default function HomeScreen() {
 
       {/* QUICK ACTIONS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("quickActions")}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("quickActions")}</Text>
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action, index) => (
             <TouchableOpacity
               key={index}
-              style={[styles.quickActionCard, { backgroundColor: action.color }]}
+              style={[
+                styles.quickActionCard,
+                { backgroundColor: action.color },
+                isSenior && { width: '100%', flexDirection: 'row', justifyContent: 'center', height: 80 }
+              ]}
               onPress={action.action}
             >
-              <Ionicons name={action.icon as any} size={24} color={colors.buttonText} />
-              <Text style={[styles.quickActionText, { color: colors.buttonText }]}>{action.title}</Text>
+              <Ionicons name={action.icon as any} size={isSenior ? 32 : 24} color={colors.buttonText} />
+              <Text style={[
+                styles.quickActionText,
+                { color: colors.buttonText, fontSize: getFontSize(isSenior ? 20 : 16) },
+                isSenior && { marginLeft: 15, marginTop: 0 }
+              ]}>
+                {action.title}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -536,32 +596,49 @@ export default function HomeScreen() {
 
       {/* HEALTH METRICS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysHealthSummary")}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysHealthSummary")}</Text>
         <View style={styles.metricsGrid}>
           {healthMetrics.map((metric, index) => (
-            <View key={index} style={[styles.metricCard, { backgroundColor: colors.card }]}>
-              <View style={styles.metricHeader}>
-                <Ionicons name={metric.icon as any} size={20} color={colors.primary} />
+            <View key={index} style={[
+              styles.metricCard,
+              { backgroundColor: colors.card },
+              isSenior && { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 }
+            ]}>
+              <View style={[styles.metricHeader, isSenior && { marginBottom: 0, marginRight: 15 }]}>
+                <Ionicons name={metric.icon as any} size={isSenior ? 28 : 20} color={colors.primary} />
+                {!isSenior && (
+                  <Ionicons
+                    name={
+                      metric.trend === "up"
+                        ? "trending-up"
+                        : metric.trend === "down"
+                          ? "trending-down"
+                          : "remove"
+                    }
+                    size={16}
+                    color={
+                      metric.trend === "up"
+                        ? colors.success
+                        : metric.trend === "down"
+                          ? colors.warning
+                          : colors.mutedText
+                    }
+                  />
+                )}
+              </View>
+              <View style={isSenior && { flex: 1 }}>
+                <Text style={[styles.metricValue, { color: colors.text, fontSize: getFontSize(isSenior ? 24 : 20) }]}>{metric.value}</Text>
+                <Text style={[styles.metricLabel, { color: colors.mutedText, fontSize: getFontSize(14) }]}>{metric.label}</Text>
+              </View>
+              {isSenior && (
                 <Ionicons
                   name={
-                    metric.trend === "up"
-                      ? "trending-up"
-                      : metric.trend === "down"
-                        ? "trending-down"
-                        : "remove"
+                    metric.trend === "up" ? "arrow-up-circle" : metric.trend === "down" ? "arrow-down-circle" : "remove-circle"
                   }
-                  size={16}
-                  color={
-                    metric.trend === "up"
-                      ? colors.success
-                      : metric.trend === "down"
-                        ? colors.warning
-                        : colors.mutedText
-                  }
+                  size={24}
+                  color={metric.trend === "up" ? colors.success : metric.trend === "down" ? colors.warning : colors.mutedText}
                 />
-              </View>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{metric.value}</Text>
-              <Text style={[styles.metricLabel, { color: colors.mutedText }]}>{metric.label}</Text>
+              )}
             </View>
           ))}
         </View>
@@ -569,14 +646,14 @@ export default function HomeScreen() {
 
       {/* UPCOMING EVENTS */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("todaysSchedule")}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysSchedule")}</Text>
         {upcomingEvents.map((event, index) => (
-          <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }]}>
-            <View style={[styles.eventTime, { borderRightColor: colors.primary }]}>
-              <Text style={[styles.eventTimeText, { color: colors.primary }]}>{event.time}</Text>
+          <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }, isSenior && { padding: 20 }]}>
+            <View style={[styles.eventTime, { borderRightColor: colors.primary }, isSenior && { minWidth: 80 }]}>
+              <Text style={[styles.eventTimeText, { color: colors.primary, fontSize: getFontSize(16) }]}>{event.time}</Text>
             </View>
             <View style={styles.eventContent}>
-              <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+              <Text style={[styles.eventTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{event.title}</Text>
               <View style={styles.eventType}>
                 <Ionicons
                   name={
@@ -598,16 +675,16 @@ export default function HomeScreen() {
 
       {/* AI COMPANION */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("yourAICompanion")}</Text>
-        <View style={[styles.companionCard, { backgroundColor: colors.card }]}>
-          <Ionicons name="chatbubble-ellipses" size={32} color={colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
+        <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
+          <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
           <View style={styles.companionContent}>
-            <Text style={[styles.companionTitle, { color: colors.text }]}>{t("elderBotHelp")}</Text>
-            <Text style={[styles.companionMessage, { color: colors.mutedText }]}>"{aiMessage}"</Text>
+            <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
+            <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
           </View>
         </View>
-        <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary }]} onPress={handleAIChat}>
-          <Text style={[styles.chatButtonText, { color: colors.buttonText }]}>{t("startConversation")}</Text>
+        <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
+          <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

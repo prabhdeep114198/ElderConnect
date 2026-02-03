@@ -20,7 +20,10 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { profileService } from "../../services/api/profile";
+import { sustainabilityService } from "../../services/api/sustainability";
+import { incrementLocalTelemedicine } from "../../utils/sustainabilityStorage";
 import { LinearGradient } from 'expo-linear-gradient';
+import { Switch } from "react-native";
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +40,7 @@ interface Appointment {
   notes?: string;
   reminder: boolean;
   scheduledAt: string;
+  isTelemedicine?: boolean;
 }
 
 export default function AppointmentsScreen() {
@@ -56,7 +60,8 @@ export default function AppointmentsScreen() {
     date: '',
     time: '10:00',
     location: '',
-    notes: ''
+    notes: '',
+    isTelemedicine: false
   });
 
   useEffect(() => {
@@ -83,7 +88,8 @@ export default function AppointmentsScreen() {
           status: a.status.toLowerCase(),
           notes: a.notes,
           reminder: a.reminderEnabled,
-          scheduledAt: a.scheduledAt
+          scheduledAt: a.scheduledAt,
+          isTelemedicine: a.isTelemedicine ?? false
         }));
         setAppointments(mapped);
       }
@@ -108,9 +114,10 @@ export default function AppointmentsScreen() {
         title: newAppointment.title,
         doctorName: newAppointment.doctorName,
         specialty: newAppointment.specialty,
-        location: newAppointment.location,
+        location: newAppointment.location || (newAppointment.isTelemedicine ? 'Video Call' : undefined),
         scheduledAt: scheduledAt.toISOString(),
-        notes: newAppointment.notes
+        notes: newAppointment.notes,
+        isTelemedicine: newAppointment.isTelemedicine
       });
 
       fetchAppointments();
@@ -131,8 +138,27 @@ export default function AppointmentsScreen() {
       date: '',
       time: '10:00',
       location: '',
-      notes: ''
+      notes: '',
+      isTelemedicine: false
     });
+  };
+
+  const markAppointmentComplete = async (appt: Appointment) => {
+    if (!user) return;
+    try {
+      await profileService.updateAppointment(user.id, appt.id, { status: 'completed' });
+      if (appt.isTelemedicine) {
+        await incrementLocalTelemedicine(user.id, 1);
+        try {
+          await sustainabilityService.trackTelemedicine(user.id, 1);
+        } catch (_) {}
+      }
+      fetchAppointments();
+      Alert.alert(t("success") || "Success", "Appointment marked as completed.");
+    } catch (error) {
+      console.error("Failed to update appointment:", error);
+      Alert.alert("Error", "Could not update appointment.");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -234,9 +260,18 @@ export default function AppointmentsScreen() {
                   </View>
 
                   <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={16} color={colors.mutedText} />
-                    <Text style={[styles.locationText, { color: colors.mutedText }]} numberOfLines={1}>{appt.location}</Text>
+                    <Ionicons name={appt.isTelemedicine ? "videocam-outline" : "location-outline"} size={16} color={colors.mutedText} />
+                    <Text style={[styles.locationText, { color: colors.mutedText }]} numberOfLines={1}>
+                      {appt.isTelemedicine ? "Video call" : (appt.location || "-")}
+                    </Text>
                   </View>
+                  <TouchableOpacity
+                    style={[styles.completeBtn, { backgroundColor: '#10B981' }]}
+                    onPress={() => markAppointmentComplete(appt)}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#FFF" />
+                    <Text style={styles.completeBtnText}>Mark complete</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ))
@@ -330,10 +365,21 @@ export default function AppointmentsScreen() {
               <Text style={[styles.label, { color: colors.text }]}>Location / Clinic</Text>
               <TextInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                placeholder="e.g., City Medical Center, Suite 402"
+                placeholder={newAppointment.isTelemedicine ? "Video call (optional)" : "e.g., City Medical Center, Suite 402"}
                 placeholderTextColor={colors.mutedText}
                 value={newAppointment.location}
                 onChangeText={(v) => setNewAppointment(p => ({ ...p, location: v }))}
+                editable={!newAppointment.isTelemedicine}
+              />
+            </View>
+
+            <View style={[styles.formGroup, styles.telemedicineRow]}>
+              <Text style={[styles.label, { color: colors.text }]}>Video / Telemedicine visit</Text>
+              <Switch
+                value={newAppointment.isTelemedicine}
+                onValueChange={(v) => setNewAppointment(p => ({ ...p, isTelemedicine: v, location: v ? "Video Call" : p.location }))}
+                trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                thumbColor={newAppointment.isTelemedicine ? colors.primary : '#f4f3f4'}
               />
             </View>
 
@@ -388,6 +434,9 @@ const styles = StyleSheet.create({
   specialty: { fontSize: 13, marginTop: 1 },
   locationRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
   locationText: { fontSize: 13, marginLeft: 6, flex: 1 },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, marginTop: 12, gap: 6 },
+  completeBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+  telemedicineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalWrapper: { flex: 1 },
   modalHeader: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, borderBottomWidth: 1 },
   modalHeaderTitle: { fontSize: 18, fontWeight: '700' },

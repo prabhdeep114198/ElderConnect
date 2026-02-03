@@ -13,21 +13,31 @@ import { useTheme } from "../../context/ThemeContext";
 
 // ... imports ...
 
-import { fetchMockEvents, Event as MockEvent } from "../../services/MockEventService";
+import { profileService } from "../../services/api/profile";
+import { useAuth } from "../../context/AuthContext";
 
 export default function EventsHomePage() {
   const { colors, theme } = useTheme();
-  const [events, setEvents] = useState<MockEvent[]>([]);
+  const { user } = useAuth();
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = async () => {
     try {
-      const lat = 28.6139; // Delhi coordinates
-      const lon = 77.2090;
+      if (!user?.id) return;
 
-      // Use mocked service "Simulated Live Events" 
-      const mockData = await fetchMockEvents(lat, lon);
-      setEvents(mockData);
+      const response: any = await profileService.getSocialEvents(user.id);
+      if (response.data && response.data.data && response.data.data.events) {
+        // Map backend fields to the component expectation if necessary
+        // Backend: { id, title, description, scheduledAt, category, location }
+        // Component expects: { id, name, category, start, description }
+        const mappedEvents = response.data.data.events.map((e: any) => ({
+          ...e,
+          name: e.title,
+          start: e.scheduledAt,
+        }));
+        setEvents(mappedEvents);
+      }
     } catch (err) {
       console.error("Event fetch error:", err);
     } finally {
@@ -37,7 +47,7 @@ export default function EventsHomePage() {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [user?.id]);
 
   if (loading) {
     return (

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { getProfileKey } from "../../utils/userStorageKeys";
 
 const INTERESTS = ["Gardening", "Reading", "Music", "Walking", "Technology", "Cooking", "Art", "Photography", "Knitting", "Traveling", "Sports", "Puzzles", "Bird Watching"];
 const CONDITIONS = ["Diabetes", "Hypertension", "Mobility Issues", "Vision Impairment", "Hearing Impairment", "Arthritis", "Heart Disease", "Asthma", "Memory Issues", "None"];
@@ -155,7 +156,8 @@ export default function OnboardingScreen() {
         };
 
         try {
-            await AsyncStorage.setItem("user_profile_data", JSON.stringify(profileData));
+            if (!user?.id) throw new Error("User not logged in");
+            await AsyncStorage.setItem(getProfileKey(user.id), JSON.stringify(profileData));
             await completeOnboarding();
             router.replace("/(tabs)/home");
         } catch (error) {

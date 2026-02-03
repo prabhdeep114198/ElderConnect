@@ -20,6 +20,22 @@ interface SettingsSectionType {
   data: SettingItemType[];
 }
 
+const ACCENT_COLORS = [
+  { label: "Classic Blue", value: "#2E5EAA" },
+  { label: "Soft Lavender", value: "#8B5CF6" },
+  { label: "Nature Green", value: "#10B981" },
+  { label: "sunset Orange", value: "#F59E0B" },
+  { label: "Rose Pink", value: "#EC4899" },
+  { label: "Premium Graphite", value: "#374151" },
+];
+
+const FONT_SIZES = [
+  { label: "Small", value: "small", scale: 0.9 },
+  { label: "Normal", value: "medium", scale: 1.0 },
+  { label: "Large", value: "large", scale: 1.2 },
+  { label: "Extra Large", value: "extraLarge", scale: 1.4 },
+];
+
 // Mock function to fetch settings from backend
 const fetchSettings = (t: any): SettingsSectionType[] => [
   {
@@ -43,6 +59,9 @@ const fetchSettings = (t: any): SettingsSectionType[] => [
   {
     title: t("preferences"),
     data: [
+      { type: "item", title: t("uiMode") || "Interface Mode", subtitle: t("uiModeSubtitle") || "Switch between Senior and Caregiver view", action: "uiMode" },
+      { type: "item", title: t("fontSize") || "Text Size", subtitle: t("fontSizeSubtitle") || "Adjust for readability", action: "fontSize" },
+      { type: "item", title: t("accentColor") || "Brand Theme", subtitle: t("accentColorSubtitle") || "Pick your favorite color", action: "accentColor" },
       { type: "toggle", title: t("notifications"), key: "notifications", subtitle: t("notificationsSubtitle") },
       { type: "toggle", title: t("darkMode"), key: "darkMode", subtitle: t("darkModeSubtitle") },
       { type: "item", title: t("language"), subtitle: t("languageSubtitleEnglish"), action: "language" },
@@ -74,7 +93,7 @@ const LANGUAGES = [
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { theme, colors, toggleTheme } = useTheme();
+  const { theme, colors, toggleTheme, uiMode, setUIMode, fontSize, setFontSize, accentColor, setAccentColor } = useTheme();
   const { user, logout, requireAuth, refreshSubscription } = useAuth();
   const { t, i18n } = useTranslation();
   const [settingsSections, setSettingsSections] = useState<SettingsSectionType[]>([]);
@@ -83,6 +102,9 @@ export default function SettingsScreen() {
     darkMode: theme === "dark",
   });
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const [isUIModalVisible, setIsUIModalVisible] = useState(false);
+  const [isFontSizeModalVisible, setIsFontSizeModalVisible] = useState(false);
+  const [isColorModalVisible, setIsColorModalVisible] = useState(false);
 
   useEffect(() => {
     setToggles((prev) => ({ ...prev, darkMode: theme === "dark" }));
@@ -129,6 +151,15 @@ export default function SettingsScreen() {
         break;
       case "language":
         setIsLanguageModalVisible(true);
+        break;
+      case "uiMode":
+        setIsUIModalVisible(true);
+        break;
+      case "fontSize":
+        setIsFontSizeModalVisible(true);
+        break;
+      case "accentColor":
+        setIsColorModalVisible(true);
         break;
       default:
         Alert.alert("Action", `Perform ${action}`);
@@ -295,6 +326,65 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* UI Mode Modal */}
+      <Modal visible={isUIModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsUIModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Interface Mode</Text>
+              <TouchableOpacity onPress={() => setIsUIModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("senior"); setIsUIModalVisible(false); }}>
+              <Text style={[styles.optionLabel, { color: colors.text }]}>🧓 Senior Mode (Simple)</Text>
+              {uiMode === "senior" && <Text style={{ color: colors.primary }}>✓</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("caregiver"); setIsUIModalVisible(false); }}>
+              <Text style={[styles.optionLabel, { color: colors.text }]}>👩‍⚕️ Caregiver Mode (Advanced)</Text>
+              {uiMode === "caregiver" && <Text style={{ color: colors.primary }}>✓</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Font Size Modal */}
+      <Modal visible={isFontSizeModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsFontSizeModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Text Size</Text>
+              <TouchableOpacity onPress={() => setIsFontSizeModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+            </View>
+            {FONT_SIZES.map((size) => (
+              <TouchableOpacity key={size.value} style={styles.optionItem} onPress={() => { setFontSize(size.value as any); setIsFontSizeModalVisible(false); }}>
+                <Text style={[styles.optionLabel, { color: colors.text, fontSize: 16 * size.scale }]}>{size.label}</Text>
+                {fontSize === size.value && <Text style={{ color: colors.primary }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Accent Color Modal */}
+      <Modal visible={isColorModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsColorModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Theme Color</Text>
+              <TouchableOpacity onPress={() => setIsColorModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+            </View>
+            <View style={styles.colorGrid}>
+              {ACCENT_COLORS.map((color) => (
+                <TouchableOpacity key={color.value} style={styles.colorOption} onPress={() => { setAccentColor(color.value); setIsColorModalVisible(false); }}>
+                  <View style={[styles.colorCircle, { backgroundColor: color.value }]} />
+                  <Text style={[styles.colorLabel, { color: colors.text }]}>{color.label}</Text>
+                  {accentColor === color.value && <Text style={[styles.checkMark, { color: color.value }]}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -381,4 +471,34 @@ const styles = StyleSheet.create({
   },
   languageLabel: { fontSize: 18, fontWeight: "600" },
   languageSubtitle: { fontSize: 14, marginTop: 2 },
+  optionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  optionLabel: { fontSize: 18, fontWeight: "500" },
+  colorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 20,
+    justifyContent: "space-between",
+  },
+  colorOption: {
+    width: "30%",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  colorCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  colorLabel: { fontSize: 12, textAlign: "center", fontWeight: "600" },
+  checkMark: { fontSize: 18, fontWeight: "bold", marginTop: 4 },
 });
