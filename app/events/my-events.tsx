@@ -32,8 +32,28 @@ export default function MyTicketsPage() {
     }
     try {
       const stored = await AsyncStorage.getItem(getTicketsKey(user.id));
-      const userTickets = stored ? JSON.parse(stored) : [];
-      setTickets(userTickets.reverse()); // Show newest first
+      const userTickets: Ticket[] = stored ? JSON.parse(stored) : [];
+
+      // Function to filter tickets: Future tickets + Past tickets (last 1 month)
+      const getRecentTickets = (allTickets: Ticket[]) => {
+        const now = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(now.getMonth() - 1);
+        oneMonthAgo.setHours(0, 0, 0, 0);
+
+        return allTickets.filter(ticket => {
+          const ticketDate = new Date(ticket.date);
+          // Include if future OR if within the last month
+          return ticketDate >= oneMonthAgo;
+        });
+      };
+
+      const filteredTickets = getRecentTickets(userTickets);
+
+      // Sort by date descending (newest events first)
+      filteredTickets.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setTickets(filteredTickets);
     } catch (err) {
       console.error(err);
     } finally {

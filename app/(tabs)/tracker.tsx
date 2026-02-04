@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState, useEffect, useCallback } from "react";
 import {
   Alert,
@@ -16,6 +17,8 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { deviceService } from "../../services/api/device";
+import { profileService } from "../../services/api/profile";
+import { HealthCharts } from "../../components/HealthCharts";
 
 const { width } = Dimensions.get('window');
 
@@ -68,10 +71,156 @@ export default function HealthTrackerScreen() {
     else setLoading(true);
 
     try {
-      // 1. Fetch Vitals List (Manual entries)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 6); // Last 7 days inclusive
+
+      const startStr = startDate.toISOString();
+      const endStr = endDate.toISOString();
+
+      // 1. Fetch Aggregated Daily Metrics (Source of Truth for Steps, HR, Sleep, Water)
+      let dailyMetricsData: any[] = [];
+      try {
+        const metricsRes: any = await profileService.getMetricsRange(user.id, startStr, endStr);
+        dailyMetricsData = metricsRes?.data?.metrics || [];
+      } catch (e) {
+        console.log("Error fetching daily metrics range:", e);
+      }
+
+      // Helper to get history from daily metrics
+      const getHistoryFromDaily = (key: string) => {
+        const historyMap = dailyMetricsData.map(d => ({
+          date: d.date,
+          value: Number(d[key]) || 0
+        }));
+
+        // Ensure 7 days
+        const fullHistory = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(startDate);
+          d.setDate(d.getDate() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          const found = historyMap.find(h => new Date(h.date).toISOString().split('T')[0] === dateStr);
+          fullHistory.push({ date: d.toISOString(), value: found ? found.value : 0 });
+        }
+        return fullHistory;
+      };
+
+      // Helper to get latest value from daily metrics
+      const getLatestFromDaily = (key: string) => {
+        if (dailyMetricsData.length === 0) return 0;
+        // Sort by date descending
+        const sorted = [...dailyMetricsData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return Number(sorted[0][key]) || 0;
+      };
+
+      // 2. Define Fetch Logic for Other Metrics (Exercise, Weight) via Telemetry/Vitals
+      const fetchRawMetric = async (metricName: string, type: 'telemetry' | 'vital', typeName: string, extractor: (i: any) => number) => {
+        let items = [];
+        try {
+          if (type === 'telemetry') {
+            const res: any = await deviceService.getTelemetry(user.id, { metricType: typeName, startDate: startStr, endDate: endStr, limit: 100 });
+            if (res.data?.data?.telemetry) items = res.data.data.telemetry;
+          } else {
+            const res: any = await deviceService.getVitals(user.id, { vitalType: typeName, startDate: startStr, endDate: endStr, limit: 100 });
+            if (res.data?.data?.vitals) items = res.data.data.vitals;
+          }
+        } catch (e) {
+          console.log(`Error fetching ${metricName}`, e);
+        }
+
+        // Process raw items into daily history
+        const dailyMap = new Map<string, number>();
+        // Initialize 0s
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(startDate);
+          d.setDate(d.getDate() + i);
+          dailyMap.set(d.toISOString().split('T')[0], 0);
+        }
+
+        if (items && Array.isArray(items)) {
+          items.forEach((item: any) => {
+            const dKey = new Date(item.timestamp || item.recordedAt).toISOString().split('T')[0];
+            if (dailyMap.has(dKey)) {
+              const val = extractor(item);
+              const curr = dailyMap.get(dKey) || 0;
+              if (metricName === 'Exercise') {
+                dailyMap.set(dKey, curr + val); // Sum for exercise
+              } else {
+                if (val > curr) dailyMap.set(dKey, val); // Max for weight
+              }
+            }
+          });
+        }
+
+        const history = Array.from(dailyMap.entries())
+          .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+          .map(([date, value]) => ({ date, value }));
+
+        const latest = history[history.length - 1]?.value || 0;
+        return { history, latest };
+      };
+
+      const exerciseData = await fetchRawMetric('Exercise', 'telemetry', 'exercise', (i) => i.value?.minutes || i.reading?.minutes || 0);
+      const weightData = await fetchRawMetric('Weight', 'vital', 'weight', (i) => i.value?.kg || i.reading?.kg || 0);
+
+      // 3. Construct the HealthMetrics State
+      const metricsMap = [
+        {
+          id: '1', name: 'Steps', unit: 'steps', target: 8000, icon: 'walk', color: colors.primary,
+          history: getHistoryFromDaily('steps'), value: getLatestFromDaily('steps')
+        },
+        {
+          id: '2', name: 'Heart Rate', unit: 'bpm', target: 75, icon: 'heart', color: colors.error,
+          history: getHistoryFromDaily('heartRate'), value: getLatestFromDaily('heartRate')
+        },
+        {
+          id: '3', name: 'Sleep', unit: 'hours', target: 8, icon: 'moon', color: colors.info,
+          history: getHistoryFromDaily('sleepHours'), value: getLatestFromDaily('sleepHours')
+        },
+        {
+          id: '4', name: 'Water Intake', unit: 'glasses', target: 8, icon: 'water', color: colors.info,
+          history: getHistoryFromDaily('waterIntake'), value: getLatestFromDaily('waterIntake')
+        },
+        {
+          id: '5', name: 'Weight', unit: 'kg', target: 0, icon: 'fitness', color: colors.success,
+          history: weightData.history, value: weightData.latest
+        },
+        {
+          id: '6', name: 'Exercise', unit: 'minutes', target: 60, icon: 'barbell', color: colors.warning,
+          history: exerciseData.history, value: exerciseData.latest
+        }
+      ];
+
+      const updatedMetrics: HealthMetric[] = metricsMap.map(m => {
+        const hist = m.history.map(h => h.value);
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (hist.length >= 3) {
+          const last3 = hist.slice(-3);
+          if (last3[2] > last3[1] && last3[1] > last3[0]) trend = 'up';
+          else if (last3[2] < last3[1] && last3[1] < last3[0]) trend = 'down';
+        }
+
+        return {
+          id: m.id,
+          name: m.name,
+          value: m.value,
+          unit: m.unit,
+          target: m.target,
+          icon: m.icon as any,
+          color: m.color,
+          trend,
+          history: m.history,
+          lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+      });
+
+      console.log('📊 Loaded Real DB Health Metrics');
+      setHealthMetrics(updatedMetrics);
+
+      // 4. Fetch Recent Vitals
       const vitalsResponse: any = await deviceService.getVitals(user.id, { limit: 50 });
       const backendVitals = vitalsResponse?.data?.vitals || [];
-
       const mappedVitals = backendVitals.map((v: any) => ({
         id: v.id,
         name: getVitalName(v.vitalType),
@@ -85,59 +234,22 @@ export default function HealthTrackerScreen() {
       }));
       setVitalSigns(mappedVitals);
 
-      // 2. Fetch Latest Telemetry (Automated tracking)
-      const telemetryMetrics = ['steps', 'heart_rate', 'sleep', 'water', 'exercise', 'weight'];
-      const telemetryData: Record<string, any> = {};
-
-      await Promise.all(telemetryMetrics.map(async (type) => {
-        try {
-          const res: any = await deviceService.getLatestTelemetry(user.id, type);
-          if (res?.data?.telemetry) {
-            telemetryData[type] = res.data.telemetry;
-          }
-        } catch (e) { /* ignore individual failures */ }
-      }));
-
-      // 3. Update Dashboard Metrics (Merge Vitals & Telemetry)
-      const updatedMetrics = [...healthMetrics];
-      const metricMap: Record<string, string> = {
-        'steps': 'Steps',
-        'heart_rate': 'Heart Rate',
-        'sleep': 'Sleep',
-        'water': 'Water Intake',
-        'weight': 'Weight',
-        'exercise': 'Exercise',
-        'oxygen_saturation': 'Oxygen'
+      // 5. Calculate Weekly Goals
+      const sumHistory = (metricName: string) => {
+        const m = updatedMetrics.find(x => x.name === metricName);
+        if (!m) return 0;
+        return m.history.reduce((acc, curr) => acc + curr.value, 0);
       };
 
-      for (const [vType, mName] of Object.entries(metricMap)) {
-        const mIndex = updatedMetrics.findIndex(m => m.name === mName || (mName === 'Oxygen' && m.name === 'Oxygen Saturation'));
-        if (mIndex === -1) continue;
+      const newGoals = [
+        { name: 'Steps', current: sumHistory('Steps'), target: 56000, unit: 'steps' },
+        { name: 'Exercise', current: sumHistory('Exercise'), target: 420, unit: 'minutes' },
+        { name: 'Sleep', current: sumHistory('Sleep'), target: 56, unit: 'hours' },
+        { name: 'Water', current: sumHistory('Water Intake'), target: 56, unit: 'glasses' }
+      ];
 
-        // Try telemetry first for automated metrics, then fall back to manual vitals
-        const latestTelemetry = telemetryData[vType];
-        const latestVital = backendVitals.find((v: any) => v.vitalType === vType);
-
-        if (latestTelemetry || latestVital) {
-          const source = (latestTelemetry && (!latestVital || new Date(latestTelemetry.timestamp) > new Date(latestVital.recordedAt)))
-            ? latestTelemetry
-            : latestVital;
-
-          const timestamp = source.timestamp || source.recordedAt;
-
-          updatedMetrics[mIndex].value = source.vitalType === 'blood_pressure'
-            ? source.reading.systolic
-            : extractNumericReading(source);
-          updatedMetrics[mIndex].lastUpdated = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-      }
-      setHealthMetrics(updatedMetrics);
-
-      // 4. Calculate Weekly Goals (Mocking logic for now since we'd need a grouped API endpoint)
-      // In a real app, you'd fetch /telemetry/summary or similar
-      const updatedGoals = [...weeklyGoals];
-      updatedGoals[0].current = mappedVitals.filter((v: VitalSign) => v.name === 'Steps').reduce((sum: number, v: VitalSign) => sum + (v.value || 0), 0) || 5200 * 7; // Mock fallback
-      setWeeklyGoals(updatedGoals);
+      console.log('🎯 Weekly Goals Calculated from DB History');
+      setWeeklyGoals(newGoals);
 
     } catch (error) {
       console.error("Failed to load health data", error);
@@ -172,8 +284,8 @@ export default function HealthTrackerScreen() {
       target: 8000,
       icon: 'walk',
       color: colors.primary,
-      trend: 'up',
-      lastUpdated: 'Never',
+      trend: 'stable',
+      lastUpdated: '--',
       history: []
     },
     {
@@ -185,7 +297,7 @@ export default function HealthTrackerScreen() {
       icon: 'heart',
       color: colors.error,
       trend: 'stable',
-      lastUpdated: 'Never',
+      lastUpdated: '--',
       history: []
     },
     {
@@ -196,8 +308,8 @@ export default function HealthTrackerScreen() {
       target: 8,
       icon: 'moon',
       color: colors.info,
-      trend: 'up',
-      lastUpdated: 'Never',
+      trend: 'stable',
+      lastUpdated: '--',
       history: []
     },
     {
@@ -208,8 +320,8 @@ export default function HealthTrackerScreen() {
       target: 8,
       icon: 'water',
       color: colors.info,
-      trend: 'down',
-      lastUpdated: 'Never',
+      trend: 'stable',
+      lastUpdated: '--',
       history: []
     },
     {
@@ -217,10 +329,11 @@ export default function HealthTrackerScreen() {
       name: 'Weight',
       value: 0,
       unit: 'kg',
+      target: 0,
       icon: 'fitness',
       color: colors.success,
       trend: 'stable',
-      lastUpdated: 'Never',
+      lastUpdated: '--',
       history: []
     },
     {
@@ -231,8 +344,8 @@ export default function HealthTrackerScreen() {
       target: 60,
       icon: 'barbell',
       color: colors.warning,
-      trend: 'up',
-      lastUpdated: 'Never',
+      trend: 'stable',
+      lastUpdated: '--',
       history: []
     }
   ]);
@@ -445,6 +558,33 @@ export default function HealthTrackerScreen() {
     );
   };
 
+  const seedSampleData = async () => {
+    if (!user?.id) return;
+
+    try {
+      Alert.alert('Seed Data', 'Generating 7 days of sample health data...');
+      const response: any = await profileService.updateHealthMetric(user.id, {
+        type: 'steps',
+        value: 0
+      });
+
+      // Call the seed endpoint via a POST request
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/v1/users/${user.id}/health/seed?days=7`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${await AsyncStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      Alert.alert('Success', 'Sample data created! Pull down to refresh.');
+      loadHealthData();
+    } catch (error) {
+      console.error('Failed to seed data', error);
+      Alert.alert('Error', 'Failed to create sample data');
+    }
+  };
+
 
   if (loading && !refreshing) {
     return (
@@ -471,12 +611,20 @@ export default function HealthTrackerScreen() {
             <Text style={[styles.headerTitle, { color: colors.text }]}>Health Tracker</Text>
             <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Monitor your daily health metrics</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={() => setShowVitalModal(true)}
-          >
-            <Ionicons name="add" size={24} color={colors.buttonText} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.info }]}
+              onPress={seedSampleData}
+            >
+              <Ionicons name="flask" size={20} color={colors.buttonText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowVitalModal(true)}
+            >
+              <Ionicons name="add" size={24} color={colors.buttonText} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -528,7 +676,7 @@ export default function HealthTrackerScreen() {
                 </Text>
                 <Text style={[styles.metricName, { color: colors.mutedText }]}>{metric.name}</Text>
 
-                {metric.target && (
+                {!!metric.target && (
                   <View style={styles.progressContainer}>
                     <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
                       <View
@@ -551,40 +699,81 @@ export default function HealthTrackerScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Charts for specific metrics */}
+          <HealthCharts userId={user?.id || ''} />
         </View>
 
         {/* Weekly Goals */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Goals</Text>
           <View style={[styles.goalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {weeklyGoals.map((goal, index) => (
-              <View key={index} style={styles.goalCard}>
-                <View style={styles.goalHeader}>
-                  <Text style={[styles.goalName, { color: colors.text }]}>{goal.name}</Text>
-                  <Text style={[styles.goalPercentage, { color: colors.primary }]}>
-                    {Math.round((goal.current / goal.target) * 100)}%
-                  </Text>
-                </View>
+            {weeklyGoals.map((goal, index) => {
+              // Get the corresponding metric to access history
+              const metric = healthMetrics.find(m => m.name === goal.name ||
+                (goal.name === 'Water' && m.name === 'Water Intake'));
+              const hasHistory = metric && metric.history && metric.history.length > 0;
 
-                <View style={styles.goalProgress}>
-                  <View style={[styles.goalProgressBar, { backgroundColor: colors.background }]}>
-                    <View
-                      style={[
-                        styles.goalProgressFill,
-                        {
-                          width: `${Math.min((goal.current / goal.target) * 100, 100)}%`,
-                          backgroundColor: (goal.current / goal.target) >= 0.8 ? colors.success : colors.warning
-                        }
-                      ]}
-                    />
+              return (
+                <View key={index} style={styles.goalCard}>
+                  <View style={styles.goalHeader}>
+                    <Text style={[styles.goalName, { color: colors.text }]}>{goal.name}</Text>
+                    <Text style={[styles.goalPercentage, { color: colors.primary }]}>
+                      {Math.round((goal.current / goal.target) * 100)}%
+                    </Text>
                   </View>
-                </View>
 
-                <Text style={[styles.goalText, { color: colors.mutedText }]}>
-                  {goal.current} / {goal.target} {goal.unit}
-                </Text>
-              </View>
-            ))}
+                  <View style={styles.goalProgress}>
+                    <View style={[styles.goalProgressBar, { backgroundColor: colors.background }]}>
+                      <View
+                        style={[
+                          styles.goalProgressFill,
+                          {
+                            width: `${Math.min((goal.current / goal.target) * 100, 100)}%`,
+                            backgroundColor: (goal.current / goal.target) >= 0.8 ? colors.success : colors.warning
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={[styles.goalText, { color: colors.mutedText }]}>
+                    {goal.current.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                  </Text>
+
+                  {/* Mini 7-day breakdown chart */}
+                  {hasHistory && (
+                    <View style={styles.miniChartContainer}>
+                      <Text style={[styles.miniChartTitle, { color: colors.mutedText }]}>Daily Breakdown</Text>
+                      <View style={styles.miniChart}>
+                        {metric.history.slice(-7).map((entry, idx) => {
+                          const maxValue = Math.max(...metric.history.slice(-7).map(h => h.value), 1);
+                          const heightPercent = (entry.value / maxValue) * 100;
+                          return (
+                            <View key={idx} style={styles.miniBar}>
+                              <View style={styles.miniBarContainer}>
+                                <View
+                                  style={[
+                                    styles.miniBarFill,
+                                    {
+                                      height: `${heightPercent}%`,
+                                      backgroundColor: metric.color
+                                    }
+                                  ]}
+                                />
+                              </View>
+                              <Text style={[styles.miniBarLabel, { color: colors.mutedText }]}>
+                                {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'narrow' })}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -795,7 +984,7 @@ export default function HealthTrackerScreen() {
                 <Text style={[styles.detailValue, { color: colors.primary }]}>
                   {selectedMetric.value} {selectedMetric.unit}
                 </Text>
-                {selectedMetric.target && (
+                {!!selectedMetric.target && (
                   <Text style={[styles.detailTarget, { color: colors.mutedText }]}>
                     Target: {selectedMetric.target} {selectedMetric.unit}
                   </Text>
@@ -804,25 +993,24 @@ export default function HealthTrackerScreen() {
 
               <View style={styles.detailSection}>
                 <Text style={[styles.detailTitle, { color: colors.text }]}>7-Day History</Text>
-                <View style={styles.historyChart}>
-                  {selectedMetric.history.slice(-7).map((entry, index) => (
-                    <View key={index} style={styles.historyBar}>
-                      <View
-                        style={[
-                          styles.historyBarFill,
-                          {
-                            height: `${(entry.value / Math.max(...selectedMetric.history.map(h => h.value))) * 100}%`,
-                            backgroundColor: selectedMetric.color
-                          }
-                        ]}
-                      />
-                      <Text style={[styles.historyDate, { color: colors.mutedText }]}>
-                        {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short' })}
-                      </Text>
-                      <Text style={[styles.historyValue, { color: colors.mutedText }]}>{entry.value}</Text>
-                    </View>
-                  ))}
-                </View>
+                {selectedMetric.history.length > 0 ? (
+                  <View style={{ marginTop: 12 }}>
+                    {selectedMetric.history.slice(-7).map((entry, index) => (
+                      <View key={index} style={[styles.historyItem, { borderBottomColor: colors.border }]}>
+                        <Text style={[styles.historyItemDate, { color: colors.text }]}>
+                          {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                        </Text>
+                        <Text style={[styles.historyItemValue, { color: colors.primary }]}>
+                          {entry.value} {selectedMetric.unit}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={[styles.detailTarget, { color: colors.mutedText, marginTop: 8 }]}>
+                    No history data available
+                  </Text>
+                )}
               </View>
 
               <View style={styles.detailSection}>
@@ -1194,5 +1382,60 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 14,
     marginLeft: 8,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  historyItemDate: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  historyItemValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  miniChartContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  miniChartTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  miniChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 60,
+    paddingHorizontal: 4,
+  },
+  miniBar: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginHorizontal: 2,
+  },
+  miniBarContainer: {
+    width: '100%',
+    height: 40,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  miniBarFill: {
+    width: '80%',
+    borderRadius: 2,
+    minHeight: 2,
+  },
+  miniBarLabel: {
+    fontSize: 9,
+    marginTop: 4,
   },
 });

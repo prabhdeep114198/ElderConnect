@@ -13,8 +13,10 @@ import { useTheme } from "../../context/ThemeContext";
 import { N8NService } from "../../services/N8NService";
 import { sustainabilityService } from "../../services/api/sustainability";
 import { profileService } from "../../services/api/profile";
+import { deviceService } from "../../services/api/device";
 import { graphService, GraphData } from "../../services/api/graph";
 import * as Haptics from 'expo-haptics';
+import { HealthCharts } from "../../components/HealthCharts";
 import {
   getLocalSustainability,
   incrementLocalReports,
@@ -56,6 +58,7 @@ export default function ReportsScreen() {
   const [exerciseData, setExerciseData] = useState<any>(null);
   const [vitalSignsData, setVitalSignsData] = useState<any[]>([]);
   const [diaryEntries, setDiaryEntries] = useState<any[]>([]);
+  const [reportMetrics, setReportMetrics] = useState<any[]>([]);
   const [scores, setScores] = useState({
     physical: 65,
     social: 40,
@@ -293,57 +296,64 @@ export default function ReportsScreen() {
       }
 
       // 4. Process Health Metrics (Exercise & Sleep)
-      if (healthMetrics) {
-        const metrics = JSON.parse(healthMetrics);
-        setExerciseData(metrics);
+      // 4. Process Health Metrics (Exercise & Sleep) - REAL DATA
+      try {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
 
-        const exerciseMetric = metrics.find((m: any) => m.name === 'Exercise');
-        if (exerciseMetric && exerciseMetric.target) {
-          const exercisePercentage = (exerciseMetric.value / exerciseMetric.target) * 100;
-          calculatedScores.exercise = Math.min(100, Math.round(exercisePercentage));
+        const [metricsRes, complianceRes, medsRes]: any = await Promise.all([
+          profileService.getMetricsRange(userId, startDate.toISOString(), endDate.toISOString()),
+          profileService.getComplianceReport(userId, 7),
+          profileService.getMedications(userId)
+        ]);
+
+        if (medsRes?.data?.medications) {
+          setUserData((prev: any) => ({ ...prev, medications: medsRes.data.medications }));
         }
 
-        const sleepMetric = metrics.find((m: any) => m.name === 'Sleep');
-        if (sleepMetric && sleepMetric.target) {
-          const sleepPercentage = (sleepMetric.value / sleepMetric.target) * 100;
-          calculatedScores.sleep = Math.min(100, Math.round(sleepPercentage));
-        }
-      } else {
-        // Load mock health metrics
-        const { fetchMockHealthMetrics } = await import('../../services/MockEventService');
-        const mockMetrics = await fetchMockHealthMetrics();
-        setExerciseData(mockMetrics);
+        if (metricsRes?.data?.metrics) {
+          const metrics = metricsRes.data.metrics;
+          setReportMetrics(metrics);
 
-        const exerciseMetric = mockMetrics.find((m: any) => m.name === 'Exercise');
-        if (exerciseMetric && exerciseMetric.target) {
-          calculatedScores.exercise = Math.round((exerciseMetric.value / exerciseMetric.target) * 100);
-        }
+          // Calculate Scores based on last 7 days average vs Targets
+          const last7 = metrics.slice(-7);
+          const avgSteps = last7.reduce((acc: number, m: any) => acc + (Number(m.steps) || 0), 0) / (last7.length || 1);
+          const avgSleep = last7.reduce((acc: number, m: any) => acc + (Number(m.sleepHours) || 0), 0) / (last7.length || 1);
 
-        const sleepMetric = mockMetrics.find((m: any) => m.name === 'Sleep');
-        if (sleepMetric && sleepMetric.target) {
-          calculatedScores.sleep = Math.round((sleepMetric.value / sleepMetric.target) * 100);
+          // Exercise Score (Target 6000 steps)
+          calculatedScores.exercise = Math.min(100, Math.round((avgSteps / 6000) * 100));
+
+          // Sleep Score (Target 7-9 hours)
+          calculatedScores.sleep = avgSleep >= 7 && avgSleep <= 9 ? 100 : Math.max(40, 100 - (Math.abs(8 - avgSleep) * 20));
+
+          // Set detail data for modal
+          setExerciseData([{ history: metrics.map((m: any) => ({ date: m.date, value: m.steps })) }]);
+
+          // 6. Generate Weekly Trends (Real Data)
+          const avgHR = last7.reduce((acc: number, m: any) => acc + (Number(m.heartRate) || 0), 0) / (last7.length || 1);
+
+          setWeeklyTrends({
+            avgSteps: Math.round(avgSteps),
+            avgSleep: avgSleep.toFixed(1),
+            avgHeartRate: Math.round(avgHR),
+            compliance: Math.round(complianceRes?.overallCompliance || 0),
+            weightTrend: 'stable' // Can be derived if weight history exists
+          });
         }
+      } catch (e) {
+        console.log("Error loading metrics:", e);
       }
 
-      // 5. Process Vital Signs
-      if (vitalSigns) {
-        const vitals = JSON.parse(vitalSigns);
-        setVitalSignsData(vitals.slice(0, 3)); // Store latest 3 vitals
-      } else {
-        // Load mock vital signs
-        const { fetchMockVitalSigns } = await import('../../services/MockEventService');
-        const mockVitals = await fetchMockVitalSigns();
-        setVitalSignsData(mockVitals.slice(0, 3));
+      // 5. Process Vital Signs - REAL DATA
+      if (userId) {
+        try {
+          const vitalsRes: any = await deviceService.getVitals(userId, { limit: 5 });
+          if (vitalsRes?.data?.vitals) {
+            setVitalSignsData(vitalsRes.data.vitals);
+          }
+        } catch (e) { console.log("Error loading vitals:", e); }
       }
-
-      // 6. Generate Weekly Trends (Last 7 Days)
-      setWeeklyTrends({
-        avgSteps: Math.round(5000 + Math.random() * 2000),
-        avgSleep: (7 + Math.random() * 1.5).toFixed(1),
-        avgHeartRate: Math.round(70 + Math.random() * 5),
-        compliance: Math.round(85 + Math.random() * 10),
-        weightTrend: 'stable'
-      });
 
       setScores(calculatedScores);
     } catch (e) {
@@ -374,90 +384,138 @@ export default function ReportsScreen() {
       <html>
         <head>
           <style>
-            body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #5a67d8; padding-bottom: 20px; margin-bottom: 30px; }
-            .section { margin-bottom: 25px; }
-            .section-title { color: #5a67d8; font-size: 20px; font-weight: bold; margin-bottom: 15px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-            .card { background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
-            .label { font-size: 12px; color: #718096; text-transform: uppercase; letter-spacing: 0.5px; }
-            .value { font-size: 16px; font-weight: 500; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; }
-            th { background: #edf2f7; font-size: 14px; }
+            body { font-family: 'Times New Roman', serif; padding: 50px; color: #000; line-height: 1.4; }
+            .header-row { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+            .meta { text-align: right; font-size: 12px; }
+            .title { text-align: center; font-size: 22px; font-weight: bold; margin: 30px 0; text-decoration: underline; text-underline-offset: 5px; }
+            
+            .section { margin-bottom: 30px; }
+            .section-header { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; }
+            
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+            .info-item { display: flex; }
+            .info-label { font-weight: bold; width: 140px; }
+            
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+            th { background-color: #f0f0f0; font-weight: bold; }
+            
+            .vitals-summary { display: flex; justify-content: space-between; margin-bottom: 20px; border: 1px solid #000; padding: 15px; background: #fafafa; }
+            .vital-box { text-align: center; }
+            .vital-val { font-size: 18px; font-weight: bold; display: block; }
+            .vital-lbl { font-size: 11px; text-transform: uppercase; }
+            
+            .notes-area { border: 1px solid #ccc; height: 100px; padding: 10px; font-style: italic; color: #666; margin-top: 10px; }
+            
+            .footer { margin-top: 50px; border-top: 1px solid #000; padding-top: 10px; font-size: 10px; display: flex; justify-content: space-between; }
+            .signature-line { margin-top: 60px; border-top: 1px solid #000; width: 250px; text-align: center; font-size: 12px; float: right; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>ElderConnect Health Report</h1>
-            <p>Participant: ${user?.name || userData.name}</p>
-            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+          <div class="header-row">
+            <div class="logo">ElderConnect Health</div>
+            <div class="meta">
+               <div>Report ID: #${Math.floor(Math.random() * 1000000)}</div>
+               <div>Date: ${new Date().toLocaleDateString()}</div>
+               <div>Generated By: Dr. AI (Automated)</div>
+            </div>
           </div>
+          
+          <div class="title">COMPREHENSIVE MEDICAL REPORT</div>
 
           <div class="section">
-            <div class="section-title">Personal Profile</div>
-            <div class="grid">
-              <div class="card"><div class="label">Age</div><div class="value">${userData.age || 'N/A'}</div></div>
-              <div class="card"><div class="label">Living Arrangement</div><div class="value">${userData.livingArrangement || 'N/A'}</div></div>
-              <div class="card"><div class="label">Activity Level</div><div class="value">${userData.activityLevel || 'N/A'}</div></div>
-              <div class="card"><div class="label">Mobility</div><div class="value">${userData.mobilityLevel || 'N/A'}</div></div>
+            <div class="section-header">Patient Demographics</div>
+            <div class="info-grid">
+               <div class="info-item"><div class="info-label">Patient Name:</div> <div>${user?.name || userData.name}</div></div>
+               <div class="info-item"><div class="info-label">Age/Gender:</div> <div>${userData.age || 'N/A'} / ${userData.gender || '-'}</div></div>
+               <div class="info-item"><div class="info-label">Patient ID:</div> <div>${user?.id?.substring(0, 8).toUpperCase() || '-'}</div></div>
+               <div class="info-item"><div class="info-label">Blood Type:</div> <div>${userData.bloodType || 'Unknown'}</div></div>
+               <div class="info-item"><div class="info-label">Primary Physician:</div> <div>${userData.physician || 'Not Assigned'}</div></div>
+               <div class="info-item"><div class="info-label">Contact:</div> <div>${userData.phone || 'N/A'}</div></div>
             </div>
           </div>
 
           <div class="section">
-            <div class="section-title">Wellness Indices</div>
-            <table>
-              <thead>
-                <tr><th>Metric</th><th>Score</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>Physical</td><td>${scores.physical}%</td><td>${scores.physical > 70 ? 'Excellent' : scores.physical > 50 ? 'Good' : 'Needs Improvement'}</td></tr>
-                <tr><td>Social</td><td>${scores.social}%</td><td>${scores.social > 70 ? 'Connected' : scores.social > 50 ? 'Steady' : 'Isolated'}</td></tr>
-                <tr><td>Mental</td><td>${scores.mental}%</td><td>${scores.mental > 70 ? 'Strong' : scores.mental > 50 ? 'Balanced' : 'Vulnerable'}</td></tr>
-                <tr><td>Dietary</td><td>${scores.diet}%</td><td>${scores.diet > 70 ? 'Healthy' : scores.diet > 50 ? 'Standard' : 'Unbalanced'}</td></tr>
-              </tbody>
-            </table>
+             <div class="section-header">Clinical Vitals Summary</div>
+             <div class="vitals-summary">
+                <div class="vital-box"><span class="vital-val">${weeklyTrends.avgHeartRate} BPM</span><span class="vital-lbl">Avg Heart Rate</span></div>
+                <div class="vital-box"><span class="vital-val">${userData.bloodPressure || '120/80'}</span><span class="vital-lbl">Blood Pressure</span></div>
+                <div class="vital-box"><span class="vital-val">${userData.weight || 'N/A'} kg</span><span class="vital-lbl">Weight</span></div>
+                <div class="vital-box"><span class="vital-val">${weeklyTrends.avgSteps}</span><span class="vital-lbl">Avg Daily Steps</span></div>
+                <div class="vital-box"><span class="vital-val">${weeklyTrends.avgSleep} hrs</span><span class="vital-lbl">Avg Sleep</span></div>
+             </div>
           </div>
 
           <div class="section">
-            <div class="section-title">Weekly Trends (Last 7 Days)</div>
-            <div class="grid">
-              <div class="card"><div class="label">Avg Daily Steps</div><div class="value">${weeklyTrends.avgSteps}</div></div>
-              <div class="card"><div class="label">Avg Sleep</div><div class="value">${weeklyTrends.avgSleep} hrs</div></div>
-              <div class="card"><div class="label">Medication Compliance</div><div class="value">${weeklyTrends.compliance}%</div></div>
-              <div class="card"><div class="label">Avg Heart Rate</div><div class="value">${weeklyTrends.avgHeartRate} BPM</div></div>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Health Conditions & Medications</div>
-            <div class="card">
-                <strong>Conditions:</strong> ${userData.conditions?.join(", ") || 'None stated'}<br/>
-                <strong style="margin-top: 10px; display: block;">Medication Frequency:</strong> ${userData.medicationFrequency || 'N/A'}
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Interests & Hobbies</div>
-            <p>${userData.interests?.join(" • ") || 'None listed'}</p>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Emergency Contacts</div>
-            <table>
+             <div class="section-header">Last 7 Days Metrics History</div>
+             <table>
                 <thead>
-                    <tr><th>Name</th><th>Phone</th><th>Relation</th></tr>
+                   <tr>
+                      <th>Date</th>
+                      <th>Steps</th>
+                      <th>Heart Rate (Avg)</th>
+                      <th>Sleep (Hrs)</th>
+                      <th>Water (Glasses)</th>
+                   </tr>
                 </thead>
                 <tbody>
-                    ${userData.emergencyContacts?.map((c: any) => `
-                        <tr><td>${c.name}</td><td>${c.phone}</td><td>${c.relation}</td></tr>
-                    `).join('') || '<tr><td colspan="3">No contacts listed</td></tr>'}
+                   ${reportMetrics.slice(-7).reverse().map((m: any) => `
+                      <tr>
+                         <td>${new Date(m.date).toLocaleDateString()}</td>
+                         <td>${m.steps || '-'}</td>
+                         <td>${m.heartRate || '-'}</td>
+                         <td>${m.sleepHours || '-'}</td>
+                         <td>${m.waterIntake || '-'}</td>
+                      </tr>
+                   `).join('') || '<tr><td colspan="5">No recent data recorded.</td></tr>'}
                 </tbody>
-            </table>
+             </table>
           </div>
 
-          <div style="margin-top: 50px; font-size: 10px; color: #a0aec0; text-align: center;">
-            This report is generated by ElderConnect and is intended for informational purposes only.
+          <div class="section">
+             <div class="section-header">Medication Adherence</div>
+             <div class="info-item" style="margin-bottom: 10px;">
+                <div class="info-label">Weekly Compliance:</div>
+                <div>${weeklyTrends.compliance}%</div>
+             </div>
+             <table>
+                <thead>
+                   <tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                   ${userData.medications?.map((m: any) => `
+                      <tr>
+                         <td>${m.name}</td>
+                         <td>${m.dosage}</td>
+                         <td>${m.frequency}</td>
+                         <td>Active</td>
+                      </tr>
+                   `).join('') || '<tr><td colspan="4">No active medications.</td></tr>'}
+                </tbody>
+             </table>
+          </div>
+
+          <div class="section">
+             <div class="section-header">Clinical Notes / Observations</div>
+             <div class="notes-area">
+                Patient metrics indicate ${scores.physical > 60 ? 'good' : 'low'} physical activity levels. 
+                Sleep patterns are ${weeklyTrends.avgSleep > 6 ? 'adequate' : 'irregular'}. 
+                Medication compliance is ${weeklyTrends.compliance > 80 ? 'excellent' : 'optimal'}.
+                <br/><br/>
+                Signed: ___________________________________
+             </div>
+          </div>
+
+          <div class="signature-line">
+             Authorized Signature<br/>
+             ${new Date().toLocaleDateString()}
+          </div>
+          <div style="clear: both;"></div>
+
+          <div class="footer">
+             <div>CONFIDENTIAL - This document contains private medical information.</div>
+             <div>Page 1 of 1</div>
           </div>
         </body>
       </html>
@@ -1092,6 +1150,7 @@ export default function ReportsScreen() {
             <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Heart Rate</Text>
           </View>
         </View>
+        <HealthCharts userId={user?.id || userData?.id} />
       </View>
 
       <View style={styles.section}>

@@ -24,20 +24,38 @@ export default function EventsHomePage() {
 
   const fetchEvents = async () => {
     try {
+      console.log("Fetching events for user:", user?.id);
       if (!user?.id) return;
 
       const response: any = await profileService.getSocialEvents(user.id);
-      if (response.data && response.data.data && response.data.data.events) {
-        // Map backend fields to the component expectation if necessary
-        // Backend: { id, title, description, scheduledAt, category, location }
-        // Component expects: { id, name, category, start, description }
-        const mappedEvents = response.data.data.events.map((e: any) => ({
+      console.log("Events API Response:", JSON.stringify(response, null, 2));
+
+      // Handle different response structures gracefully
+      const eventsList = response?.data?.events || response?.events || [];
+      console.log("Raw Events List:", eventsList.length);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const mappedEvents = eventsList
+        .map((e: any) => ({
           ...e,
+          id: e.id,
           name: e.title,
-          start: e.scheduledAt,
-        }));
-        setEvents(mappedEvents);
-      }
+          category: e.category,
+          start: e.scheduledAt, // ensure this matches backend field
+          description: e.description
+        }))
+        // Filter: Start date is today or later
+        .filter((e: any) => {
+          const eventDate = new Date(e.start);
+          const isFuture = eventDate >= today;
+          console.log(`Event ${e.name}: ${e.start} -> Future? ${isFuture}`);
+          return isFuture;
+        });
+
+      console.log("Filtered Events:", mappedEvents.length);
+      setEvents(mappedEvents);
     } catch (err) {
       console.error("Event fetch error:", err);
     } finally {
@@ -59,7 +77,16 @@ export default function EventsHomePage() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.text }]}>Social Gatherings Near You</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.header, { color: colors.text }]}>Social Gatherings</Text>
+        <TouchableOpacity
+          onPress={() => router.push("/events/my-events")}
+          style={[styles.myTicketsButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <Ionicons name="ticket-outline" size={20} color={colors.primary} />
+          <Text style={[styles.myTicketsText, { color: colors.primary }]}>My Tickets</Text>
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         data={events}
@@ -184,5 +211,25 @@ const styles = StyleSheet.create({
   detailsLink: {
     fontSize: 14,
     fontWeight: '600'
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  myTicketsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  myTicketsText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
   }
 });
