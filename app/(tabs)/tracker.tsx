@@ -1,20 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  RefreshControl
+  View
 } from "react-native";
-import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { analyticsService, TimeGranularity } from "../../services/api/analytics";
 import { deviceService } from "../../services/api/device";
 
 const { width } = Dimensions.get('window');
@@ -47,6 +49,7 @@ interface VitalSign {
 export default function HealthTrackerScreen() {
   const { colors, theme } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -133,11 +136,22 @@ export default function HealthTrackerScreen() {
       }
       setHealthMetrics(updatedMetrics);
 
-      // 4. Calculate Weekly Goals (Mocking logic for now since we'd need a grouped API endpoint)
-      // In a real app, you'd fetch /telemetry/summary or similar
-      const updatedGoals = [...weeklyGoals];
-      updatedGoals[0].current = mappedVitals.filter((v: VitalSign) => v.name === 'Steps').reduce((sum: number, v: VitalSign) => sum + (v.value || 0), 0) || 5200 * 7; // Mock fallback
-      setWeeklyGoals(updatedGoals);
+      // 4. Update Weekly Goals using Analytics Service
+      try {
+        const analyticsRes = await analyticsService.getHealthAnalytics(user.id, { granularity: TimeGranularity.WEEK });
+        if (analyticsRes?.data?.statistics) {
+          const stats = analyticsRes.data.statistics;
+          const updatedGoals = [
+            { name: 'Steps', current: stats.steps.total, target: 56000, unit: 'steps' },
+            { name: 'Exercise', current: Math.round(stats.steps.avg / 100), target: 420, unit: 'minutes' }, // Mocking exercise from steps if not directly available
+            { name: 'Sleep', current: Math.round(stats.sleep.avg * 7), target: 56, unit: 'hours' },
+            { name: 'Water', current: Math.round(stats.water.total * 1000 / 250), target: 56, unit: 'glasses' } // converting L to glasses
+          ];
+          setWeeklyGoals(updatedGoals);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch weekly analytics for goals", e);
+      }
 
     } catch (error) {
       console.error("Failed to load health data", error);
@@ -498,6 +512,25 @@ export default function HealthTrackerScreen() {
               <Text style={[styles.quickActionText, { color: colors.text }]}>Log Vitals</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* View Trends Button */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.trendsButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+            onPress={() => router.push("/AnalyticsDashboard")}
+          >
+            <View style={styles.trendsButtonContent}>
+              <View style={[styles.trendsIcon, { backgroundColor: colors.primary }]}>
+                <Ionicons name="trending-up" size={20} color="#fff" />
+              </View>
+              <View style={styles.trendsTextContainer}>
+                <Text style={[styles.trendsTitle, { color: colors.text }]}>View Detailed Trends</Text>
+                <Text style={[styles.trendsSubtitle, { color: colors.mutedText }]}>Check your health progress charts</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Today's Metrics */}
@@ -1194,5 +1227,34 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 14,
     marginLeft: 8,
+  },
+  trendsButton: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  trendsButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trendsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  trendsTextContainer: {
+    flex: 1,
+  },
+  trendsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  trendsSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

@@ -3,9 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from 'expo-print';
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Animated, Pressable, TouchableWithoutFeedback } from "react-native";
+import { Alert, Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { useFlags } from "react-native-flagsmith/react";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { useAuth } from "../../context/AuthContext";
@@ -755,6 +755,14 @@ export default function ReportsScreen() {
       <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
         <Ionicons name="download-outline" size={24} color="#fff" />
         <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
+        onPress={() => router.push("/AnalyticsDashboard")}
+      >
+        <Ionicons name="trending-up" size={24} color="#fff" />
+        <Text style={styles.pdfButtonText}>{t("viewTrends") || "View Trends Dashboard"}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

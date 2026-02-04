@@ -57,6 +57,8 @@
     "react-native-camera": "^4.2.1",
     "react-native-flagsmith": "^10.0.0",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-gifted-charts": "^1.4.73",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-push-notification": "^8.1.1",
     "react-native-razorpay": "^2.3.1",
     "react-native-reanimated": "~4.1.1",
