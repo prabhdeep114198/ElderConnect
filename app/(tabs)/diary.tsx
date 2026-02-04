@@ -17,6 +17,8 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { getDiaryKey } from "../../utils/userStorageKeys";
 
 const { width } = Dimensions.get("window");
 
@@ -39,6 +41,7 @@ const API_URL = "http://192.168.29.13:3000"; // Replace with your backend URL
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
@@ -55,18 +58,19 @@ export default function DiaryScreen() {
 
   /** --- Fetch diary entries from storage --- */
   const fetchDiaryEntries = async () => {
+    if (!user?.id) {
+      setDiaryEntries([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const stored = await AsyncStorage.getItem("user_diary_entries");
+      const key = getDiaryKey(user.id);
+      const stored = await AsyncStorage.getItem(key);
       if (stored) {
         setDiaryEntries(JSON.parse(stored));
       } else {
-        // Initial mock data if empty
-        const mockData: DiaryEntry[] = [
-          { id: '1', date: '2024-12-20', mood: 'happy', notes: 'Had a great walk in the park.', tags: ['walk', 'nature'], weather: 'sunny', activity: ['walk'] },
-        ];
-        setDiaryEntries(mockData);
-        await AsyncStorage.setItem("user_diary_entries", JSON.stringify(mockData));
+        setDiaryEntries([]);
       }
     } catch (err) {
       console.error(err);
@@ -78,7 +82,7 @@ export default function DiaryScreen() {
 
   useEffect(() => {
     fetchDiaryEntries();
-  }, []);
+  }, [user?.id]);
 
   const addDiaryEntry = async () => {
     if (!newEntry.notes) {
@@ -92,10 +96,14 @@ export default function DiaryScreen() {
       date: newEntry.date,
     };
 
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to save diary entries.");
+      return;
+    }
     try {
       const updatedEntries = [entryToAdd as DiaryEntry, ...diaryEntries];
       setDiaryEntries(updatedEntries);
-      await AsyncStorage.setItem("user_diary_entries", JSON.stringify(updatedEntries));
+      await AsyncStorage.setItem(getDiaryKey(user.id), JSON.stringify(updatedEntries));
 
       setNewEntry({
         date: new Date().toISOString().split("T")[0],

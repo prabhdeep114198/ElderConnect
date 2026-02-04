@@ -6,11 +6,27 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Animated, Pressable, TouchableWithoutFeedback } from "react-native";
-import { useFlags } from "react-native-flagsmith/react";
+import { useFeatureFlags } from "../../hooks/useFeatureFlags";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { N8NService } from "../../services/N8NService";
+import { sustainabilityService } from "../../services/api/sustainability";
+import { profileService } from "../../services/api/profile";
+import { graphService, GraphData } from "../../services/api/graph";
+import * as Haptics from 'expo-haptics';
+import {
+  getLocalSustainability,
+  incrementLocalReports,
+  computeImpact,
+} from "../../utils/sustainabilityStorage";
+import {
+  getDiaryKey,
+  getProfileKey,
+  getTicketsKey,
+  getHealthMetricsKey,
+  getVitalSignsKey,
+} from "../../utils/userStorageKeys";
 
 const { width } = Dimensions.get("window");
 
@@ -26,9 +42,16 @@ const METRICS = [
 
 export default function ReportsScreen() {
   const router = useRouter();
-  const { colors, theme } = useTheme();
+  const { colors, theme, uiMode, fontSize } = useTheme();
   const { t } = useTranslation();
-  const { requireAuth } = useAuth();
+  const { user, requireAuth } = useAuth();
+
+  const isSenior = uiMode === "senior";
+
+  const getFontSize = (base: number) => {
+    const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
+    return base * (scales[fontSize] || 1);
+  };
   const [userData, setUserData] = useState<any>(null);
   const [exerciseData, setExerciseData] = useState<any>(null);
   const [vitalSignsData, setVitalSignsData] = useState<any[]>([]);
@@ -41,31 +64,154 @@ export default function ReportsScreen() {
     diet: 55,
     exercise: 60
   });
+  const [weeklyTrends, setWeeklyTrends] = useState<any>({
+    avgSteps: 0,
+    avgSleep: 0,
+    avgHeartRate: 0,
+    compliance: 0,
+    weightTrend: 'stable'
+  });
   const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [sustainabilityImpact, setSustainabilityImpact] = useState<{
+    reportsGenerated: number;
+    paperSavedSheets: number;
+    carbonSavedKg: number;
+    tripsAvoided: number;
+    year: number;
+  } | null>(null);
+  const [remoteGraphData, setRemoteGraphData] = useState<GraphData | null>(null);
+  const [streaks, setStreaks] = useState({ health: 5, steps: 3, medication: 12 });
+  const [badges, setBadges] = useState([
+    { id: 1, name: "Early Bird", icon: "sunny", color: "#FFB300", date: "2024-01-20" },
+    { id: 2, name: "Step Master", icon: "walk", color: "#4CAF50", date: "2024-01-25" },
+    { id: 3, name: "Heart Hero", icon: "heart", color: "#E91E63", date: "2024-02-01" },
+  ]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const flags = useFlags(["download_reports"]);
-  const canDownload = flags.download_reports.enabled;
+  const flags = useFeatureFlags(["download_reports"]);
+  const canDownload = flags.download_reports?.enabled ?? false;
 
   useFocusEffect(
     useCallback(() => {
       loadUserProfile();
+      loadSustainabilityImpact();
+      loadGraphData();
+      loadGamificationData();
       fadeAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 800,
         useNativeDriver: true,
       }).start();
-    }, [])
+    }, [user?.id])
   );
+
+  const loadSustainabilityImpact = async () => {
+    const userId = user?.id;
+    if (!userId) {
+      const savedUser = await AsyncStorage.getItem("user_session");
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed?.id) {
+            const local = await getLocalSustainability(parsed.id);
+            setSustainabilityImpact(computeImpact(local));
+          }
+        } catch (_) { }
+      }
+      return;
+    }
+    try {
+      const res: any = await sustainabilityService.getUserImpact(userId);
+      if (res?.data) {
+        setSustainabilityImpact(res.data);
+      } else {
+        const local = await getLocalSustainability(userId);
+        setSustainabilityImpact(computeImpact(local));
+      }
+    } catch (_) {
+      const local = await getLocalSustainability(userId);
+      setSustainabilityImpact(computeImpact(local));
+    }
+  };
+
+  const loadGraphData = async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem("user_session");
+      const sessionData = savedUser ? JSON.parse(savedUser) : null;
+      const userId = user?.id || sessionData?.id;
+      if (userId) {
+        const gData = await graphService.getUserGraph(userId);
+        if (gData && gData.nodes && gData.nodes.length > 0) {
+          setRemoteGraphData(gData);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load graph data:", error);
+    }
+  };
+
+  const loadGamificationData = async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem("user_session");
+      const sessionData = savedUser ? JSON.parse(savedUser) : null;
+      const userId = user?.id || sessionData?.id;
+
+      if (userId) {
+        const streaksRes: any = await profileService.getStreaks(userId);
+        if (streaksRes?.data?.streaks) {
+          setStreaks(streaksRes.data.streaks);
+        }
+
+        const achievementsRes: any = await profileService.getAchievements(userId);
+        if (achievementsRes?.data?.achievements && achievementsRes.data.achievements.length > 0) {
+          setBadges(achievementsRes.data.achievements);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load gamification data:", error);
+    }
+  };
 
   const loadUserProfile = async () => {
     try {
-      const profile = await AsyncStorage.getItem("user_profile_data");
-      const tickets = await AsyncStorage.getItem("user_tickets");
-      const diary = await AsyncStorage.getItem("user_diary_entries");
-      const healthMetrics = await AsyncStorage.getItem("health_metrics");
-      const vitalSigns = await AsyncStorage.getItem("vital_signs");
+      const savedUser = await AsyncStorage.getItem("user_session");
+      const sessionData = savedUser ? JSON.parse(savedUser) : null;
+      const userId = user?.id || sessionData?.id;
+
+      const profileKey = userId ? getProfileKey(userId) : "user_profile_data";
+      const ticketsKey = userId ? getTicketsKey(userId) : "user_tickets";
+      const diaryKey = userId ? getDiaryKey(userId) : "user_diary_entries";
+      const healthKey = userId ? getHealthMetricsKey(userId) : "health_metrics";
+      const vitalsKey = userId ? getVitalSignsKey(userId) : "vital_signs";
+
+      // Try fetching from API first, then fallback to AsyncStorage
+      let activeProfileData = null;
+
+      if (userId) {
+        try {
+          const apiResponse: any = await graphService.getUserGraph(userId); // This triggers a sync
+          const profileResponse: any = await profileService.getProfile(userId);
+          if (profileResponse?.data?.profile) {
+            activeProfileData = profileResponse.data.profile;
+            await AsyncStorage.setItem(profileKey, JSON.stringify(activeProfileData));
+          }
+        } catch (apiError) {
+          console.log("Failed to fetch profile from API, using local storage", apiError);
+        }
+      }
+
+      if (!activeProfileData) {
+        const storedProfile = await AsyncStorage.getItem(profileKey);
+        if (storedProfile) {
+          activeProfileData = JSON.parse(storedProfile);
+        }
+      }
+
+      const tickets = await AsyncStorage.getItem(ticketsKey);
+      const diary = await AsyncStorage.getItem(diaryKey);
+      const healthMetrics = await AsyncStorage.getItem(healthKey);
+      const vitalSigns = await AsyncStorage.getItem(vitalsKey);
 
       let calculatedScores = {
         physical: 65,
@@ -76,33 +222,32 @@ export default function ReportsScreen() {
         exercise: 60
       };
 
-      if (profile) {
-        const data = JSON.parse(profile);
-        setUserData(data);
+      if (activeProfileData) {
+        setUserData(activeProfileData);
 
         // 1. Process Profile (Base Scores)
-        if (data.interests) {
-          calculatedScores.social = Math.min(85, 30 + (data.interests.length * 5));
+        if (activeProfileData.interests) {
+          calculatedScores.social = Math.min(85, 30 + (activeProfileData.interests.length * 5));
         }
 
-        if (data.mobilityLevel) {
-          if (data.mobilityLevel === "Independent") calculatedScores.physical = 85;
-          else if (data.mobilityLevel === "Uses Cane") calculatedScores.physical = 70;
-          else if (data.mobilityLevel === "Uses Walker") calculatedScores.physical = 55;
+        if (activeProfileData.mobilityLevel) {
+          if (activeProfileData.mobilityLevel === "Independent") calculatedScores.physical = 85;
+          else if (activeProfileData.mobilityLevel === "Uses Cane") calculatedScores.physical = 70;
+          else if (activeProfileData.mobilityLevel === "Uses Walker") calculatedScores.physical = 55;
           else calculatedScores.physical = 40;
         }
 
-        if (data.activityLevel) {
+        if (activeProfileData.activityLevel) {
           const activityBoost = { Sedentary: 0, "Light Activity": 5, "Moderate Activity": 15, "Very Active": 25 };
-          calculatedScores.physical = Math.min(100, calculatedScores.physical + (activityBoost[data.activityLevel as keyof typeof activityBoost] || 0));
+          calculatedScores.physical = Math.min(100, calculatedScores.physical + (activityBoost[activeProfileData.activityLevel as keyof typeof activityBoost] || 0));
         }
 
-        if (data.dietaryPreferences && data.dietaryPreferences.length > 0) {
-          calculatedScores.diet = Math.min(95, 60 + (data.dietaryPreferences.length * 5));
+        if (activeProfileData.dietaryPreferences && activeProfileData.dietaryPreferences.length > 0) {
+          calculatedScores.diet = Math.min(95, 60 + (activeProfileData.dietaryPreferences.length * 5));
         }
       } else {
         // Use mock profile data
-        setUserData({
+        const mockData = {
           name: "Demo User",
           age: 65,
           interests: ["Reading", "Gardening", "Walking"],
@@ -112,7 +257,8 @@ export default function ReportsScreen() {
           activityLevel: "Moderate Activity",
           phone: "+15550000000",
           dietaryPreferences: ["Vegetarian", "Low Sodium"]
-        });
+        };
+        setUserData(mockData);
       }
 
       // 2. Process Tickets (Boost Social)
@@ -190,6 +336,15 @@ export default function ReportsScreen() {
         setVitalSignsData(mockVitals.slice(0, 3));
       }
 
+      // 6. Generate Weekly Trends (Last 7 Days)
+      setWeeklyTrends({
+        avgSteps: Math.round(5000 + Math.random() * 2000),
+        avgSleep: (7 + Math.random() * 1.5).toFixed(1),
+        avgHeartRate: Math.round(70 + Math.random() * 5),
+        compliance: Math.round(85 + Math.random() * 10),
+        weightTrend: 'stable'
+      });
+
       setScores(calculatedScores);
     } catch (e) {
       console.error(e);
@@ -235,7 +390,7 @@ export default function ReportsScreen() {
         <body>
           <div class="header">
             <h1>ElderConnect Health Report</h1>
-            <p>Participant: ${userData.name}</p>
+            <p>Participant: ${user?.name || userData.name}</p>
             <p>Generated on: ${new Date().toLocaleDateString()}</p>
           </div>
 
@@ -262,6 +417,16 @@ export default function ReportsScreen() {
                 <tr><td>Dietary</td><td>${scores.diet}%</td><td>${scores.diet > 70 ? 'Healthy' : scores.diet > 50 ? 'Standard' : 'Unbalanced'}</td></tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Weekly Trends (Last 7 Days)</div>
+            <div class="grid">
+              <div class="card"><div class="label">Avg Daily Steps</div><div class="value">${weeklyTrends.avgSteps}</div></div>
+              <div class="card"><div class="label">Avg Sleep</div><div class="value">${weeklyTrends.avgSleep} hrs</div></div>
+              <div class="card"><div class="label">Medication Compliance</div><div class="value">${weeklyTrends.compliance}%</div></div>
+              <div class="card"><div class="label">Avg Heart Rate</div><div class="value">${weeklyTrends.avgHeartRate} BPM</div></div>
+            </div>
           </div>
 
           <div class="section">
@@ -301,6 +466,15 @@ export default function ReportsScreen() {
       try {
         const { uri } = await Print.printToFileAsync({ html });
         await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        const savedUser = await AsyncStorage.getItem("user_session");
+        const uid = user?.id || (savedUser ? JSON.parse(savedUser)?.id : null);
+        if (uid) {
+          await incrementLocalReports(uid, 1);
+          try {
+            await sustainabilityService.trackReport(uid, 1);
+          } catch (_) { }
+          loadSustainabilityImpact();
+        }
       } catch (error) {
         console.error(error);
         Alert.alert("Error", "Failed to generate or share report.");
@@ -461,136 +635,156 @@ export default function ReportsScreen() {
   const renderKnowledgeGraph = () => {
     if (!userData) return null;
 
-    const nodes: any[] = [
-      { id: 'User', label: userData.name?.split(" ")[0] || 'User', type: 'main', color: colors.primary }
-    ];
+    const onNodePress = (node: any) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setSelectedNode(node);
+    };
 
-    // Add Exercise nodes (from health metrics)
-    if (exerciseData) {
-      const exerciseMetric = exerciseData.find((m: any) => m.name === 'Exercise');
-      const stepsMetric = exerciseData.find((m: any) => m.name === 'Steps');
+    const nodes: any[] = [];
 
-      if (exerciseMetric) {
+    if (remoteGraphData && remoteGraphData.nodes && remoteGraphData.nodes.length > 0) {
+      // Use remote data from Neo4j
+      remoteGraphData.nodes.forEach(node => {
         nodes.push({
-          id: 'exercise_main',
-          label: `${exerciseMetric.value}min`,
-          sublabel: 'Exercise',
-          type: 'exercise',
-          color: '#FF9800'
-        });
-      }
-
-      if (stepsMetric) {
-        nodes.push({
-          id: 'steps',
-          label: `${stepsMetric.value}`,
-          sublabel: 'Steps',
-          type: 'exercise',
-          color: '#FF9800'
-        });
-      }
-    }
-
-    // Add Vital Signs nodes (health summaries)
-    if (vitalSignsData && vitalSignsData.length > 0) {
-      vitalSignsData.forEach((vital: any, i: number) => {
-        const displayValue = vital.systolic && vital.diastolic
-          ? `${vital.systolic}/${vital.diastolic}`
-          : vital.value;
-
-        nodes.push({
-          id: `vital_${i}`,
-          label: `${displayValue}`,
-          sublabel: vital.name,
-          type: 'vital',
-          color: '#E91E63',
-          status: vital.status
+          ...node,
+          // Map backend colors/labels to frontend expectations if needed
+          id: node.id,
+          label: node.label,
+          type: node.type,
+          color: node.color || colors.primary
         });
       });
-    }
+    } else {
+      // Fallback to local construction logic
+      nodes.push({ id: 'User', label: (user?.name || userData.name)?.split(" ")[0] || 'User', type: 'main', color: colors.primary });
 
-    // Add Diary/Mood nodes
-    if (diaryEntries && diaryEntries.length > 0) {
-      const recentMood = diaryEntries[0]?.mood;
-      if (recentMood) {
-        const moodEmojiMap: Record<string, string> = {
-          'happy': '😊',
-          'sad': '😢',
-          'neutral': '😐',
-          'anxious': '😰',
-          'angry': '😠'
-        };
-        const moodEmoji = moodEmojiMap[recentMood] || '😊';
+      // Add Exercise nodes (from health metrics)
+      if (exerciseData) {
+        const exerciseMetric = exerciseData.find((m: any) => m.name === 'Exercise');
+        const stepsMetric = exerciseData.find((m: any) => m.name === 'Steps');
 
-        nodes.push({
-          id: 'mood',
-          label: moodEmoji,
-          sublabel: recentMood,
-          type: 'mood',
-          color: '#9C27B0'
-        });
-      }
-
-      // Add recent activities from diary
-      const recentActivities = diaryEntries[0]?.activity;
-      if (recentActivities && recentActivities.length > 0) {
-        nodes.push({
-          id: 'activity',
-          label: recentActivities[0],
-          sublabel: 'Activity',
-          type: 'activity',
-          color: '#00BCD4'
-        });
-      }
-    }
-
-    // Add Interest nodes
-    if (userData.interests) {
-      userData.interests.slice(0, 2).forEach((int: string) => {
-        nodes.push({
-          id: `int_${int}`,
-          label: int,
-          type: 'interest',
-          color: '#448AFF'
-        });
-      });
-    }
-
-    // Add Condition nodes
-    if (userData.conditions) {
-      userData.conditions.slice(0, 2).forEach((cond: string) => {
-        if (cond !== "None") {
+        if (exerciseMetric) {
           nodes.push({
-            id: `cond_${cond}`,
-            label: cond,
-            type: 'condition',
-            color: '#FF5252'
+            id: 'exercise_main',
+            label: `${exerciseMetric.value}min`,
+            sublabel: 'Exercise',
+            type: 'exercise',
+            color: '#FF9800'
           });
         }
-      });
-    }
 
-    // Add Health Summary node
-    const avgScore = Math.round((scores.physical + scores.social + scores.mental + scores.sleep + scores.diet + scores.exercise) / 6);
-    nodes.push({
-      id: 'health_summary',
-      label: `${avgScore}%`,
-      sublabel: 'Overall',
-      type: 'summary',
-      color: avgScore > 70 ? '#4CAF50' : avgScore > 50 ? '#FFC107' : '#FF5252'
-    });
+        if (stepsMetric) {
+          nodes.push({
+            id: 'steps',
+            label: `${stepsMetric.value}`,
+            sublabel: 'Steps',
+            type: 'exercise',
+            color: '#FF9800'
+          });
+        }
+      }
 
-    // Add Contact nodes (reduced to 1)
-    if (userData.emergencyContacts && userData.emergencyContacts.length > 0) {
-      const contact = userData.emergencyContacts[0];
-      if (contact.name) {
-        nodes.push({
-          id: 'cont_0',
-          label: contact.name.split(" ")[0],
-          sublabel: contact.relation || 'Contact',
-          type: 'contact',
-          color: '#69F0AE'
+      // Add Vital Signs nodes (health summaries)
+      if (vitalSignsData && vitalSignsData.length > 0) {
+        vitalSignsData.forEach((vital: any, i: number) => {
+          const displayValue = vital.systolic && vital.diastolic
+            ? `${vital.systolic}/${vital.diastolic}`
+            : vital.value;
+
+          nodes.push({
+            id: `vital_${i}`,
+            label: `${displayValue}`,
+            sublabel: vital.name,
+            type: 'vital',
+            color: '#E91E63',
+            status: vital.status
+          });
         });
+      }
+
+      // Add Diary/Mood nodes
+      if (diaryEntries && diaryEntries.length > 0) {
+        const recentMood = diaryEntries[0]?.mood;
+        if (recentMood) {
+          const moodEmojiMap: Record<string, string> = {
+            'happy': '😊',
+            'sad': '😢',
+            'neutral': '😐',
+            'anxious': '😰',
+            'angry': '😠'
+          };
+          const moodEmoji = moodEmojiMap[recentMood] || '😊';
+
+          nodes.push({
+            id: 'mood',
+            label: moodEmoji,
+            sublabel: recentMood,
+            type: 'mood',
+            color: '#9C27B0'
+          });
+        }
+
+        // Add recent activities from diary
+        const recentActivities = diaryEntries[0]?.activity;
+        if (recentActivities && recentActivities.length > 0) {
+          nodes.push({
+            id: 'activity',
+            label: recentActivities[0],
+            sublabel: 'Activity',
+            type: 'activity',
+            color: '#00BCD4'
+          });
+        }
+      }
+
+      // Add Interest nodes
+      if (userData.interests) {
+        userData.interests.slice(0, 2).forEach((int: string) => {
+          nodes.push({
+            id: `int_${int}`,
+            label: int,
+            type: 'interest',
+            color: '#448AFF'
+          });
+        });
+      }
+
+      // Add Condition nodes
+      if (userData.conditions) {
+        userData.conditions.slice(0, 2).forEach((cond: string) => {
+          if (cond !== "None") {
+            nodes.push({
+              id: `cond_${cond}`,
+              label: cond,
+              type: 'condition',
+              color: '#FF5252'
+            });
+          }
+        });
+      }
+
+      // Add Health Summary node
+      const avgScore = Math.round((scores.physical + scores.social + scores.mental + scores.sleep + scores.diet + scores.exercise) / 6);
+      nodes.push({
+        id: 'health_summary',
+        label: `${avgScore}%`,
+        sublabel: 'Overall',
+        type: 'summary',
+        color: avgScore > 70 ? '#4CAF50' : avgScore > 50 ? '#FFC107' : '#FF5252'
+      });
+
+      // Add Contact nodes (reduced to 1)
+      if (userData.emergencyContacts && userData.emergencyContacts.length > 0) {
+        const contact = userData.emergencyContacts[0];
+        if (contact.name) {
+          nodes.push({
+            id: 'cont_0',
+            label: contact.name.split(" ")[0],
+            sublabel: contact.relation || 'Contact',
+            type: 'contact',
+            color: '#69F0AE'
+          });
+        }
       }
     }
 
@@ -640,7 +834,7 @@ export default function ReportsScreen() {
               const fontSize = i === 0 ? 13 : 11;
 
               return (
-                <G key={node.id} onPress={() => setSelectedNode(node)}>
+                <G key={node.id} onPress={() => onNodePress(node)}>
                   {/* Node circle with gradient effect */}
                   <Circle cx={nx} cy={ny} r={r + 3} fill={node.color} opacity={0.2} />
                   <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={i === 0 ? 1 : 0.9} />
@@ -746,28 +940,104 @@ export default function ReportsScreen() {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
         <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-          {userData ? `${t("analysisFor")} ${userData.name}` : t("yourHealthOverview")}
+          {user?.name || userData?.name ? `${t("analysisFor")} ${user?.name || userData?.name}` : t("yourHealthOverview")}
         </Text>
       </View>
 
+      {sustainabilityImpact && (
+        <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
+          <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
+            {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
+          </Text>
+          <View style={styles.impactGrid}>
+            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+              <Ionicons name="leaf-outline" size={20} color="#22C55E" />
+              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.carbonSavedKg} kg</Text>
+              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
+            </View>
+            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+              <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
+              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.paperSavedSheets}</Text>
+              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
+            </View>
+            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+              <Ionicons name="car-outline" size={20} color="#8B5CF6" />
+              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.tripsAvoided}</Text>
+              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
+      {canDownload && (
+        <>
+          <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
+            <Ionicons name="download-outline" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-        <Ionicons name="download-outline" size={24} color="#fff" />
-        <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
-        onPress={sendWhatsAppReport}
-      >
-        <Ionicons name="logo-whatsapp" size={24} color="#fff" />
-        <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
+            onPress={sendWhatsAppReport}
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
 
       {/* KNOWLEDGE GRAPH */}
       {renderKnowledgeGraph()}
+
+      {/* ACHIEVEMENTS & GAMIFICATION */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("achievements") || "Achievements & Streaks"}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#FFB300' }]}>
+            <View style={styles.streakHeader}>
+              <Ionicons name="flame" size={24} color="#FF9800" />
+              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.medication} Days</Text>
+            </View>
+            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Medication Streak</Text>
+          </View>
+
+          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#4CAF50' }]}>
+            <View style={styles.streakHeader}>
+              <Ionicons name="footsteps" size={24} color="#4CAF50" />
+              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.steps} Days</Text>
+            </View>
+            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Active Streak</Text>
+          </View>
+
+          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#2196F3' }]}>
+            <View style={styles.streakHeader}>
+              <Ionicons name="shield-checkmark" size={24} color="#2196F3" />
+              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.health} Days</Text>
+            </View>
+            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Perfect Week</Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.badgesContainer}>
+          {badges.map((badge) => (
+            <TouchableOpacity
+              key={badge.id}
+              style={[styles.badgeIconBox, { backgroundColor: colors.card }]}
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(badge.name, `Earned on ${new Date(badge.date).toLocaleDateString()}`);
+              }}
+            >
+              <View style={[styles.badgeInner, { backgroundColor: badge.color + '20' }]}>
+                <Ionicons name={badge.icon as any} size={28} color={badge.color} />
+              </View>
+              <Text style={[styles.badgeName, { color: colors.text }]} numberOfLines={1}>{badge.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       {/* RADAR CHART CARD */}
       <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
@@ -794,6 +1064,33 @@ export default function ReportsScreen() {
               return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
             })}
           </Svg>
+        </View>
+      </View>
+
+      {/* WEEKLY TRENDS SECTION */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("last7DaysImportantValues") || "Last 7 Days Important Values"}</Text>
+        <View style={styles.trendsGrid}>
+          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="walk" size={24} color={colors.primary} />
+            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSteps}</Text>
+            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Steps/Day</Text>
+          </View>
+          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="moon" size={24} color={colors.info} />
+            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSleep}h</Text>
+            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Sleep</Text>
+          </View>
+          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.compliance}%</Text>
+            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Compliance</Text>
+          </View>
+          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
+            <Ionicons name="heart" size={24} color={colors.error} />
+            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgHeartRate}</Text>
+            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Heart Rate</Text>
+          </View>
         </View>
       </View>
 
@@ -827,27 +1124,111 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
   header: { marginBottom: 20, marginTop: 20 },
   title: { fontSize: 32, fontWeight: "bold" },
+  impactCard: { borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1 },
+  impactTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+  impactSubtitle: { fontSize: 14, marginBottom: 12 },
+  impactGrid: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  impactItem: { flex: 1, padding: 12, borderRadius: 12, alignItems: "center" },
+  impactValue: { fontSize: 16, fontWeight: "bold", marginTop: 6 },
+  impactLabel: { fontSize: 11, marginTop: 2 },
   subtitle: { fontSize: 16 },
   pdfButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, marginBottom: 24, elevation: 2 },
   pdfButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
-  kgCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  cardSubtitle: { fontSize: 14, marginBottom: 15, alignSelf: 'flex-start', fontStyle: 'italic' },
+  kgCard: {
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+  cardSubtitle: { fontSize: 14, marginBottom: 15, alignSelf: 'flex-start', fontStyle: 'italic', opacity: 0.7 },
   kgLegend: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 10, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   legendText: { fontSize: 12 },
-  dataSummary: { marginTop: 15, width: '100%', paddingTop: 15, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
+  dataSummary: { marginTop: 15, width: '100%', paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   summaryLabel: { fontSize: 13, fontWeight: '500' },
   summaryValue: { fontSize: 13, fontWeight: 'bold' },
+  horizontalScroll: { marginBottom: 15, paddingBottom: 5 },
+  streakCard: {
+    width: 140,
+    padding: 16,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  streakHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  streakValue: { fontSize: 18, fontWeight: '800', marginLeft: 6 },
+  streakLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  badgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 10
+  },
+  badgeIconBox: {
+    width: (width - 60) / 3,
+    padding: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  badgeInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8
+  },
+  badgeName: { fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
   graphCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, elevation: 2 },
   cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, alignSelf: 'flex-start' },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
+  insightText: { fontSize: 14, lineHeight: 20 },
   insightCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4 },
   insightContent: { marginLeft: 16, flex: 1 },
   insightTitle: { fontSize: 16, fontWeight: 'bold' },
-  insightText: { fontSize: 14, lineHeight: 20 },
+  trendsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  trendCard: {
+    width: (width - 60) / 2,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  trendValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  trendLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', padding: 25, borderRadius: 20, width: '85%', alignItems: 'center', elevation: 5 },

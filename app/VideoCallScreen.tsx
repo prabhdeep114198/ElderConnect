@@ -19,7 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useFlags } from "react-native-flagsmith/react";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
 
 import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,8 +30,8 @@ const { width } = Dimensions.get("window");
 export default function VideoCallScreen() {
   const { t } = useTranslation();
   const { requireAuth } = useAuth();
-  const flags = useFlags(["unlimited_video"]);
-  const isPremium = flags.unlimited_video.enabled;
+  const flags = useFeatureFlags(["unlimited_video"]);
+  const isPremium = flags.unlimited_video?.enabled ?? false;
   const [isMuted, setIsMuted] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<CameraType>("front");
 

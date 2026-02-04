@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Detect host for local n8n development
@@ -8,7 +9,15 @@ const getHostIP = () => {
 };
 
 const host = getHostIP();
-const N8N_WEBHOOK_URL = `http://${host}:5678/webhook/elder-connect-report`;
+
+// Helper to replace localhost with dynamic host IP for mobile devices
+const getUrl = (envUrl: string | undefined) => {
+    if (!envUrl) return '';
+    return envUrl.replace('localhost', host).replace('127.0.0.1', host);
+};
+
+const N8N_VOICE_WEBHOOK = getUrl(process.env.EXPO_PUBLIC_N8N_VOICE_WEBHOOK);
+const N8N_REPORT_WEBHOOK = getUrl(process.env.EXPO_PUBLIC_N8N_REPORT_WEBHOOK);
 
 export const N8NService = {
 
@@ -54,17 +63,17 @@ export const N8NService = {
                 action: "SEND_WHATSAPP_REPORT"
             };
 
-            console.log("🚀 [N8N Service] Sending payload:", JSON.stringify(payload, null, 2));
+            console.log("[N8N Service] Sending payload:", JSON.stringify(payload, null, 2));
 
             // 2. Mock Request for Demo (Remove this block when you have a real URL)
-            if (N8N_WEBHOOK_URL.includes("your-n8n-instance")) {
-                console.log("⚠️ [N8N Service] Simulation Mode: No real URL configured.");
+            if (N8N_REPORT_WEBHOOK.includes("your-n8n-instance")) {
+                console.log("[N8N Service] Simulation Mode: No real URL configured.");
                 await new Promise(r => setTimeout(r, 1000)); // Fake network delay
                 return { success: true, message: "Simulation: Report Sent Successfully" };
             }
 
             // 3. Real Request to n8n Webhook
-            const response = await fetch(N8N_WEBHOOK_URL, {
+            const response = await fetch(N8N_REPORT_WEBHOOK, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -81,7 +90,7 @@ export const N8NService = {
             return { success: true, message: result };
 
         } catch (error) {
-            console.error("❌ [N8N Service] Error:", error);
+            console.error("[N8N Service] Error:", error);
             return { success: false, error: error };
         }
     },
@@ -110,16 +119,95 @@ export const N8NService = {
                 contacts: userData?.emergencyContacts || []
             };
 
-            const response = await fetch(N8N_WEBHOOK_URL, {
+            const response = await fetch(N8N_REPORT_WEBHOOK, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    // 'X-API-KEY': 'your-secure-token' // Good practice to secure webhooks
+                },
                 body: JSON.stringify(payload)
             });
 
             return response.ok;
         } catch (error) {
-            console.error("❌ [N8N Service] Reminder Error:", error);
+            console.error("[N8N Service] Reminder Error:", error);
             return false;
+        }
+    },
+
+    /**
+     * Sends a text transcript to n8n for intent parsing and action triggering.
+     * Following the "no Whisper in n8n" target architecture.
+     * @param transcript The transcribed text from the voice command
+     * @param userContext Information about the current user
+     */
+    async sendTextCommand(transcript: string, userContext: any) {
+        try {
+            // Get the JWT to include in the payload so n8n can call protected backend endpoints
+            const jwt = await AsyncStorage.getItem("auth_token");
+
+            const payload = {
+                action: 'PROCESS_TEXT_COMMAND',
+                text: transcript,
+                jwt: jwt,
+                userContext: JSON.stringify({
+                    userId: userContext.userId,
+                    name: userContext.name,
+                    timestamp: new Date().toISOString()
+                }),
+                meta: {
+                    source: "ElderConnect_App",
+                    platform: Platform.OS
+                }
+            };
+
+            const response = await fetch(N8N_VOICE_WEBHOOK, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`n8n text command failed: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error("[N8N Service] Text Command Error:", error);
+            return { success: false, error: "Failed to reach n8n" };
+        }
+    },
+
+    /**
+     * Legacy: Sends a voice recording to n8n for transcription (n8n-side)
+     * @deprecated Use STT on frontend + sendTextCommand instead
+     */
+    async parseVoiceCommand(audioUri: string, userContext: any) {
+        // ... (existing code kept for backward compatibility if needed)
+        try {
+            const formData = new FormData();
+            // @ts-ignore
+            formData.append('audio', {
+                uri: audioUri,
+                name: 'voice_command.m4a',
+                type: 'audio/m4a',
+            });
+            formData.append('userContext', JSON.stringify(userContext));
+            formData.append('action', 'PROCESS_VOICE_COMMAND');
+
+            const response = await fetch(N8N_VOICE_WEBHOOK, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!response.ok) throw new Error(`n8n Voice parsing failed: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error("[N8N Service] Voice Command Error:", error);
+            return { success: false, error: "Cloud connection failed" };
         }
     }
 };

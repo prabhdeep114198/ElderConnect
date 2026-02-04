@@ -16,6 +16,9 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { getTicketsKey } from "../../utils/userStorageKeys";
+import { profileService } from "../../services/api/profile";
 
 interface Event {
   id: string;
@@ -39,6 +42,7 @@ interface Ticket {
 export default function EventDetailsPage() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const { id, event: eventParam } = useLocalSearchParams();
 
@@ -64,13 +68,18 @@ export default function EventDetailsPage() {
       return;
     }
 
-    if (!event) return;
+    if (!event || !user?.id) return;
 
     try {
-      const storedTickets = await AsyncStorage.getItem("user_tickets");
+      // 1. Persist on Server
+      await profileService.joinSocialEvent(user.id, event.id);
+
+      // 2. Save locally for "My Tickets"
+      const ticketsKey = getTicketsKey(user.id);
+      const storedTickets = await AsyncStorage.getItem(ticketsKey);
       const tickets: Ticket[] = storedTickets ? JSON.parse(storedTickets) : [];
 
-      // Check for duplicate registration
+      // Check for duplicate registration locally
       if (tickets.find((t) => t.eventId === event.id)) {
         Alert.alert("Already Registered", "You already have a ticket for this event.");
         setModalVisible(false);
@@ -83,12 +92,12 @@ export default function EventDetailsPage() {
         eventName: event.name,
         attendeeName: name,
         date: event.start,
-        location: "Venue details unavailable", // In a real app, this comes from API
+        location: "Venue details unavailable",
         category: event.category,
       };
 
       tickets.push(newTicket);
-      await AsyncStorage.setItem("user_tickets", JSON.stringify(tickets));
+      await AsyncStorage.setItem(ticketsKey, JSON.stringify(tickets));
 
       setModalVisible(false);
 
@@ -101,9 +110,10 @@ export default function EventDetailsPage() {
         ]
       );
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      Alert.alert("Error", "Failed to generate ticket.");
+      const msg = err.response?.data?.message || "Failed to generate ticket.";
+      Alert.alert("Error", msg);
     }
   };
 
