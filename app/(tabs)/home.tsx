@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
-import { ResponsiveView } from "../../components/ResponsiveView";
 import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
@@ -21,13 +19,15 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-import { profileService } from "../../services/api/profile";
 import { deviceService } from "../../services/api/device";
+import { profileService } from "../../services/api/profile";
 import { getRemindersKey } from "../../utils/userStorageKeys";
 
 // NOTIFICATION HANDLER
@@ -501,6 +501,47 @@ export default function HomeScreen() {
               )}
             </View>
 
+            {/* SAFETY STATUS */}
+            {user && (
+              <View style={styles.section}>
+                <View style={[styles.safetyCard, { backgroundColor: colors.success + '10', borderColor: colors.success }]}>
+                  <View style={styles.safetyHeader}>
+                    <Ionicons name="shield-checkmark" size={24} color={colors.success} />
+                    <Text style={[styles.safetyTitle, { color: colors.success, fontSize: getFontSize(20) }]}>Safety Status</Text>
+                  </View>
+                  <View style={styles.safetyBody}>
+                    <View style={styles.safetyItem}>
+                      <Ionicons name="radio-button-on" size={16} color={colors.success} />
+                      <Text style={[styles.safetyText, { color: colors.text, fontSize: getFontSize(16) }]}>Fall Detection Active</Text>
+                    </View>
+                    <Text style={[styles.safetySubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>Monitoring movement for emergency assistance.</Text>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: 12,
+                        paddingVertical: 8,
+                        paddingHorizontal: 15,
+                        borderRadius: 20,
+                        alignSelf: 'flex-start',
+                        backgroundColor: colors.success
+                      }}
+                      onPress={() => router.push("/fall-detected")}
+                    >
+                      <Ionicons name="play" size={16} color="#FFF" />
+                      <Text style={{
+                        color: '#FFF',
+                        fontWeight: 'bold',
+                        marginLeft: 6,
+                        fontSize: 14,
+                      }}>Simulate Fall Alert (Test)</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {!user && (
               <TouchableOpacity
                 style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
@@ -935,5 +976,37 @@ const styles = StyleSheet.create({
   chatButtonText: {
     fontSize: 18,
     fontWeight: "700",
+  },
+  safetyCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  safetyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  safetyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
+  safetyBody: {
+    paddingLeft: 34,
+  },
+  safetyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  safetyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  safetySubtitle: {
+    fontSize: 14,
   },
 });
