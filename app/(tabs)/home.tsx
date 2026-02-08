@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Pedometer } from "expo-sensors";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -288,69 +289,12 @@ export default function HomeScreen() {
   // ACTION HANDLERS
   // ============================================
   const handleEmergencySOS = async () => {
-    try {
-      // Fetch user profile to get emergency contacts
-      let emergencyContacts: any[] = [];
-
-      if (user?.id) {
-        try {
-          const profileResponse: any = await profileService.getProfile(user.id);
-          if (profileResponse?.data?.profile?.emergencyContacts) {
-            emergencyContacts = profileResponse.data.profile.emergencyContacts;
-          }
-        } catch (error) {
-          console.log("Failed to fetch emergency contacts:", error);
-        }
-      }
-
-      // Log SOS event to backend
-      if (user) {
-        await deviceService.createSOS(user.id, {
-          location: 'Home',
-          type: 'manual_trigger'
-        });
-      }
-
-      // Build alert options
-      const alertButtons: any[] = [
-        { text: "Cancel", style: "cancel" }
-      ];
-
-      // Add caregiver/family contact options
-      if (emergencyContacts.length > 0) {
-        emergencyContacts.slice(0, 2).forEach((contact) => {
-          alertButtons.unshift({
-            text: `📞 Call ${contact.name} (${contact.relation})`,
-            onPress: () => {
-              const phoneNumber = contact.phone.replace(/[^0-9+]/g, '');
-              const telUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
-              Linking.openURL(telUrl);
-            }
-          });
-        });
-      }
-
-      // Add 911 option
-      alertButtons.unshift({
-        text: "🚨 Call 911 Emergency",
-        style: "destructive",
-        onPress: () => {
-          const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:911' : 'tel:911';
-          Linking.openURL(emergencyNumber);
-        }
-      });
-
-      Alert.alert(
-        "🆘 Emergency SOS",
-        emergencyContacts.length > 0
-          ? "Who would you like to call for help?"
-          : "Emergency services will be notified immediately.",
-        alertButtons
-      );
-    } catch (error) {
-      console.error("SOS Error:", error);
-      Alert.alert("Error", "Failed to activate SOS. Please call emergency services directly.");
-    }
+    // Navigate to the countdown screen instead of triggering immediately
+    // This allows the user to cancel if it was accidental (User is OK)
+    router.push({
+      pathname: "/fall-detected",
+      params: { type: 'manual' }
+    });
   };
 
   const handleFamilyCall = async () => {
@@ -405,12 +349,12 @@ export default function HomeScreen() {
     };
 
     requestPermissions();
-    loadReminders();
+    if (user) {
+      loadReminders();
+      fetchHealthMetrics();
+      fetchSchedule();
+    }
     startStepTracking();
-
-    // Fetch data from API
-    fetchHealthMetrics();
-    fetchSchedule();
     fetchAIMessage();
 
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -422,8 +366,10 @@ export default function HomeScreen() {
 
     // Auto-refresh every 5 minutes
     const refreshInterval = setInterval(() => {
-      fetchHealthMetrics();
-      fetchSchedule();
+      if (user) {
+        fetchHealthMetrics();
+        fetchSchedule();
+      }
       fetchAIMessage();
     }, 5 * 60 * 1000);
 
@@ -431,7 +377,7 @@ export default function HomeScreen() {
       clearInterval(timer);
       clearInterval(refreshInterval);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     updateHealthMetrics();
@@ -558,6 +504,58 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
 
+            {/* QUICK ACTIONS */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("quickActions")}</Text>
+              <View style={styles.quickActionsGrid}>
+                {quickActions.map((action, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.quickActionCard,
+                      { backgroundColor: action.color },
+                      isSenior && { width: '100%', flexDirection: 'row', justifyContent: 'center', height: 80 },
+                      isDesktop && { width: '48%' }
+                    ]}
+                    onPress={action.action}
+                  >
+                    <Ionicons name={action.icon as any} size={isSenior ? 32 : 24} color={colors.buttonText} />
+                    <Text style={[
+                      styles.quickActionText,
+                      { color: colors.buttonText, fontSize: getFontSize(isSenior ? 20 : 16) },
+                      isSenior && { marginLeft: 15, marginTop: 0 }
+                    ]}>
+                      {action.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* WELLNESS & MIND */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>Wellness & Mind</Text>
+              <TouchableOpacity
+                style={[styles.wellnessCard, { backgroundColor: colors.info + '15', borderColor: colors.info }]}
+                onPress={() => router.push("/music" as any)}
+              >
+                <LinearGradient
+                  colors={[colors.primary + '20', 'transparent']}
+                  style={styles.wellnessGradient}
+                />
+                <View style={styles.wellnessIcon}>
+                  <Ionicons name="musical-notes" size={32} color={colors.primary} />
+                </View>
+                <View style={styles.wellnessContent}>
+                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Relaxing Music</Text>
+                  <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
+                    Calm sounds for meditation and better sleep.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
             {/* HEALTH METRICS */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysHealthSummary")}</Text>
@@ -609,52 +607,6 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* AI COMPANION */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
-              <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
-                <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
-                <View style={styles.companionContent}>
-                  <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
-                  <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
-                </View>
-              </View>
-              <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
-                <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={isDesktop ? styles.desktopRightColumn : null}>
-            {/* QUICK ACTIONS */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("quickActions")}</Text>
-              <View style={styles.quickActionsGrid}>
-                {quickActions.map((action, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.quickActionCard,
-                      { backgroundColor: action.color },
-                      isSenior && { width: '100%', flexDirection: 'row', justifyContent: 'center', height: 80 },
-                      isDesktop && { width: '48%' }
-                    ]}
-                    onPress={action.action}
-                  >
-                    <Ionicons name={action.icon as any} size={isSenior ? 32 : 24} color={colors.buttonText} />
-                    <Text style={[
-                      styles.quickActionText,
-                      { color: colors.buttonText, fontSize: getFontSize(isSenior ? 20 : 16) },
-                      isSenior && { marginLeft: 15, marginTop: 0 }
-                    ]}>
-                      {action.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* UPCOMING EVENTS */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysSchedule")}</Text>
               {upcomingEvents.map((event, index) => (
@@ -688,7 +640,23 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
+
+          {/* AI COMPANION */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
+            <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
+              <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
+              <View style={styles.companionContent}>
+                <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
+                <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
+              <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
 
         {/* REMINDER MODAL remains full width logic, but centered */}
         <Modal visible={showReminderModal} transparent animationType="slide">
@@ -971,7 +939,48 @@ const styles = StyleSheet.create({
   },
   guestCtaSubtitle: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  wellnessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 10,
+  },
+  wellnessGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  wellnessIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  wellnessContent: {
+    flex: 1,
+  },
+  wellnessTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  wellnessSubtitle: {
+    lineHeight: 18,
   },
   chatButtonText: {
     fontSize: 18,

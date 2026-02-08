@@ -14,8 +14,9 @@ class ApiError extends Error {
     status: number;
     data: any;
 
-    constructor(status: number, message: string, data?: any) {
-        super(message);
+    constructor(status: number, message: string | string[], data?: any) {
+        const formattedMessage = Array.isArray(message) ? message.join(', ') : message;
+        super(formattedMessage);
         this.status = status;
         this.data = data;
         this.name = 'ApiError';

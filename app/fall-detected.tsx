@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
 import { Colors } from '../constants/colors';
@@ -9,12 +9,16 @@ import { deviceService } from '../services/api/device';
 
 export default function FallDetectedScreen() {
     const router = useRouter();
+    const { type = 'fall' } = useLocalSearchParams<{ type: 'fall' | 'manual' }>();
     const { user } = useAuth();
     const [countdown, setCountdown] = useState(30);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const isProcessingRef = useRef(false);
+    const timerRef = useRef<any>(null);
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
     const player = useAudioPlayer(require('../assets/sounds/alarm.wav'));
+
+    const isManual = type === 'manual';
 
     useEffect(() => {
         // Start Alarm Sound
@@ -33,11 +37,11 @@ export default function FallDetectedScreen() {
         ).start();
 
         // Countdown logic
-        const timer = setInterval(() => {
+        timerRef.current = setInterval(() => {
             setCountdown(prev => {
                 if (prev <= 1) {
-                    clearInterval(timer);
-                    handleConfirmedFall();
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    handleConfirmedSOS();
                     return 0;
                 }
                 return prev - 1;
@@ -45,32 +49,43 @@ export default function FallDetectedScreen() {
         }, 1000);
 
         return () => {
-            clearInterval(timer);
+            if (timerRef.current) clearInterval(timerRef.current);
             Vibration.cancel();
-            player.pause();
+            try {
+                player.pause();
+            } catch (e: any) {
+                console.log('Audio player cleanup skipped:', e.message);
+            }
         };
     }, []);
 
     const handleIAmOk = async () => {
-        setIsProcessing(true);
+        // IMPORTANT: Mark as processing/handled so the timer doesn't trigger SOS
+        isProcessingRef.current = true;
+        if (timerRef.current) clearInterval(timerRef.current);
+
         player.pause();
         Vibration.cancel();
+
+        // Go back without notifying
+        console.log('User confirmed they are OK. No notification sent.');
         router.back();
     };
 
-    const handleConfirmedFall = async () => {
-        if (isProcessing) return;
-        setIsProcessing(true);
+    const handleConfirmedSOS = async () => {
+        // Check ref to see if user already clicked "I AM OK"
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
 
-        console.log('EMERGENCY: Fall Confirmed. Notifying backend...');
+        const alertType = isManual ? 'manual' : 'fall_detection';
+        console.log(`EMERGENCY: ${alertType} Confirmed. Notifying backend...`);
 
         try {
             if (user) {
                 await deviceService.createSOS(user.id, {
-                    type: 'fall_detected',
-                    location: 'Automated Detection',
-                    status: 'pending',
-                    severity: 'critical'
+                    type: alertType,
+                    description: isManual ? 'User Triggered SOS' : 'Automated Fall Detection',
+                    priority: 'critical'
                 });
                 console.log('SOS Alert created successfully');
             }
@@ -88,8 +103,8 @@ export default function FallDetectedScreen() {
     return (
         <View style={[styles.container, { backgroundColor: Colors.error }]}>
             <View style={styles.header}>
-                <Ionicons name="warning" size={120} color="#FFF" />
-                <Text style={styles.title}>Fall Detected!</Text>
+                <Ionicons name={isManual ? "alert-circle" : "warning"} size={120} color="#FFF" />
+                <Text style={styles.title}>{isManual ? "SOS Triggered!" : "Fall Detected!"}</Text>
                 <Text style={styles.subtitle}>Are you okay?</Text>
             </View>
 
@@ -104,6 +119,13 @@ export default function FallDetectedScreen() {
                         <Text style={styles.okButtonText}>I AM OK</Text>
                     </TouchableOpacity>
                 </Animated.View>
+
+                <TouchableOpacity
+                    style={styles.cancelLink}
+                    onPress={handleIAmOk}
+                >
+                    <Text style={styles.cancelLinkText}>Cancel & Go Back</Text>
+                </TouchableOpacity>
             </View>
 
             <Text style={styles.footerText}>
@@ -178,6 +200,17 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '900',
         color: Colors.error,
+    },
+    cancelLink: {
+        marginTop: 20,
+        padding: 10,
+    },
+    cancelLinkText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+        opacity: 0.8,
     },
     footerText: {
         color: 'rgba(255, 255, 255, 0.8)',
