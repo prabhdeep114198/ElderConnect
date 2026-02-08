@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { ResponsiveView } from "../components/ResponsiveView";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -44,60 +45,62 @@ export default function ProfileScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}
-        >
-            <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-                        <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.largeTitle, { color: colors.text }]}>Profile</Text>
-                </View>
+        <ResponsiveView maxWidth={600} style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{ flex: 1 }}
+            >
+                <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                            <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.largeTitle, { color: colors.text }]}>Profile</Text>
+                    </View>
 
-                <View style={styles.avatarSection}>
-                    <View style={[styles.avatarCircle, { backgroundColor: colors.card }]}>
-                        <Ionicons name="person" size={80} color={colors.primary} />
-                        <TouchableOpacity style={styles.editAvatarBtn}>
-                            <Ionicons name="camera" size={20} color="#FFF" />
+                    <View style={styles.avatarSection}>
+                        <View style={[styles.avatarCircle, { backgroundColor: colors.card }]}>
+                            <Ionicons name="person" size={80} color={colors.primary} />
+                            <TouchableOpacity style={styles.editAvatarBtn}>
+                                <Ionicons name="camera" size={20} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>PERSONAL INFORMATION</Text>
+                        <View style={[styles.card, { backgroundColor: colors.card }]}>
+                            <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+                                <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+                                <TextInput
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Full Name"
+                                    placeholderTextColor={colors.mutedText}
+                                />
+                            </View>
+                            <View style={styles.inputRow}>
+                                <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+                                <Text style={[styles.readOnlyText, { color: colors.mutedText }]}>{user?.email}</Text>
+                            </View>
+                        </View>
+                        <Text style={styles.footerText}>Your email address cannot be changed. It is used for account recovery and security notifications.</Text>
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity
+                            style={[styles.saveButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
+                            onPress={handleSave}
+                            disabled={loading}
+                        >
+                            <Text style={styles.saveButtonText}>{loading ? "Saving..." : "Save Changes"}</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>PERSONAL INFORMATION</Text>
-                    <View style={[styles.card, { backgroundColor: colors.card }]}>
-                        <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
-                            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
-                            <TextInput
-                                style={[styles.input, { color: colors.text }]}
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Full Name"
-                                placeholderTextColor={colors.mutedText}
-                            />
-                        </View>
-                        <View style={styles.inputRow}>
-                            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-                            <Text style={[styles.readOnlyText, { color: colors.mutedText }]}>{user?.email}</Text>
-                        </View>
-                    </View>
-                    <Text style={styles.footerText}>Your email address cannot be changed. It is used for account recovery and security notifications.</Text>
-                </View>
-
-                <View style={styles.buttonContainer}>
-                    <TouchableOpacity
-                        style={[styles.saveButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
-                        onPress={handleSave}
-                        disabled={loading}
-                    >
-                        <Text style={styles.saveButtonText}>{loading ? "Saving..." : "Save Changes"}</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </ResponsiveView>
     );
 }
 

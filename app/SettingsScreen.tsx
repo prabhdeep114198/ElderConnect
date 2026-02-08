@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { ResponsiveView } from "../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
@@ -218,174 +219,176 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.primary }]}>{t("settings")}</Text>
+    <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView>
+        <Text style={[styles.header, { color: colors.primary }]}>{t("settings")}</Text>
 
-      {settingsSections.map((section, index) => (
-        <View key={index} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.mutedText }]}>{section.title}</Text>
+        {settingsSections.map((section, index) => (
+          <View key={index} style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedText }]}>{section.title}</Text>
 
-          {section.data.map((item: SettingItemType, idx: number) => {
+            {section.data.map((item: SettingItemType, idx: number) => {
 
-            if (item.type === "item") {
-              return (
-                <SettingItem
-                  key={idx}
-                  title={item.title}
-                  subtitle={item.action === "language" ? LANGUAGES.find(l => l.value === i18n.language)?.subtitle : item.subtitle}
-                  onPress={() => handleItemAction(item.action)}
-                />
-              );
-            } else if (item.type === "toggle") {
-              const isDarkMode = item.key === "darkMode";
-              const value = isDarkMode ? theme === "dark" : (item.key ? toggles[item.key] : false);
+              if (item.type === "item") {
+                return (
+                  <SettingItem
+                    key={idx}
+                    title={item.title}
+                    subtitle={item.action === "language" ? LANGUAGES.find(l => l.value === i18n.language)?.subtitle : item.subtitle}
+                    onPress={() => handleItemAction(item.action)}
+                  />
+                );
+              } else if (item.type === "toggle") {
+                const isDarkMode = item.key === "darkMode";
+                const value = isDarkMode ? theme === "dark" : (item.key ? toggles[item.key] : false);
 
-              return (
-                <SettingToggle
-                  key={idx}
-                  title={item.title}
-                  subtitle={item.subtitle}
-                  value={value}
-                  onValueChange={(val: boolean) => item.key && handleToggleChange(item.key, val)}
-                />
-              );
-            }
-          })}
-        </View>
-      ))}
+                return (
+                  <SettingToggle
+                    key={idx}
+                    title={item.title}
+                    subtitle={item.subtitle}
+                    value={value}
+                    onValueChange={(val: boolean) => item.key && handleToggleChange(item.key, val)}
+                  />
+                );
+              }
+            })}
+          </View>
+        ))}
 
-      <View style={styles.section}>
-        {user ? (
-          <>
-            <TouchableOpacity
-              style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.primary }]}
-              onPress={handleLogout}
-            >
-              <Text style={[styles.logoutButtonText, { color: colors.primary }]}>{t("logout")}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: colors.card }]}
-              onPress={handleDeleteAccount}
-            >
-              <Text style={styles.deleteButtonText}>{t("deleteAccount")}</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/auth/login")}
-          >
-            <Text style={[styles.loginButtonText, { color: colors.buttonText }]}>{t("signIn") || "Sign In"}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.mutedText }]}>{t("version")} 1.0.0</Text>
-      </View>
-
-      <Modal
-        visible={isLanguageModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsLanguageModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Language</Text>
-              <TouchableOpacity onPress={() => setIsLanguageModalVisible(false)}>
-                <Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text>
+        <View style={styles.section}>
+          {user ? (
+            <>
+              <TouchableOpacity
+                style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.primary }]}
+                onPress={handleLogout}
+              >
+                <Text style={[styles.logoutButtonText, { color: colors.primary }]}>{t("logout")}</Text>
               </TouchableOpacity>
-            </View>
-            <FlatList
-              data={LANGUAGES}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.languageOption,
-                    { borderBottomColor: colors.border },
-                    i18n.language === item.value && { backgroundColor: colors.border + "40" }
-                  ]}
-                  onPress={() => {
-                    i18n.changeLanguage(item.value);
-                    setIsLanguageModalVisible(false);
-                  }}
-                >
-                  <View>
-                    <Text style={[styles.languageLabel, { color: colors.text }]}>{item.label}</Text>
-                    <Text style={[styles.languageSubtitle, { color: colors.mutedText }]}>{item.subtitle}</Text>
-                  </View>
-                  {i18n.language === item.value && (
-                    <Text style={{ color: colors.primary, fontSize: 20 }}>✓</Text>
-                  )}
+              <TouchableOpacity
+                style={[styles.deleteButton, { backgroundColor: colors.card }]}
+                onPress={handleDeleteAccount}
+              >
+                <Text style={styles.deleteButtonText}>{t("deleteAccount")}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={[styles.loginButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push("/auth/login")}
+            >
+              <Text style={[styles.loginButtonText, { color: colors.buttonText }]}>{t("signIn") || "Sign In"}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: colors.mutedText }]}>{t("version")} 1.0.0</Text>
+        </View>
+
+        <Modal
+          visible={isLanguageModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setIsLanguageModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Select Language</Text>
+                <TouchableOpacity onPress={() => setIsLanguageModalVisible(false)}>
+                  <Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text>
                 </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* UI Mode Modal */}
-      <Modal visible={isUIModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsUIModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Interface Mode</Text>
-              <TouchableOpacity onPress={() => setIsUIModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+              </View>
+              <FlatList
+                data={LANGUAGES}
+                keyExtractor={(item) => item.value}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.languageOption,
+                      { borderBottomColor: colors.border },
+                      i18n.language === item.value && { backgroundColor: colors.border + "40" }
+                    ]}
+                    onPress={() => {
+                      i18n.changeLanguage(item.value);
+                      setIsLanguageModalVisible(false);
+                    }}
+                  >
+                    <View>
+                      <Text style={[styles.languageLabel, { color: colors.text }]}>{item.label}</Text>
+                      <Text style={[styles.languageSubtitle, { color: colors.mutedText }]}>{item.subtitle}</Text>
+                    </View>
+                    {i18n.language === item.value && (
+                      <Text style={{ color: colors.primary, fontSize: 20 }}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              />
             </View>
-            <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("senior"); setIsUIModalVisible(false); }}>
-              <Text style={[styles.optionLabel, { color: colors.text }]}>🧓 Senior Mode (Simple)</Text>
-              {uiMode === "senior" && <Text style={{ color: colors.primary }}>✓</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("caregiver"); setIsUIModalVisible(false); }}>
-              <Text style={[styles.optionLabel, { color: colors.text }]}>👩‍⚕️ Caregiver Mode (Advanced)</Text>
-              {uiMode === "caregiver" && <Text style={{ color: colors.primary }}>✓</Text>}
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Font Size Modal */}
-      <Modal visible={isFontSizeModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsFontSizeModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Text Size</Text>
-              <TouchableOpacity onPress={() => setIsFontSizeModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
-            </View>
-            {FONT_SIZES.map((size) => (
-              <TouchableOpacity key={size.value} style={styles.optionItem} onPress={() => { setFontSize(size.value as any); setIsFontSizeModalVisible(false); }}>
-                <Text style={[styles.optionLabel, { color: colors.text, fontSize: 16 * size.scale }]}>{size.label}</Text>
-                {fontSize === size.value && <Text style={{ color: colors.primary }}>✓</Text>}
+        {/* UI Mode Modal */}
+        <Modal visible={isUIModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsUIModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Interface Mode</Text>
+                <TouchableOpacity onPress={() => setIsUIModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("senior"); setIsUIModalVisible(false); }}>
+                <Text style={[styles.optionLabel, { color: colors.text }]}>🧓 Senior Mode (Simple)</Text>
+                {uiMode === "senior" && <Text style={{ color: colors.primary }}>✓</Text>}
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Accent Color Modal */}
-      <Modal visible={isColorModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsColorModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Theme Color</Text>
-              <TouchableOpacity onPress={() => setIsColorModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.optionItem} onPress={() => { setUIMode("caregiver"); setIsUIModalVisible(false); }}>
+                <Text style={[styles.optionLabel, { color: colors.text }]}>👩‍⚕️ Caregiver Mode (Advanced)</Text>
+                {uiMode === "caregiver" && <Text style={{ color: colors.primary }}>✓</Text>}
+              </TouchableOpacity>
             </View>
-            <View style={styles.colorGrid}>
-              {ACCENT_COLORS.map((color) => (
-                <TouchableOpacity key={color.value} style={styles.colorOption} onPress={() => { setAccentColor(color.value); setIsColorModalVisible(false); }}>
-                  <View style={[styles.colorCircle, { backgroundColor: color.value }]} />
-                  <Text style={[styles.colorLabel, { color: colors.text }]}>{color.label}</Text>
-                  {accentColor === color.value && <Text style={[styles.checkMark, { color: color.value }]}>✓</Text>}
+          </View>
+        </Modal>
+
+        {/* Font Size Modal */}
+        <Modal visible={isFontSizeModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsFontSizeModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Text Size</Text>
+                <TouchableOpacity onPress={() => setIsFontSizeModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+              </View>
+              {FONT_SIZES.map((size) => (
+                <TouchableOpacity key={size.value} style={styles.optionItem} onPress={() => { setFontSize(size.value as any); setIsFontSizeModalVisible(false); }}>
+                  <Text style={[styles.optionLabel, { color: colors.text, fontSize: 16 * size.scale }]}>{size.label}</Text>
+                  {fontSize === size.value && <Text style={{ color: colors.primary }}>✓</Text>}
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+
+        {/* Accent Color Modal */}
+        <Modal visible={isColorModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsColorModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Theme Color</Text>
+                <TouchableOpacity onPress={() => setIsColorModalVisible(false)}><Text style={[styles.closeButton, { color: colors.primary }]}>Close</Text></TouchableOpacity>
+              </View>
+              <View style={styles.colorGrid}>
+                {ACCENT_COLORS.map((color) => (
+                  <TouchableOpacity key={color.value} style={styles.colorOption} onPress={() => { setAccentColor(color.value); setIsColorModalVisible(false); }}>
+                    <View style={[styles.colorCircle, { backgroundColor: color.value }]} />
+                    <Text style={[styles.colorLabel, { color: colors.text }]}>{color.label}</Text>
+                    {accentColor === color.value && <Text style={[styles.checkMark, { color: color.value }]}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </ResponsiveView>
   );
 }
 

@@ -49,8 +49,7 @@
             "peripheral",
             "central"
           ],
-          "bluetoothAlwaysPermission": "Allow ElderConnect to connect to your health devices.",
-          "bluetoothPeripheralPermission": "Allow ElderConnect to be discovered by other devices."
+          "bluetoothAlwaysPermission": "Allow ElderConnect to connect to your health devices."
         }
       ]
     ],

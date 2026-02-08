@@ -34,6 +34,11 @@ export const profileService = {
         if (date) params.date = date;
         return api.get(`/v1/users/${userId}/health/metrics`, { params });
     },
+    getMetricsRange: (userId: string, startDate: string, endDate: string) => {
+        return api.get(`/v1/users/${userId}/health/metrics`, {
+            params: { startDate, endDate }
+        });
+    },
 
     // Appointments
     getAppointments: (userId: string) => api.get(`/v1/users/${userId}/appointments`),

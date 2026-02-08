@@ -23,7 +23,7 @@ export interface GraphData {
 export const graphService = {
     async getUserGraph(userId: string): Promise<GraphData | null> {
         try {
-            return await api.get<GraphData>(`/graph/user/${userId}`);
+            return await api.get<GraphData>(`/v1/graph/user/${userId}`);
         } catch (error) {
             console.error('Error fetching graph data:', error);
             return null;
@@ -32,7 +32,7 @@ export const graphService = {
 
     async syncGraph(userId: string): Promise<boolean> {
         try {
-            await api.post(`/graph/sync/${userId}`, {});
+            await api.post(`/v1/graph/sync/${userId}`, {});
             return true;
         } catch (error) {
             console.error('Error syncing graph:', error);

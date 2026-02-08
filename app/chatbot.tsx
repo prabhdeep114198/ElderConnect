@@ -165,6 +165,7 @@ export default function ChatbotScreen() {
     const quickReplies = [
         { label: "Medications", text: "Go to medications", route: "/(tabs)/medications" },
         { label: "Health Tracker", text: "Show my health tracker", route: "/(tabs)/tracker" },
+        { label: "Relaxing Music", text: "I want to relax with music", route: "/music" },
         { label: "My Profile", text: "Go to profile", route: "/profile" },
         { label: "Help", text: "How can you help me?" },
         { label: "Settings", text: "Open settings", route: "/SettingsScreen" },

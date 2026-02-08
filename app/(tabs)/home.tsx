@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Pedometer } from "expo-sensors";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -18,14 +18,17 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-import { profileService } from "../../services/api/profile";
 import { deviceService } from "../../services/api/device";
+import { profileService } from "../../services/api/profile";
 import { getRemindersKey } from "../../utils/userStorageKeys";
 
 // NOTIFICATION HANDLER
@@ -57,6 +60,8 @@ export default function HomeScreen() {
   const { user, requireAuth } = useAuth();
 
   const isSenior = uiMode === "senior";
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && windowWidth > 900;
 
   const getFontSize = (base: number) => {
     const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
@@ -284,69 +289,12 @@ export default function HomeScreen() {
   // ACTION HANDLERS
   // ============================================
   const handleEmergencySOS = async () => {
-    try {
-      // Fetch user profile to get emergency contacts
-      let emergencyContacts: any[] = [];
-
-      if (user?.id) {
-        try {
-          const profileResponse: any = await profileService.getProfile(user.id);
-          if (profileResponse?.data?.profile?.emergencyContacts) {
-            emergencyContacts = profileResponse.data.profile.emergencyContacts;
-          }
-        } catch (error) {
-          console.log("Failed to fetch emergency contacts:", error);
-        }
-      }
-
-      // Log SOS event to backend
-      if (user) {
-        await deviceService.createSOS(user.id, {
-          location: 'Home',
-          type: 'manual_trigger'
-        });
-      }
-
-      // Build alert options
-      const alertButtons: any[] = [
-        { text: "Cancel", style: "cancel" }
-      ];
-
-      // Add caregiver/family contact options
-      if (emergencyContacts.length > 0) {
-        emergencyContacts.slice(0, 2).forEach((contact) => {
-          alertButtons.unshift({
-            text: `📞 Call ${contact.name} (${contact.relation})`,
-            onPress: () => {
-              const phoneNumber = contact.phone.replace(/[^0-9+]/g, '');
-              const telUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
-              Linking.openURL(telUrl);
-            }
-          });
-        });
-      }
-
-      // Add 911 option
-      alertButtons.unshift({
-        text: "🚨 Call 911 Emergency",
-        style: "destructive",
-        onPress: () => {
-          const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:911' : 'tel:911';
-          Linking.openURL(emergencyNumber);
-        }
-      });
-
-      Alert.alert(
-        "🆘 Emergency SOS",
-        emergencyContacts.length > 0
-          ? "Who would you like to call for help?"
-          : "Emergency services will be notified immediately.",
-        alertButtons
-      );
-    } catch (error) {
-      console.error("SOS Error:", error);
-      Alert.alert("Error", "Failed to activate SOS. Please call emergency services directly.");
-    }
+    // Navigate to the countdown screen instead of triggering immediately
+    // This allows the user to cancel if it was accidental (User is OK)
+    router.push({
+      pathname: "/fall-detected",
+      params: { type: 'manual' }
+    });
   };
 
   const handleFamilyCall = async () => {
@@ -401,12 +349,12 @@ export default function HomeScreen() {
     };
 
     requestPermissions();
-    loadReminders();
+    if (user) {
+      loadReminders();
+      fetchHealthMetrics();
+      fetchSchedule();
+    }
     startStepTracking();
-
-    // Fetch data from API
-    fetchHealthMetrics();
-    fetchSchedule();
     fetchAIMessage();
 
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -418,8 +366,10 @@ export default function HomeScreen() {
 
     // Auto-refresh every 5 minutes
     const refreshInterval = setInterval(() => {
-      fetchHealthMetrics();
-      fetchSchedule();
+      if (user) {
+        fetchHealthMetrics();
+        fetchSchedule();
+      }
       fetchAIMessage();
     }, 5 * 60 * 1000);
 
@@ -427,7 +377,7 @@ export default function HomeScreen() {
       clearInterval(timer);
       clearInterval(refreshInterval);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     updateHealthMetrics();
@@ -476,218 +426,279 @@ export default function HomeScreen() {
   ];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={[styles.greeting, { color: colors.primary, fontSize: getFontSize(isSenior ? 34 : 28) }]}>{greeting}!</Text>
-        <Text style={[styles.time, { color: colors.text, fontSize: getFontSize(isSenior ? 48 : 36) }]}>
-          {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </Text>
-        {!isSenior && (
-          <Text style={[styles.date, { color: colors.mutedText, fontSize: getFontSize(16) }]}>
-            {currentTime.toLocaleDateString(i18n.language, {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </Text>
-        )}
-      </View>
-
-      {!user && (
-        <TouchableOpacity
-          style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-          onPress={() => router.push("/auth/login")}
-        >
-          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
-          <View style={styles.guestCtaContent}>
-            <Text style={[styles.guestCtaTitle, { color: colors.primary }]}>{t("signInToUnlock") || "Sign in to unlock full access"}</Text>
-            <Text style={[styles.guestCtaSubtitle, { color: colors.mutedText }]}>
-              {t("guestModeMessage") || "Enjoy personalized health tracking and stay connected with your family."}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-        </TouchableOpacity>
-      )}
-
-      {/* QUICK ACTIONS */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("quickActions")}</Text>
-        <View style={styles.quickActionsGrid}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.quickActionCard,
-                { backgroundColor: action.color },
-                isSenior && { width: '100%', flexDirection: 'row', justifyContent: 'center', height: 80 }
-              ]}
-              onPress={action.action}
-            >
-              <Ionicons name={action.icon as any} size={isSenior ? 32 : 24} color={colors.buttonText} />
-              <Text style={[
-                styles.quickActionText,
-                { color: colors.buttonText, fontSize: getFontSize(isSenior ? 20 : 16) },
-                isSenior && { marginLeft: 15, marginTop: 0 }
-              ]}>
-                {action.title}
+    <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <View style={isDesktop ? styles.desktopMainLayout : null}>
+          <View style={isDesktop ? styles.desktopLeftColumn : null}>
+            <View style={styles.header}>
+              <Text style={[styles.greeting, { color: colors.primary, fontSize: getFontSize(isSenior ? 34 : 28) }]}>{greeting}!</Text>
+              <Text style={[styles.time, { color: colors.text, fontSize: getFontSize(isSenior ? 48 : 36) }]}>
+                {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+              {!isSenior && (
+                <Text style={[styles.date, { color: colors.mutedText, fontSize: getFontSize(16) }]}>
+                  {currentTime.toLocaleDateString(i18n.language, {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </Text>
+              )}
+            </View>
 
-      {/* REMINDER MODAL */}
-      <Modal visible={showReminderModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.appleModalBox, { backgroundColor: theme === 'dark' ? colors.card : "#F2F2F7" }]}>
-            <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            {/* SAFETY STATUS */}
+            {user && (
+              <View style={styles.section}>
+                <View style={[styles.safetyCard, { backgroundColor: colors.success + '10', borderColor: colors.success }]}>
+                  <View style={styles.safetyHeader}>
+                    <Ionicons name="shield-checkmark" size={24} color={colors.success} />
+                    <Text style={[styles.safetyTitle, { color: colors.success, fontSize: getFontSize(20) }]}>Safety Status</Text>
+                  </View>
+                  <View style={styles.safetyBody}>
+                    <View style={styles.safetyItem}>
+                      <Ionicons name="radio-button-on" size={16} color={colors.success} />
+                      <Text style={[styles.safetyText, { color: colors.text, fontSize: getFontSize(16) }]}>Fall Detection Active</Text>
+                    </View>
+                    <Text style={[styles.safetySubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>Monitoring movement for emergency assistance.</Text>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: 12,
+                        paddingVertical: 8,
+                        paddingHorizontal: 15,
+                        borderRadius: 20,
+                        alignSelf: 'flex-start',
+                        backgroundColor: colors.success
+                      }}
+                      onPress={() => router.push("/fall-detected")}
+                    >
+                      <Ionicons name="play" size={16} color="#FFF" />
+                      <Text style={{
+                        color: '#FFF',
+                        fontWeight: 'bold',
+                        marginLeft: 6,
+                        fontSize: 14,
+                      }}>Simulate Fall Alert (Test)</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {!user && (
               <TouchableOpacity
-                onPress={() => {
-                  setShowReminderModal(false);
-                  setMode("date");
-                }}
+                style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                onPress={() => router.push("/auth/login")}
               >
-                <Text style={styles.cancelText}>{t("cancel")}</Text>
+                <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
+                <View style={styles.guestCtaContent}>
+                  <Text style={[styles.guestCtaTitle, { color: colors.primary }]}>{t("signInToUnlock") || "Sign in to unlock full access"}</Text>
+                  <Text style={[styles.guestCtaSubtitle, { color: colors.mutedText }]}>
+                    {t("guestModeMessage") || "Enjoy personalized health tracking and stay connected with your family."}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>{t("addReminder")}</Text>
-              <TouchableOpacity onPress={scheduleReminder}>
-                <Text style={styles.saveText}>{t("saveChanges")}</Text>
+            )}
+
+            {/* QUICK ACTIONS */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("quickActions")}</Text>
+              <View style={styles.quickActionsGrid}>
+                {quickActions.map((action, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.quickActionCard,
+                      { backgroundColor: action.color },
+                      isSenior && { width: '100%', flexDirection: 'row', justifyContent: 'center', height: 80 },
+                      isDesktop && { width: '48%' }
+                    ]}
+                    onPress={action.action}
+                  >
+                    <Ionicons name={action.icon as any} size={isSenior ? 32 : 24} color={colors.buttonText} />
+                    <Text style={[
+                      styles.quickActionText,
+                      { color: colors.buttonText, fontSize: getFontSize(isSenior ? 20 : 16) },
+                      isSenior && { marginLeft: 15, marginTop: 0 }
+                    ]}>
+                      {action.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* WELLNESS & MIND */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>Wellness & Mind</Text>
+              <TouchableOpacity
+                style={[styles.wellnessCard, { backgroundColor: colors.info + '15', borderColor: colors.info }]}
+                onPress={() => router.push("/music" as any)}
+              >
+                <LinearGradient
+                  colors={[colors.primary + '20', 'transparent']}
+                  style={styles.wellnessGradient}
+                />
+                <View style={styles.wellnessIcon}>
+                  <Ionicons name="musical-notes" size={32} color={colors.primary} />
+                </View>
+                <View style={styles.wellnessContent}>
+                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Relaxing Music</Text>
+                  <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
+                    Calm sounds for meditation and better sleep.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
-              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>{t("remindMeAt")}</Text>
-              <Text style={[styles.selectedTime, { color: colors.text }]}>
-                {selectedDate.toLocaleString()}
-              </Text>
+            {/* HEALTH METRICS */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysHealthSummary")}</Text>
+              <View style={styles.metricsGrid}>
+                {healthMetrics.map((metric, index) => (
+                  <View key={index} style={[
+                    styles.metricCard,
+                    { backgroundColor: colors.card },
+                    isSenior && { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
+                    isDesktop && { width: '48%' }
+                  ]}>
+                    <View style={[styles.metricHeader, isSenior && { marginBottom: 0, marginRight: 15 }]}>
+                      <Ionicons name={metric.icon as any} size={isSenior ? 28 : 20} color={colors.primary} />
+                      {!isSenior && (
+                        <Ionicons
+                          name={
+                            metric.trend === "up"
+                              ? "trending-up"
+                              : metric.trend === "down"
+                                ? "trending-down"
+                                : "remove"
+                          }
+                          size={16}
+                          color={
+                            metric.trend === "up"
+                              ? colors.success
+                              : metric.trend === "down"
+                                ? colors.warning
+                                : colors.mutedText
+                          }
+                        />
+                      )}
+                    </View>
+                    <View style={isSenior && { flex: 1 }}>
+                      <Text style={[styles.metricValue, { color: colors.text, fontSize: getFontSize(isSenior ? 24 : 20) }]}>{metric.value}</Text>
+                      <Text style={[styles.metricLabel, { color: colors.mutedText, fontSize: getFontSize(14) }]}>{metric.label}</Text>
+                    </View>
+                    {isSenior && (
+                      <Ionicons
+                        name={
+                          metric.trend === "up" ? "arrow-up-circle" : metric.trend === "down" ? "arrow-down-circle" : "remove-circle"
+                        }
+                        size={24}
+                        color={metric.trend === "up" ? colors.success : metric.trend === "down" ? colors.warning : colors.mutedText}
+                      />
+                    )}
+                  </View>
+                ))}
+              </View>
             </View>
 
-            <View style={[styles.pickerContainer, { backgroundColor: colors.card }]}>
-              {Platform.OS === "ios" ? (
-                <DateTimePicker
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysSchedule")}</Text>
+              {upcomingEvents.map((event, index) => (
+                <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }, isSenior && { padding: 20 }]}>
+                  <View style={[styles.eventTime, { borderRightColor: colors.primary }, isSenior && { minWidth: 80 }]}>
+                    <Text style={[styles.eventTimeText, { color: colors.primary, fontSize: getFontSize(16) }]}>{event.time}</Text>
+                  </View>
+                  <View style={styles.eventContent}>
+                    <Text style={[styles.eventTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{event.title}</Text>
+                    <View style={styles.eventType}>
+                      <Ionicons
+                        name={
+                          event.type === "medication"
+                            ? "medkit"
+                            : event.type === "appointment"
+                              ? "calendar"
+                              : "walk"
+                        }
+                        size={14}
+                        color={colors.primary}
+                      />
+                      <Text style={[styles.eventTypeText, { color: colors.mutedText }]}>{event.type}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+              {upcomingEvents.length === 0 && (
+                <View style={[styles.eventCard, { backgroundColor: colors.card, justifyContent: 'center', padding: 30 }]}>
+                  <Text style={{ color: colors.mutedText, textAlign: 'center' }}>No events scheduled for today.</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* AI COMPANION */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
+            <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
+              <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
+              <View style={styles.companionContent}>
+                <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
+                <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
+              <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+
+        {/* REMINDER MODAL remains full width logic, but centered */}
+        <Modal visible={showReminderModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.appleModalBox, { backgroundColor: theme === 'dark' ? colors.card : "#F2F2F7" }]}>
+              <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowReminderModal(false);
+                    setMode("date");
+                  }}
+                >
+                  <Text style={styles.cancelText}>{t("cancel")}</Text>
+                </TouchableOpacity>
+                <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>{t("addReminder")}</Text>
+                <TouchableOpacity onPress={scheduleReminder}>
+                  <Text style={styles.saveText}>{t("saveChanges")}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
+                <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>{t("remindMeAt")}</Text>
+                <Text style={[styles.selectedTime, { color: colors.text }]}>
+                  {selectedDate.toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={[styles.pickerContainer, { backgroundColor: colors.card, paddingVertical: 20 }]}>
+                <PlatformDateTimePicker
                   value={selectedDate}
                   mode="datetime"
                   display="spinner"
                   onChange={onChange}
-                  textColor={colors.text}
-                  style={styles.iosDatePicker}
-                  minimumDate={new Date()}
                   themeVariant={theme}
+                  minimumDate={new Date()}
                 />
-              ) : (
-                <>
-                  <DateTimePicker
-                    value={selectedDate}
-                    mode={mode}
-                    display="default"
-                    onChange={onChange}
-                    minimumDate={new Date()}
-                  />
-                  {mode === "date" && (
-                    <Text style={styles.androidHint}>Select date, then time</Text>
-                  )}
-                </>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* HEALTH METRICS */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysHealthSummary")}</Text>
-        <View style={styles.metricsGrid}>
-          {healthMetrics.map((metric, index) => (
-            <View key={index} style={[
-              styles.metricCard,
-              { backgroundColor: colors.card },
-              isSenior && { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 }
-            ]}>
-              <View style={[styles.metricHeader, isSenior && { marginBottom: 0, marginRight: 15 }]}>
-                <Ionicons name={metric.icon as any} size={isSenior ? 28 : 20} color={colors.primary} />
-                {!isSenior && (
-                  <Ionicons
-                    name={
-                      metric.trend === "up"
-                        ? "trending-up"
-                        : metric.trend === "down"
-                          ? "trending-down"
-                          : "remove"
-                    }
-                    size={16}
-                    color={
-                      metric.trend === "up"
-                        ? colors.success
-                        : metric.trend === "down"
-                          ? colors.warning
-                          : colors.mutedText
-                    }
-                  />
-                )}
-              </View>
-              <View style={isSenior && { flex: 1 }}>
-                <Text style={[styles.metricValue, { color: colors.text, fontSize: getFontSize(isSenior ? 24 : 20) }]}>{metric.value}</Text>
-                <Text style={[styles.metricLabel, { color: colors.mutedText, fontSize: getFontSize(14) }]}>{metric.label}</Text>
-              </View>
-              {isSenior && (
-                <Ionicons
-                  name={
-                    metric.trend === "up" ? "arrow-up-circle" : metric.trend === "down" ? "arrow-down-circle" : "remove-circle"
-                  }
-                  size={24}
-                  color={metric.trend === "up" ? colors.success : metric.trend === "down" ? colors.warning : colors.mutedText}
-                />
-              )}
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* UPCOMING EVENTS */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("todaysSchedule")}</Text>
-        {upcomingEvents.map((event, index) => (
-          <View key={index} style={[styles.eventCard, { backgroundColor: colors.card }, isSenior && { padding: 20 }]}>
-            <View style={[styles.eventTime, { borderRightColor: colors.primary }, isSenior && { minWidth: 80 }]}>
-              <Text style={[styles.eventTimeText, { color: colors.primary, fontSize: getFontSize(16) }]}>{event.time}</Text>
-            </View>
-            <View style={styles.eventContent}>
-              <Text style={[styles.eventTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{event.title}</Text>
-              <View style={styles.eventType}>
-                <Ionicons
-                  name={
-                    event.type === "medication"
-                      ? "medkit"
-                      : event.type === "appointment"
-                        ? "calendar"
-                        : "walk"
-                  }
-                  size={14}
-                  color={colors.primary}
-                />
-                <Text style={[styles.eventTypeText, { color: colors.mutedText }]}>{event.type}</Text>
               </View>
             </View>
           </View>
-        ))}
-      </View>
-
-      {/* AI COMPANION */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
-        <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
-          <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
-          <View style={styles.companionContent}>
-            <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
-            <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
-          <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </ResponsiveView>
   );
 }
 
@@ -709,25 +720,49 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   quickActionCard: {
-    width: (width - 60) / 2,
+    width: "48%",
     padding: 20,
     borderRadius: 16,
     alignItems: "center",
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  quickActionText: { fontWeight: "600", marginTop: 8 },
+  quickActionText: { fontWeight: "700", marginTop: 8 },
+
+  // Desktop Specific
+  desktopMainLayout: {
+    flexDirection: 'row',
+    gap: 30,
+    alignItems: 'flex-start',
+  },
+  desktopLeftColumn: {
+    flex: 1.5,
+  },
+  desktopRightColumn: {
+    flex: 1,
+  },
 
   // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
+    justifyContent: "center", // Center modal on web
+    alignItems: "center",
   },
   appleModalBox: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === "ios" ? 34 : 20,
-    minHeight: Platform.OS === "ios" ? 450 : "auto",
+    borderRadius: 20,
+    paddingBottom: 20,
+    width: Platform.OS === 'web' ? 500 : '100%',
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: "row",
@@ -735,8 +770,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     borderBottomWidth: 0.5,
   },
   modalHeaderTitle: {
@@ -774,7 +807,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: "hidden",
-    paddingVertical: Platform.OS === "ios" ? 0 : 20,
   },
   iosDatePicker: {
     height: 200,
@@ -793,23 +825,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   metricCard: {
-    width: (width - 60) / 2,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    width: "48%",
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   metricHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 4,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 14,
   },
 
   // Upcoming events
@@ -818,76 +855,167 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 1,
   },
   eventTime: {
     marginRight: 12,
     paddingRight: 12,
-    borderRightWidth: 2,
+    borderRightWidth: 3,
   },
   eventTimeText: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
   eventContent: { flex: 1 },
-  eventTitle: { fontSize: 16, fontWeight: "600", marginBottom: 4 },
+  eventTitle: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
   eventType: {
     flexDirection: "row",
     alignItems: "center",
   },
   eventTypeText: {
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: 13,
+    marginLeft: 6,
     textTransform: "capitalize",
+    fontWeight: '500',
   },
 
   // Companion
   companionCard: {
     flexDirection: "row",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 3,
   },
   companionContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16,
   },
   companionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 6,
   },
   companionMessage: {
-    fontSize: 14,
+    fontSize: 16,
     fontStyle: "italic",
+    lineHeight: 22,
   },
   chatButton: {
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   guestCta: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-    marginBottom: 24,
+    marginBottom: 30,
   },
   guestCtaContent: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: 16,
   },
   guestCtaTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   guestCtaSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  wellnessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 10,
+  },
+  wellnessGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  wellnessIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  wellnessContent: {
+    flex: 1,
+  },
+  wellnessTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  wellnessSubtitle: {
+    lineHeight: 18,
   },
   chatButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  safetyCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  safetyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  safetyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
+  safetyBody: {
+    paddingLeft: 34,
+  },
+  safetyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  safetyText: {
     fontSize: 16,
     fontWeight: "600",
+    marginLeft: 8,
+  },
+  safetySubtitle: {
+    fontSize: 14,
   },
 });

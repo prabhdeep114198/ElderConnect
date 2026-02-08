@@ -11,8 +11,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  AppState
 } from "react-native";
+import { BarChart } from "react-native-chart-kit";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { profileService } from "../../services/api/profile";
@@ -61,17 +63,49 @@ export default function MedicationsScreen() {
     instructions: ''
   });
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Dynamic labels for last 7 days
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toLocaleDateString('en-US', { weekday: 'short' });
+  });
+
+  const [lastFetchDate, setLastFetchDate] = useState(new Date().toDateString());
 
   useEffect(() => {
     if (user) {
       fetchData();
     }
-  }, [user]);
 
-  const fetchData = async () => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        const today = new Date().toDateString();
+        if (today !== lastFetchDate) {
+          setLastFetchDate(today);
+          fetchData();
+        } else {
+          fetchData(true); // Silent refresh to sync
+        }
+      }
+    });
+
+    const interval = setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== lastFetchDate) {
+        setLastFetchDate(today);
+        fetchData();
+      }
+    }, 60000 * 5); // Check every 5 minutes
+
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
+  }, [user, lastFetchDate]);
+
+  const fetchData = async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [medsRes, complianceRes]: any = await Promise.all([
         profileService.getMedications(user.id),
@@ -79,21 +113,36 @@ export default function MedicationsScreen() {
       ]);
 
       if (medsRes && medsRes.data) {
+        const logs = (complianceRes && complianceRes.data && complianceRes.data.todayLogs) ? complianceRes.data.todayLogs : [];
+
         // Map backend medication to frontend interface
-        const mapped: Medication[] = medsRes.data.medications.map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          dosage: m.dosage || '',
-          frequency: m.frequency || '',
-          times: Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM']),
-          taken: (Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM'])).map(() => false),
-          color: m.color || '#6366F1',
-          instructions: m.instructions || '',
-          sideEffects: Array.isArray(m.sideEffects) ? m.sideEffects : (m.sideEffects ? m.sideEffects.split(',') : []),
-          prescribedBy: m.prescribedBy || 'Self',
-          startDate: m.startDate || new Date().toISOString(),
-          endDate: m.endDate
-        }));
+        const mapped: Medication[] = medsRes.data.medications.map((m: any) => {
+          // Parse times
+          const times = Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM']);
+
+          // Determine taken status from logs
+          // Filter logs for this medication
+          const medLogs = logs.filter((l: any) => l.medication?.id === m.id || l.medicationId === m.id);
+          const takenCount = medLogs.filter((l: any) => l.status === 'taken').length;
+
+          // Map to boolean array (simple sequential assumption)
+          const taken = times.map((_: string, index: number) => index < takenCount);
+
+          return {
+            id: m.id,
+            name: m.name,
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            times,
+            taken,
+            color: m.color || '#6366F1',
+            instructions: m.instructions || '',
+            sideEffects: Array.isArray(m.sideEffects) ? m.sideEffects : (m.sideEffects ? m.sideEffects.split(',') : []),
+            prescribedBy: m.prescribedBy || 'Self',
+            startDate: m.startDate || new Date().toISOString(),
+            endDate: m.endDate
+          };
+        });
         setMedications(mapped);
       }
 
@@ -116,25 +165,30 @@ export default function MedicationsScreen() {
 
   const markAsTaken = async (medId: string, timeIndex: number) => {
     if (!user) return;
+
+    // Optimistic Update
+    const previousMeds = JSON.parse(JSON.stringify(medications));
+    setMedications(prev => prev.map(med => {
+      if (med.id === medId) {
+        const newTaken = [...med.taken];
+        newTaken[timeIndex] = true;
+        return { ...med, taken: newTaken };
+      }
+      return med;
+    }));
+
     try {
       await profileService.logMedication(user.id, medId, {
         scheduledTime: new Date().toISOString(),
         status: 'taken'
       });
-
-      setMedications(prev => prev.map(med => {
-        if (med.id === medId) {
-          const newTaken = [...med.taken];
-          newTaken[timeIndex] = true;
-          return { ...med, taken: newTaken };
-        }
-        return med;
-      }));
-
+      // Silent refresh to update stats
+      fetchData(true);
       Alert.alert(t('success'), t('medicationLogged') || 'Medication logged!');
-      fetchData();
     } catch (error) {
       console.log("Failed to log medication:", error);
+      setMedications(previousMeds); // Revert
+      Alert.alert("Error", "Failed to log medication");
     }
   };
 
@@ -287,24 +341,38 @@ export default function MedicationsScreen() {
           {/* Weekly Compliance Chart */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
-            <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.chartContainer}>
-                {weeklyCompliance.map((compliance, index) => (
-                  <View key={index} style={styles.chartBar}>
-                    <View
-                      style={[
-                        styles.chartBarFill,
-                        {
-                          height: `${Math.max(5, compliance)}%`,
-                          backgroundColor: getComplianceColor(compliance)
-                        }
-                      ]}
-                    />
-                    <Text style={[styles.chartLabel, { color: colors.mutedText }]}>{weekDays[index]}</Text>
-                    <Text style={[styles.chartValue, { color: colors.mutedText }]}>{compliance}%</Text>
-                  </View>
-                ))}
-              </View>
+            <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 0, paddingVertical: 16, alignItems: 'center' }]}>
+              <BarChart
+                data={{
+                  labels: weekDays,
+                  datasets: [{ data: weeklyCompliance }]
+                }}
+                width={width - 50}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix="%"
+                chartConfig={{
+                  backgroundColor: colors.card,
+                  backgroundGradientFrom: colors.card,
+                  backgroundGradientTo: colors.card,
+                  fillShadowGradientFrom: colors.primary,
+                  fillShadowGradientTo: colors.primary,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => colors.primary, // Using primary color for bars
+                  labelColor: (opacity = 1) => colors.mutedText,
+                  barPercentage: 0.7,
+                  propsForBackgroundLines: {
+                    strokeWidth: 1,
+                    stroke: colors.border,
+                    strokeDasharray: "0",
+                  },
+                }}
+                style={{
+                  borderRadius: 16,
+                }}
+                showValuesOnTopOfBars={true}
+                withInnerLines={true}
+              />
             </View>
           </View>
 
