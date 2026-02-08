@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -167,7 +168,7 @@ export default function DiaryScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -267,11 +268,11 @@ export default function DiaryScreen() {
                 </Text>
               </TouchableOpacity>
               {showDatePicker && (
-                <DateTimePicker
+                <PlatformDateTimePicker
                   value={newEntry.date ? new Date(newEntry.date) : new Date()}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                  onChange={(event: any, selectedDate?: Date) => {
                     setShowDatePicker(false);
                     if (selectedDate) {
                       const year = selectedDate.getFullYear();
@@ -446,7 +447,7 @@ export default function DiaryScreen() {
           </View>
         )}
       </Modal>
-    </View>
+    </ResponsiveView>
   );
 }
 

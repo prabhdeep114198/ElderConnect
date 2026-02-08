@@ -1,24 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  RefreshControl
+  View
 } from "react-native";
-import { useTheme } from "../../context/ThemeContext";
+import { HealthCharts } from "../../components/HealthCharts";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { useResponsive } from "../../hooks/useResponsive";
 import { deviceService } from "../../services/api/device";
 import { profileService } from "../../services/api/profile";
-import { HealthCharts } from "../../components/HealthCharts";
 
 const { width } = Dimensions.get('window');
 
@@ -50,6 +52,8 @@ interface VitalSign {
 export default function HealthTrackerScreen() {
   const { colors, theme } = useTheme();
   const { user } = useAuth();
+  const { isWeb, contentWidth } = useResponsive();
+  const effectiveWidth = isWeb ? contentWidth : width;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -604,252 +608,257 @@ export default function HealthTrackerScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={() => loadHealthData(true)} />
         }
       >
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Health Tracker</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Monitor your daily health metrics</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.info }]}
-              onPress={seedSampleData}
-            >
-              <Ionicons name="flask" size={20} color={colors.buttonText} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={() => setShowVitalModal(true)}
-            >
-              <Ionicons name="add" size={24} color={colors.buttonText} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Log</Text>
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogWater}>
-              <Ionicons name="water" size={24} color={colors.info} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Water</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogExercise}>
-              <Ionicons name="barbell" size={24} color={colors.warning} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Exercise</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setShowVitalModal(true)}>
-              <Ionicons name="heart" size={24} color={colors.error} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>Log Vitals</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Today's Metrics */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Metrics</Text>
-          <View style={styles.metricsGrid}>
-            {healthMetrics.map((metric) => (
+        <ResponsiveView style={styles.responsiveContent}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.headerTitle, { color: theme === 'dark' ? '#FFFFFF' : '#000000' }]}>Health Tracker</Text>
+              <Text style={[styles.headerSubtitle, { color: theme === 'dark' ? '#E5E5EA' : colors.mutedText }]}>Monitor your daily health metrics</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity
-                key={metric.id}
-                style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => showMetricDetails(metric)}
+                style={[styles.addButton, { backgroundColor: colors.info }]}
+                onPress={seedSampleData}
               >
-                <View style={styles.metricHeader}>
-                  <View style={[styles.metricIcon, { backgroundColor: metric.color + '20' }]}>
-                    <Ionicons name={metric.icon as any} size={20} color={metric.color} />
-                  </View>
-                  <View style={styles.metricTrend}>
-                    <Ionicons
-                      name={getTrendIcon(metric.trend)}
-                      size={16}
-                      color={getTrendColor(metric.trend)}
-                    />
-                  </View>
-                </View>
-
-                <Text style={[styles.metricValue, { color: colors.text }]}>
-                  {metric.value} {metric.unit}
-                </Text>
-                <Text style={[styles.metricName, { color: colors.mutedText }]}>{metric.name}</Text>
-
-                {!!metric.target && (
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${getProgressPercentage(metric.value, metric.target)}%`,
-                            backgroundColor: metric.color
-                          }
-                        ]}
-                      />
-                    </View>
-                    <Text style={[styles.progressText, { color: colors.mutedText }]}>
-                      {Math.round(getProgressPercentage(metric.value, metric.target))}% of goal
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={[styles.metricLastUpdated, { color: colors.mutedText }]}>{metric.lastUpdated}</Text>
+                <Ionicons name="flask" size={20} color={colors.buttonText} />
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowVitalModal(true)}
+              >
+                <Ionicons name="add" size={24} color={colors.buttonText} />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Charts for specific metrics */}
-          <HealthCharts userId={user?.id || ''} />
-        </View>
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Log</Text>
+            <View style={styles.quickActions}>
+              <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogWater}>
+                <Ionicons name="water" size={24} color={colors.info} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>Log Water</Text>
+              </TouchableOpacity>
 
-        {/* Weekly Goals */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Goals</Text>
-          <View style={[styles.goalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {weeklyGoals.map((goal, index) => {
-              // Get the corresponding metric to access history
-              const metric = healthMetrics.find(m => m.name === goal.name ||
-                (goal.name === 'Water' && m.name === 'Water Intake'));
-              const hasHistory = metric && metric.history && metric.history.length > 0;
+              <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={quickLogExercise}>
+                <Ionicons name="barbell" size={24} color={colors.warning} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>Log Exercise</Text>
+              </TouchableOpacity>
 
-              return (
-                <View key={index} style={styles.goalCard}>
-                  <View style={styles.goalHeader}>
-                    <Text style={[styles.goalName, { color: colors.text }]}>{goal.name}</Text>
-                    <Text style={[styles.goalPercentage, { color: colors.primary }]}>
-                      {Math.round((goal.current / goal.target) * 100)}%
-                    </Text>
-                  </View>
+              <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setShowVitalModal(true)}>
+                <Ionicons name="heart" size={24} color={colors.error} />
+                <Text style={[styles.quickActionText, { color: colors.text }]}>Log Vitals</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-                  <View style={styles.goalProgress}>
-                    <View style={[styles.goalProgressBar, { backgroundColor: colors.background }]}>
-                      <View
-                        style={[
-                          styles.goalProgressFill,
-                          {
-                            width: `${Math.min((goal.current / goal.target) * 100, 100)}%`,
-                            backgroundColor: (goal.current / goal.target) >= 0.8 ? colors.success : colors.warning
-                          }
-                        ]}
+          {/* Today's Metrics */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today&apos;s Metrics</Text>
+            <View style={styles.metricsGrid}>
+              {healthMetrics.map((metric) => (
+                <TouchableOpacity
+                  key={metric.id}
+                  style={[
+                    styles.metricCard,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    isWeb && { width: '48%', marginBottom: 16 }
+                  ]}
+                  onPress={() => showMetricDetails(metric)}
+                >
+                  <View style={styles.metricHeader}>
+                    <View style={[styles.metricIcon, { backgroundColor: metric.color + '20' }]}>
+                      <Ionicons name={metric.icon as any} size={20} color={metric.color} />
+                    </View>
+                    <View style={styles.metricTrend}>
+                      <Ionicons
+                        name={getTrendIcon(metric.trend)}
+                        size={16}
+                        color={getTrendColor(metric.trend)}
                       />
                     </View>
                   </View>
 
-                  <Text style={[styles.goalText, { color: colors.mutedText }]}>
-                    {goal.current.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                  <Text style={[styles.metricValue, { color: colors.text }]}>
+                    {metric.value} {metric.unit}
                   </Text>
+                  <Text style={[styles.metricName, { color: colors.mutedText }]}>{metric.name}</Text>
 
-                  {/* Mini 7-day breakdown chart */}
-                  {hasHistory && (
-                    <View style={styles.miniChartContainer}>
-                      <Text style={[styles.miniChartTitle, { color: colors.mutedText }]}>Daily Breakdown</Text>
-                      <View style={styles.miniChart}>
-                        {metric.history.slice(-7).map((entry, idx) => {
-                          const maxValue = Math.max(...metric.history.slice(-7).map(h => h.value), 1);
-                          const heightPercent = (entry.value / maxValue) * 100;
-                          return (
-                            <View key={idx} style={styles.miniBar}>
-                              <View style={styles.miniBarContainer}>
-                                <View
-                                  style={[
-                                    styles.miniBarFill,
-                                    {
-                                      height: `${heightPercent}%`,
-                                      backgroundColor: metric.color
-                                    }
-                                  ]}
-                                />
-                              </View>
-                              <Text style={[styles.miniBarLabel, { color: colors.mutedText }]}>
-                                {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'narrow' })}
-                              </Text>
-                            </View>
-                          );
-                        })}
+                  {!!metric.target && (
+                    <View style={styles.progressContainer}>
+                      <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${getProgressPercentage(metric.value, metric.target)}%`,
+                              backgroundColor: metric.color
+                            }
+                          ]}
+                        />
                       </View>
+                      <Text style={[styles.progressText, { color: colors.mutedText }]}>
+                        {Math.round(getProgressPercentage(metric.value, metric.target))}% of goal
+                      </Text>
                     </View>
                   )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
 
-        {/* Recent Vital Signs */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Vital Signs</Text>
-          <View style={[styles.vitalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {vitalSigns.slice(0, 4).map((vital) => (
-              <View key={vital.id} style={[styles.vitalCard, { borderBottomColor: colors.border }]}>
-                <View style={styles.vitalHeader}>
-                  <Text style={[styles.vitalName, { color: colors.text }]}>{vital.name}</Text>
-                  <View style={[styles.vitalStatus, { backgroundColor: getStatusColor(vital.status) }]}>
-                    <Text style={styles.vitalStatusText}>{vital.status}</Text>
+                  <Text style={[styles.metricLastUpdated, { color: colors.mutedText }]}>{metric.lastUpdated}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Charts for specific metrics */}
+            <HealthCharts userId={user?.id || ''} />
+          </View>
+
+          {/* Weekly Goals */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Goals</Text>
+            <View style={[styles.goalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {weeklyGoals.map((goal, index) => {
+                // Get the corresponding metric to access history
+                const metric = healthMetrics.find(m => m.name === goal.name ||
+                  (goal.name === 'Water' && m.name === 'Water Intake'));
+                const hasHistory = metric && metric.history && metric.history.length > 0;
+
+                return (
+                  <View key={index} style={styles.goalCard}>
+                    <View style={styles.goalHeader}>
+                      <Text style={[styles.goalName, { color: colors.text }]}>{goal.name}</Text>
+                      <Text style={[styles.goalPercentage, { color: colors.primary }]}>
+                        {Math.round((goal.current / goal.target) * 100)}%
+                      </Text>
+                    </View>
+
+                    <View style={styles.goalProgress}>
+                      <View style={[styles.goalProgressBar, { backgroundColor: colors.background }]}>
+                        <View
+                          style={[
+                            styles.goalProgressFill,
+                            {
+                              width: `${Math.min((goal.current / goal.target) * 100, 100)}%`,
+                              backgroundColor: (goal.current / goal.target) >= 0.8 ? colors.success : colors.warning
+                            }
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={[styles.goalText, { color: colors.mutedText }]}>
+                      {goal.current.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                    </Text>
+
+                    {/* Mini 7-day breakdown chart */}
+                    {hasHistory && (
+                      <View style={styles.miniChartContainer}>
+                        <Text style={[styles.miniChartTitle, { color: colors.mutedText }]}>Daily Breakdown</Text>
+                        <View style={styles.miniChart}>
+                          {metric.history.slice(-7).map((entry, idx) => {
+                            const maxValue = Math.max(...metric.history.slice(-7).map(h => h.value), 1);
+                            const heightPercent = (entry.value / maxValue) * 100;
+                            return (
+                              <View key={idx} style={styles.miniBar}>
+                                <View style={styles.miniBarContainer}>
+                                  <View
+                                    style={[
+                                      styles.miniBarFill,
+                                      {
+                                        height: `${heightPercent}%`,
+                                        backgroundColor: metric.color
+                                      }
+                                    ]}
+                                  />
+                                </View>
+                                <Text style={[styles.miniBarLabel, { color: colors.mutedText }]}>
+                                  {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'narrow' })}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
                   </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Recent Vital Signs */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Vital Signs</Text>
+            <View style={[styles.vitalsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {vitalSigns.slice(0, 4).map((vital) => (
+                <View key={vital.id} style={[styles.vitalCard, { borderBottomColor: colors.border }]}>
+                  <View style={styles.vitalHeader}>
+                    <Text style={[styles.vitalName, { color: colors.text }]}>{vital.name}</Text>
+                    <View style={[styles.vitalStatus, { backgroundColor: getStatusColor(vital.status) }]}>
+                      <Text style={styles.vitalStatusText}>{vital.status}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.vitalValue, { color: colors.text }]}>
+                    {vital.systolic && vital.diastolic
+                      ? `${vital.systolic}/${vital.diastolic}`
+                      : vital.value
+                    } {vital.unit}
+                  </Text>
+
+                  <Text style={[styles.vitalTimestamp, { color: colors.mutedText }]}>
+                    {new Date(vital.timestamp).toLocaleString()}
+                  </Text>
+
+                  {vital.notes && (
+                    <Text style={[styles.vitalNotes, { color: colors.mutedText }]}>{vital.notes}</Text>
+                  )}
                 </View>
-
-                <Text style={[styles.vitalValue, { color: colors.text }]}>
-                  {vital.systolic && vital.diastolic
-                    ? `${vital.systolic}/${vital.diastolic}`
-                    : vital.value
-                  } {vital.unit}
-                </Text>
-
-                <Text style={[styles.vitalTimestamp, { color: colors.mutedText }]}>
-                  {new Date(vital.timestamp).toLocaleString()}
-                </Text>
-
-                {vital.notes && (
-                  <Text style={[styles.vitalNotes, { color: colors.mutedText }]}>{vital.notes}</Text>
-                )}
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
 
-        {/* Health Insights */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Insights</Text>
-          <View style={[styles.insightsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.insightCard}>
-              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
-                <Ionicons name="trending-up" size={20} color={colors.success} />
+          {/* Health Insights */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Health Insights</Text>
+            <View style={[styles.insightsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.insightCard}>
+                <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                  <Ionicons name="trending-up" size={20} color={colors.success} />
+                </View>
+                <View style={styles.insightContent}>
+                  <Text style={[styles.insightTitle, { color: colors.text }]}>Great Progress!</Text>
+                  <Text style={[styles.insightText, { color: colors.mutedText }]}>
+                    Your sleep quality has improved by 15% this week. Keep up the good work!
+                  </Text>
+                </View>
               </View>
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: colors.text }]}>Great Progress!</Text>
-                <Text style={[styles.insightText, { color: colors.mutedText }]}>
-                  Your sleep quality has improved by 15% this week. Keep up the good work!
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.insightCard}>
-              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
-                <Ionicons name="water" size={20} color={colors.info} />
+              <View style={styles.insightCard}>
+                <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                  <Ionicons name="water" size={20} color={colors.info} />
+                </View>
+                <View style={styles.insightContent}>
+                  <Text style={[styles.insightTitle, { color: colors.text }]}>Stay Hydrated</Text>
+                  <Text style={[styles.insightText, { color: colors.mutedText }]}>
+                    You&apos;re 2 glasses short of your daily water goal. Try setting hourly reminders.
+                  </Text>
+                </View>
               </View>
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: colors.text }]}>Stay Hydrated</Text>
-                <Text style={[styles.insightText, { color: colors.mutedText }]}>
-                  You&apos;re 2 glasses short of your daily water goal. Try setting hourly reminders.
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.insightCard}>
-              <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
-                <Ionicons name="walk" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: colors.text }]}>Almost There!</Text>
-                <Text style={[styles.insightText, { color: colors.mutedText }]}>
-                  You need 1,153 more steps to reach your daily goal. A 10-minute walk should do it!
-                </Text>
+              <View style={styles.insightCard}>
+                <View style={[styles.insightIcon, { backgroundColor: colors.background }]}>
+                  <Ionicons name="walk" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.insightContent}>
+                  <Text style={[styles.insightTitle, { color: colors.text }]}>Almost There!</Text>
+                  <Text style={[styles.insightText, { color: colors.mutedText }]}>
+                    You need 1,153 more steps to reach your daily goal. A 10-minute walk should do it!
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        </ResponsiveView>
       </ScrollView>
 
       {/* Add Vital Sign Modal */}
@@ -1041,6 +1050,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  responsiveContent: {
     paddingHorizontal: 20,
   },
   header: {
@@ -1092,13 +1103,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 16,
   },
   metricCard: {
-    width: (width - 60) / 2,
+    width: '48%', // Flexible for mobile/web
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
     borderWidth: 1,
+    marginBottom: 0, // Handled by gap
   },
   metricHeader: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -151,7 +152,7 @@ export default function AppointmentsScreen() {
         await incrementLocalTelemedicine(user.id, 1);
         try {
           await sustainabilityService.trackTelemedicine(user.id, 1);
-        } catch (_) {}
+        } catch (_) { }
       }
       fetchAppointments();
       Alert.alert(t("success") || "Success", "Appointment marked as completed.");
@@ -188,7 +189,7 @@ export default function AppointmentsScreen() {
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -350,7 +351,7 @@ export default function AppointmentsScreen() {
             </View>
 
             {showDatePicker && (
-              <DateTimePicker
+              <PlatformDateTimePicker
                 value={newAppointment.date ? new Date(newAppointment.date) : new Date()}
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -394,7 +395,7 @@ export default function AppointmentsScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </ResponsiveView>
   );
 }
 

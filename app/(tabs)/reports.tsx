@@ -1,36 +1,38 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from 'expo-haptics';
 import * as Print from 'expo-print';
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Animated, Pressable, TouchableWithoutFeedback } from "react-native";
-import { useFeatureFlags } from "../../hooks/useFeatureFlags";
+import { Alert, Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
+import { HealthCharts } from "../../components/HealthCharts";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useFeatureFlags } from "../../hooks/useFeatureFlags";
+import { useResponsive } from "../../hooks/useResponsive";
 import { N8NService } from "../../services/N8NService";
-import { sustainabilityService } from "../../services/api/sustainability";
-import { profileService } from "../../services/api/profile";
 import { deviceService } from "../../services/api/device";
-import { graphService, GraphData } from "../../services/api/graph";
-import * as Haptics from 'expo-haptics';
-import { HealthCharts } from "../../components/HealthCharts";
+import { GraphData, graphService } from "../../services/api/graph";
+import { profileService } from "../../services/api/profile";
+import { sustainabilityService } from "../../services/api/sustainability";
 import {
+  computeImpact,
   getLocalSustainability,
   incrementLocalReports,
-  computeImpact,
 } from "../../utils/sustainabilityStorage";
 import {
   getDiaryKey,
+  getHealthMetricsKey,
   getProfileKey,
   getTicketsKey,
-  getHealthMetricsKey,
   getVitalSignsKey,
 } from "../../utils/userStorageKeys";
 
-const { width } = Dimensions.get("window");
+const { width: staticWidth } = Dimensions.get("window");
 
 // Metrics for the Radar Chart
 const METRICS = [
@@ -47,8 +49,10 @@ export default function ReportsScreen() {
   const { colors, theme, uiMode, fontSize } = useTheme();
   const { t } = useTranslation();
   const { user, requireAuth } = useAuth();
+  const { isWeb, contentWidth } = useResponsive();
 
   const isSenior = uiMode === "senior";
+  const width = isWeb ? contentWidth : staticWidth;
 
   const getFontSize = (base: number) => {
     const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
@@ -657,7 +661,7 @@ export default function ReportsScreen() {
             );
 
             if (result.success) {
-              Alert.alert("Success", "Report sent to your Caregiver via WhatsApp! 🚀");
+              Alert.alert("Success", "Report sent to your Caregiver via WhatsApp!");
             } else {
               Alert.alert("Error", "Could not connect to automation server.");
             }
@@ -668,9 +672,11 @@ export default function ReportsScreen() {
   };
 
   // --- RADAR CHART LOGIC ---
-  const radarSize = width - 60;
+  // On Web, these are in a 2-column layout, so we use half the contentWidth
+  const responsiveWidth = isWeb ? (contentWidth / 2) - 40 : width;
+  const radarSize = Math.min(responsiveWidth - 60, 400);
   const radarCenter = radarSize / 2;
-  const radarRadius = (radarSize - 80) / 2;
+  const radarRadius = (radarSize - 120) / 2; // Increased padding for labels
   const angleSlice = (Math.PI * 2) / METRICS.length;
 
   const getRadarCoordinates = (value: number, index: number) => {
@@ -687,10 +693,10 @@ export default function ReportsScreen() {
   };
 
   // --- KNOWLEDGE GRAPH LOGIC ---
-  const kgSize = width - 40;
+  const kgSize = Math.min(responsiveWidth - 40, 400);
   const kgCenter = kgSize / 2;
 
-  const renderKnowledgeGraph = () => {
+  const renderKnowledgeGraph = (inRow?: boolean) => {
     if (!userData) return null;
 
     const onNodePress = (node: any) => {
@@ -846,15 +852,15 @@ export default function ReportsScreen() {
       }
     }
 
-    const nodeDist = kgSize / 3.2;
+    const nodeDist = kgSize / 3.5; // Slightly more compact to avoid edge cutoff
     const nodeLabelOffset = 30;
 
     return (
-      <View style={[styles.kgCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph") || "Health Knowledge Graph"}</Text>
+      <View style={[styles.kgCard, inRow && styles.graphCardInRow, { backgroundColor: theme === 'dark' ? '#1C1C1E' : colors.card, borderColor: theme === 'dark' ? '#2C2C2E' : 'rgba(0,0,0,0.1)' }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph") || "Data Knowledge Graph"}</Text>
         <Text style={[styles.cardSubtitle, { color: colors.mutedText }]}>Live data from your health ecosystem</Text>
 
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: fadeAnim }] }}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: fadeAnim }], marginVertical: 15 }}>
           <Svg height={kgSize} width={kgSize}>
             {/* Draw edges from center to all other nodes */}
             {nodes.map((node, i) => {
@@ -937,7 +943,7 @@ export default function ReportsScreen() {
         </Animated.View>
 
         {/* Enhanced Legend */}
-        <View style={styles.kgLegend}>
+        <View style={[styles.kgLegend, { backgroundColor: theme === 'dark' ? '#000' : '#F5F5F7', borderColor: theme === 'dark' ? '#2C2C2E' : '#E5E5EA' }]}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
             <Text style={[styles.legendText, { color: colors.mutedText }]}>Exercise</Text>
@@ -957,7 +963,7 @@ export default function ReportsScreen() {
         </View>
 
         {/* Data Summary */}
-        <View style={styles.dataSummary}>
+        <View style={[styles.dataSummary, { backgroundColor: theme === 'dark' ? '#000' : '#F5F5F7', borderTopColor: theme === 'dark' ? '#2C2C2E' : '#E5E5EA' }]}>
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Last Updated:</Text>
             <Text style={[styles.summaryValue, { color: colors.text }]}>{new Date().toLocaleTimeString()}</Text>
@@ -973,214 +979,249 @@ export default function ReportsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={!!selectedNode}
-        onRequestClose={() => setSelectedNode(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                {getDetailContent()}
-                <Pressable
-                  style={{ marginTop: 20, padding: 10 }}
-                  onPress={() => setSelectedNode(null)}
-                >
-                  <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Close</Text>
-                </Pressable>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-          {user?.name || userData?.name ? `${t("analysisFor")} ${user?.name || userData?.name}` : t("yourHealthOverview")}
-        </Text>
-      </View>
-
-      {sustainabilityImpact && (
-        <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
-          <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
-            {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
+      <ResponsiveView style={styles.responsiveContent}>
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={!!selectedNode}
+          onRequestClose={() => setSelectedNode(null)}
+        >
+          <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalContent}>
+                  {getDetailContent()}
+                  <Pressable
+                    style={{ marginTop: 20, padding: 10 }}
+                    onPress={() => setSelectedNode(null)}
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Close</Text>
+                  </Pressable>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme === 'dark' ? '#FFFFFF' : '#000000' }]}>{t("wellnessReport")}</Text>
+          <Text style={[styles.subtitle, { color: theme === 'dark' ? '#E5E5EA' : colors.mutedText }]}>
+            {user?.name || userData?.name ? `${t("analysisFor")} ${user?.name || userData?.name}` : t("yourHealthOverview")}
           </Text>
-          <View style={styles.impactGrid}>
-            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-              <Ionicons name="leaf-outline" size={20} color="#22C55E" />
-              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.carbonSavedKg} kg</Text>
-              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
-            </View>
-            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-              <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
-              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.paperSavedSheets}</Text>
-              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
-            </View>
-            <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-              <Ionicons name="car-outline" size={20} color="#8B5CF6" />
-              <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.tripsAvoided}</Text>
-              <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
-            </View>
-          </View>
         </View>
-      )}
 
-      {canDownload && (
-        <>
-          <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-            <Ionicons name="download-outline" size={24} color="#fff" />
-            <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
-            onPress={sendWhatsAppReport}
-          >
-            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
-            <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-
-      {/* KNOWLEDGE GRAPH */}
-      {renderKnowledgeGraph()}
-
-      {/* ACHIEVEMENTS & GAMIFICATION */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("achievements") || "Achievements & Streaks"}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#FFB300' }]}>
-            <View style={styles.streakHeader}>
-              <Ionicons name="flame" size={24} color="#FF9800" />
-              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.medication} Days</Text>
-            </View>
-            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Medication Streak</Text>
-          </View>
-
-          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#4CAF50' }]}>
-            <View style={styles.streakHeader}>
-              <Ionicons name="footsteps" size={24} color="#4CAF50" />
-              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.steps} Days</Text>
-            </View>
-            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Active Streak</Text>
-          </View>
-
-          <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#2196F3' }]}>
-            <View style={styles.streakHeader}>
-              <Ionicons name="shield-checkmark" size={24} color="#2196F3" />
-              <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.health} Days</Text>
-            </View>
-            <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Perfect Week</Text>
-          </View>
-        </ScrollView>
-
-        <View style={styles.badgesContainer}>
-          {badges.map((badge) => (
-            <TouchableOpacity
-              key={badge.id}
-              style={[styles.badgeIconBox, { backgroundColor: colors.card }]}
-              onPress={() => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                Alert.alert(badge.name, `Earned on ${new Date(badge.date).toLocaleDateString()}`);
-              }}
-            >
-              <View style={[styles.badgeInner, { backgroundColor: badge.color + '20' }]}>
-                <Ionicons name={badge.icon as any} size={28} color={badge.color} />
+        {sustainabilityImpact && (
+          <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
+            <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
+              {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
+            </Text>
+            <View style={styles.impactGrid}>
+              <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                <Ionicons name="leaf-outline" size={20} color="#22C55E" />
+                <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.carbonSavedKg} kg</Text>
+                <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
               </View>
-              <Text style={[styles.badgeName, { color: colors.text }]} numberOfLines={1}>{badge.name}</Text>
+              <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
+                <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.paperSavedSheets}</Text>
+                <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
+              </View>
+              <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                <Ionicons name="car-outline" size={20} color="#8B5CF6" />
+                <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact.tripsAvoided}</Text>
+                <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {canDownload && (
+          <>
+            <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
+              <Ionicons name="download-outline" size={24} color="#fff" />
+              <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      </View>
 
-      {/* RADAR CHART CARD */}
-      <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
-        <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize }}>
-          <Svg height={radarSize} width={radarSize}>
-            <Polygon points={buildRadarPolygon({ physical: 100, exercise: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
-            <Polygon points={buildRadarPolygon({ physical: 50, exercise: 50, social: 50, mental: 50, sleep: 50, diet: 50 })} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" fill="none" />
+            <TouchableOpacity
+              style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
+              onPress={sendWhatsAppReport}
+            >
+              <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+              <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
-            {METRICS.map((m, i) => {
-              const { x, y } = getRadarCoordinates(100, i);
-              return <Line key={i} x1={radarCenter} y1={radarCenter} x2={x} y2={y} stroke={colors.border} strokeWidth="1" />;
-            })}
 
-            <Polygon points={buildRadarPolygon(scores)} fill={colors.primary} fillOpacity="0.3" stroke={colors.primary} strokeWidth="2" />
-
-            {METRICS.map((m, i) => {
-              const { x, y } = getRadarCoordinates(scores[m.key as keyof typeof scores], i);
-              return <Circle key={i} cx={x} cy={y} r="4" fill={colors.primary} />;
-            })}
-
-            {METRICS.map((m, i) => {
-              const { x, y } = getRadarCoordinates(120, i);
-              return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
-            })}
-          </Svg>
-        </View>
-      </View>
-
-      {/* WEEKLY TRENDS SECTION */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("last7DaysImportantValues") || "Last 7 Days Important Values"}</Text>
-        <View style={styles.trendsGrid}>
-          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
-            <Ionicons name="walk" size={24} color={colors.primary} />
-            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSteps}</Text>
-            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Steps/Day</Text>
-          </View>
-          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
-            <Ionicons name="moon" size={24} color={colors.info} />
-            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSleep}h</Text>
-            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Sleep</Text>
-          </View>
-          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
-            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.compliance}%</Text>
-            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Compliance</Text>
-          </View>
-          <View style={[styles.trendCard, { backgroundColor: colors.card }]}>
-            <Ionicons name="heart" size={24} color={colors.error} />
-            <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgHeartRate}</Text>
-            <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Heart Rate</Text>
-          </View>
-        </View>
-        <HealthCharts userId={user?.id || userData?.id} />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
-        {scores.physical < 60 && (
-          <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
-            <Ionicons name="walk-outline" size={24} color={colors.warning} />
-            <View style={styles.insightContent}>
-              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
-              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
+        {/* KNOWLEDGE GRAPH + HEALTH INDICES (side by side on web) */}
+        {isWeb ? (
+          <View style={styles.kgRadarRow}>
+            <View style={styles.kgRadarHalf}>{renderKnowledgeGraph(true)}</View>
+            <View style={styles.kgRadarHalf}>
+              <View style={[styles.graphCard, styles.graphCardInRow, { backgroundColor: theme === 'dark' ? '#1C1C1E' : colors.card, borderColor: theme === 'dark' ? '#2C2C2E' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }]}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
+                <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize, width: '100%', overflow: 'hidden' }}>
+                  <Svg height={radarSize} width={radarSize}>
+                    <Polygon points={buildRadarPolygon({ physical: 100, exercise: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
+                    <Polygon points={buildRadarPolygon({ physical: 50, exercise: 50, social: 50, mental: 50, sleep: 50, diet: 50 })} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" fill="none" />
+                    {METRICS.map((m, i) => {
+                      const { x, y } = getRadarCoordinates(100, i);
+                      return <Line key={i} x1={radarCenter} y1={radarCenter} x2={x} y2={y} stroke={colors.border} strokeWidth="1" />;
+                    })}
+                    <Polygon points={buildRadarPolygon(scores)} fill={colors.primary} fillOpacity="0.3" stroke={colors.primary} strokeWidth="2" />
+                    {METRICS.map((m, i) => {
+                      const { x, y } = getRadarCoordinates(scores[m.key as keyof typeof scores], i);
+                      return <Circle key={i} cx={x} cy={y} r="4" fill={colors.primary} />;
+                    })}
+                    {METRICS.map((m, i) => {
+                      const { x, y } = getRadarCoordinates(120, i);
+                      return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
+                    })}
+                  </Svg>
+                </View>
+              </View>
             </View>
           </View>
+        ) : (
+          <>
+            {renderKnowledgeGraph(false)}
+            <View style={[styles.graphCard, { backgroundColor: theme === 'dark' ? '#1C1C1E' : colors.card, borderColor: theme === 'dark' ? '#2C2C2E' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize, width: '100%', overflow: 'hidden' }}>
+                <Svg height={radarSize} width={radarSize}>
+                  <Polygon points={buildRadarPolygon({ physical: 100, exercise: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
+                  <Polygon points={buildRadarPolygon({ physical: 50, exercise: 50, social: 50, mental: 50, sleep: 50, diet: 50 })} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" fill="none" />
+                  {METRICS.map((m, i) => {
+                    const { x, y } = getRadarCoordinates(100, i);
+                    return <Line key={i} x1={radarCenter} y1={radarCenter} x2={x} y2={y} stroke={colors.border} strokeWidth="1" />;
+                  })}
+                  <Polygon points={buildRadarPolygon(scores)} fill={colors.primary} fillOpacity="0.3" stroke={colors.primary} strokeWidth="2" />
+                  {METRICS.map((m, i) => {
+                    const { x, y } = getRadarCoordinates(scores[m.key as keyof typeof scores], i);
+                    return <Circle key={i} cx={x} cy={y} r="4" fill={colors.primary} />;
+                  })}
+                  {METRICS.map((m, i) => {
+                    const { x, y } = getRadarCoordinates(120, i);
+                    return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
+                  })}
+                </Svg>
+              </View>
+            </View>
+          </>
         )}
-        {scores.social < 60 && (
-          <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
-            <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
-            <View style={styles.insightContent}>
-              <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
-              <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
+
+        {/* ACHIEVEMENTS & GAMIFICATION */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("achievements") || "Achievements & Streaks"}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+            <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#FFB300' }]}>
+              <View style={styles.streakHeader}>
+                <Ionicons name="flame" size={24} color="#FF9800" />
+                <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.medication} Days</Text>
+              </View>
+              <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Medication Streak</Text>
+            </View>
+
+            <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#4CAF50' }]}>
+              <View style={styles.streakHeader}>
+                <Ionicons name="footsteps" size={24} color="#4CAF50" />
+                <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.steps} Days</Text>
+              </View>
+              <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Active Streak</Text>
+            </View>
+
+            <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: '#2196F3' }]}>
+              <View style={styles.streakHeader}>
+                <Ionicons name="shield-checkmark" size={24} color="#2196F3" />
+                <Text style={[styles.streakValue, { color: colors.text }]}>{streaks.health} Days</Text>
+              </View>
+              <Text style={[styles.streakLabel, { color: colors.mutedText }]}>Perfect Week</Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.badgesContainer}>
+            {badges.map((badge) => (
+              <TouchableOpacity
+                key={badge.id}
+                style={[
+                  styles.badgeIconBox,
+                  { backgroundColor: colors.card },
+                  isWeb && { width: (width - 60) / 3 },
+                ]}
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  Alert.alert(badge.name, `Earned on ${new Date(badge.date).toLocaleDateString()}`);
+                }}
+              >
+                <View style={[styles.badgeInner, { backgroundColor: badge.color + '20' }]}>
+                  <Ionicons name={badge.icon as any} size={28} color={badge.color} />
+                </View>
+                <Text style={[styles.badgeName, { color: colors.text }]} numberOfLines={1}>{badge.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* WEEKLY TRENDS SECTION */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("last7DaysImportantValues") || "Last 7 Days Important Values"}</Text>
+          <View style={styles.trendsGrid}>
+            <View style={[styles.trendCard, { backgroundColor: colors.card }, isWeb && { width: '48%', marginBottom: 16 }]}>
+              <Ionicons name="walk" size={24} color={colors.primary} />
+              <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSteps}</Text>
+              <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Steps/Day</Text>
+            </View>
+            <View style={[styles.trendCard, { backgroundColor: colors.card }, isWeb && { width: '48%', marginBottom: 16 }]}>
+              <Ionicons name="moon" size={24} color={colors.info} />
+              <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgSleep}h</Text>
+              <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Sleep</Text>
+            </View>
+            <View style={[styles.trendCard, { backgroundColor: colors.card }, isWeb && { width: '48%', marginBottom: 16 }]}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+              <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.compliance}%</Text>
+              <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Compliance</Text>
+            </View>
+            <View style={[styles.trendCard, { backgroundColor: colors.card }, isWeb && { width: '48%', marginBottom: 16 }]}>
+              <Ionicons name="heart" size={24} color={colors.error} />
+              <Text style={[styles.trendValue, { color: colors.text }]}>{weeklyTrends.avgHeartRate}</Text>
+              <Text style={[styles.trendLabel, { color: colors.mutedText }]}>Avg Heart Rate</Text>
             </View>
           </View>
-        )}
-      </View>
-      <View style={{ height: 40 }} />
-    </ScrollView>
+          <View style={{ marginTop: 24 }}>
+            <HealthCharts userId={user?.id || userData?.id} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
+          {scores.physical < 60 && (
+            <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
+              <Ionicons name="walk-outline" size={24} color={colors.warning} />
+              <View style={styles.insightContent}>
+                <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
+                <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
+              </View>
+            </View>
+          )}
+          {scores.social < 60 && (
+            <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+              <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
+              <View style={styles.insightContent}>
+                <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
+                <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+        <View style={{ height: 40 }} />
+      </ResponsiveView>
+    </ScrollView >
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1 },
+  responsiveContent: { paddingHorizontal: 20 },
   header: { marginBottom: 20, marginTop: 20 },
   title: { fontSize: 32, fontWeight: "bold" },
   impactCard: { borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1 },
@@ -1194,26 +1235,42 @@ const styles = StyleSheet.create({
   pdfButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, marginBottom: 24, elevation: 2 },
   pdfButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
   kgCard: {
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)'
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    borderWidth: 1.5,
   },
-  cardSubtitle: { fontSize: 14, marginBottom: 15, alignSelf: 'flex-start', fontStyle: 'italic', opacity: 0.7 },
-  kgLegend: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 10, flexWrap: 'wrap' },
-  legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+  cardSubtitle: { fontSize: 14, marginBottom: 8, alignSelf: 'flex-start', fontStyle: 'italic', opacity: 0.7 },
+  kgLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
-  legendText: { fontSize: 12 },
-  dataSummary: { marginTop: 15, width: '100%', paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  summaryLabel: { fontSize: 13, fontWeight: '500' },
-  summaryValue: { fontSize: 13, fontWeight: 'bold' },
+  legendText: { fontSize: 11, fontWeight: '500' },
+  dataSummary: {
+    marginTop: 20,
+    width: '100%',
+    paddingTop: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+    borderTopWidth: 1.5,
+    borderRadius: 12,
+  },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  summaryLabel: { fontSize: 13, fontWeight: '600' },
+  summaryValue: { fontSize: 13, fontWeight: '700' },
   horizontalScroll: { marginBottom: 15, paddingBottom: 5 },
   streakCard: {
     width: 140,
@@ -1234,7 +1291,7 @@ const styles = StyleSheet.create({
     marginTop: 10
   },
   badgeIconBox: {
-    width: (width - 60) / 3,
+    width: (staticWidth - 60) / 3,
     padding: 12,
     borderRadius: 16,
     alignItems: 'center',
@@ -1254,7 +1311,10 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   badgeName: { fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
-  graphCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, elevation: 2 },
+  graphCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, elevation: 2, borderWidth: 1.5 },
+  kgRadarRow: { flexDirection: 'row', marginHorizontal: -10, marginBottom: 24, gap: 24 },
+  kgRadarHalf: { flex: 1, minWidth: 0, paddingHorizontal: 10 },
+  graphCardInRow: { marginBottom: 0 },
   cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, alignSelf: 'flex-start' },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
@@ -1266,12 +1326,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 16,
   },
   trendCard: {
-    width: (width - 60) / 2,
+    width: '48%', // For mobile/default fallback, web overrides inline
     padding: 16,
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 0, // Handled by gap/inline styles
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',

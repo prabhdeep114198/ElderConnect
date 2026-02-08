@@ -1,13 +1,13 @@
 import { ActionSheetProvider } from "@expo/react-native-action-sheet";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  DrawerContentScrollView,
-  DrawerItemList,
+    DrawerContentScrollView,
+    DrawerItemList,
 } from "@react-navigation/drawer";
 import { useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
-import { ActivityIndicator, Platform, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import flagsmith from "react-native-flagsmith";
 import { FlagsmithProvider } from "react-native-flagsmith/react";
 import { Colors } from "../constants/colors";
@@ -15,8 +15,8 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 
 import * as Notifications from "expo-notifications";
-import "../i18n";
 import { VoiceAssistant } from "../components/VoiceAssistant";
+import "../i18n";
 
 // NOTIFICATION HANDLER CONFIG
 Notifications.setNotificationHandler({
@@ -34,6 +34,8 @@ function InitialLayout() {
   const { theme, colors, toggleTheme, uiMode } = useTheme();
   const segments = useSegments();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = Platform.OS === 'web' && windowWidth > 1024;
 
   useEffect(() => {
     const setupNotifications = async () => {
@@ -220,7 +222,8 @@ function InitialLayout() {
       <Drawer
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={{
-          headerShown: true,
+          drawerType: isLargeScreen ? 'permanent' : 'front',
+          headerShown: !isLargeScreen, // Hide header on large screens if sidebar is present
           headerStyle: {
             backgroundColor: colors.background,
             elevation: 0,
@@ -242,6 +245,8 @@ function InitialLayout() {
           drawerStyle: {
             width: 280,
             backgroundColor: colors.background,
+            borderRightWidth: isLargeScreen ? 1 : 0,
+            borderRightColor: colors.border,
           }
         }}
       >
