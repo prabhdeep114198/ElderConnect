@@ -87,12 +87,8 @@ export default function ReportsScreen() {
     year: number;
   } | null>(null);
   const [remoteGraphData, setRemoteGraphData] = useState<GraphData | null>(null);
-  const [streaks, setStreaks] = useState({ health: 5, steps: 3, medication: 12 });
-  const [badges, setBadges] = useState([
-    { id: 1, name: "Early Bird", icon: "sunny", color: "#FFB300", date: "2024-01-20" },
-    { id: 2, name: "Step Master", icon: "walk", color: "#4CAF50", date: "2024-01-25" },
-    { id: 3, name: "Heart Hero", icon: "heart", color: "#E91E63", date: "2024-02-01" },
-  ]);
+  const [streaks, setStreaks] = useState({ health: 0, steps: 0, medication: 0 });
+  const [badges, setBadges] = useState<any[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const flags = useFeatureFlags(["download_reports"]);
@@ -171,7 +167,7 @@ export default function ReportsScreen() {
         }
 
         const achievementsRes: any = await profileService.getAchievements(userId);
-        if (achievementsRes?.data?.achievements && achievementsRes.data.achievements.length > 0) {
+        if (achievementsRes?.data?.achievements) {
           setBadges(achievementsRes.data.achievements);
         }
       }
@@ -1188,7 +1184,7 @@ export default function ReportsScreen() {
             </View>
           </View>
           <View style={{ marginTop: 24 }}>
-            <HealthCharts userId={user?.id || userData?.id} />
+            <HealthCharts userId={user?.id || userData?.id || ""} />
           </View>
         </View>
 

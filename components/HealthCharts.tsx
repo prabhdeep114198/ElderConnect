@@ -28,6 +28,10 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ userId }) => {
     }, [userId]);
 
     const loadData = async () => {
+        if (!userId || userId === 'demo' || userId === '') {
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
             const endDate = new Date();
