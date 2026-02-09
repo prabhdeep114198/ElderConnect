@@ -88,7 +88,7 @@ export default function VideoCallScreen() {
     setCameraKey(Date.now());
 
     setTimeout(() => {
-      router.replace("/");
+      router.replace("/(tabs)/home");
     }, 300);
   };
 
@@ -100,7 +100,7 @@ export default function VideoCallScreen() {
           t("contactLimitReached"),
           [
             { text: t("cancel"), style: "cancel" },
-            { text: t("upgradeNow"), onPress: () => router.push("/SettingsScreen") }
+            { text: t("upgradeNow"), onPress: () => router.push("/settings") }
           ]
         );
         setAdding(false);

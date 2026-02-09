@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ResponsiveView } from "../components/ResponsiveView";
+import { ResponsiveView } from "../../../components/ResponsiveView";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,8 +15,8 @@ import {
     View,
     StatusBar
 } from "react-native";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -148,4 +148,3 @@ const styles = StyleSheet.create({
     saveButton: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     saveButtonText: { color: "#FFF", fontSize: 17, fontWeight: "600" },
 });
-

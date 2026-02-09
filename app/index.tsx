@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import * as SecureStore from "expo-secure-store";
 import {
   ActivityIndicator,
   Dimensions,
@@ -180,11 +181,20 @@ export default function LandingScreen() {
                   ? { backgroundColor: colors.primary, shadowColor: colors.primary }
                   : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
               ]}
-              onPress={() => {
-                if (btn.actionType === "login") setShowLogin(true);
-                else if (btn.actionType === "route" && btn.route)
-                  router.push(btn.route as any);
-              }}
+              onPress={async () => {
+  const accepted = await SecureStore.getItemAsync("privacyAccepted");
+
+  if (!accepted) {
+    router.push("./settings/privacy");
+    return;
+  }
+
+  if (btn.actionType === "login") {
+    setShowLogin(true);
+  } else if (btn.actionType === "route" && btn.route) {
+    router.push(btn.route as any);
+  }
+}}
             >
               <Text style={[
                 styles.buttonText,
@@ -202,6 +212,7 @@ export default function LandingScreen() {
       <Modal visible={showLogin} animationType="slide" transparent>
         <LoginModal onClose={() => setShowLogin(false)} />
       </Modal>
+      
     </ScrollView>
   );
 }
@@ -218,6 +229,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  footerText: {
+  fontSize: 12,
+  color: "#6b7280", // gray-500
+  textAlign: "center",
+  marginTop: 8,
+},
+  footerDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: "#9ca3af",
+  marginHorizontal: 4,
+},
   heroSection: {
     alignItems: 'center',
     marginBottom: 40,
@@ -228,6 +252,13 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 16
   },
+  footer: {
+  paddingVertical: 16,
+  paddingHorizontal: 16,
+  borderTopWidth: 1,
+  borderColor: "#e5e7eb",
+  backgroundColor: "#fff",
+},
   title: {
     fontSize: 32,
     fontWeight: "bold",

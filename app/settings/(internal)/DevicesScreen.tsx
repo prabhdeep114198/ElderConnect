@@ -17,9 +17,9 @@ import {
 } from "react-native";
 import { BleManager, Device, State } from "react-native-ble-plx";
 import * as Location from "expo-location";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
-import { authService } from "../services/api/auth";
+import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
+import { authService } from "../../../services/api/auth";
 
 // Initialize BleManager lazily
 let bleManager: BleManager | null = null;

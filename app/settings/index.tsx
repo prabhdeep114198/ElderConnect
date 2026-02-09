@@ -1,11 +1,11 @@
 import { useRouter } from "expo-router";
-import { ResponsiveView } from "../components/ResponsiveView";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 
 // Define Types
 interface SettingItemType {
@@ -132,23 +132,23 @@ export default function SettingsScreen() {
 
     switch (action) {
       case "profile":
-        requireAuth(() => router.push("/profile"));
+        requireAuth(() => router.push("./profile"));
         break;
       case "devices":
-        requireAuth(() => router.push("/DevicesScreen"));
+        requireAuth(() => router.push("./DevicesScreen"));
         break;
       case "changePassword":
 
-        requireAuth(() => router.push("/change-password"));
+        requireAuth(() => router.push("./change-password"));
         break;
       case "upgradePlan":
-        requireAuth(() => router.push("/upgrade-plan"));
+        requireAuth(() => router.push("./upgrade-plan"));
         break;
       case "manageSubscription":
-        requireAuth(() => router.push("/manage-subscription"));
+        requireAuth(() => router.push("./manage-subscription"));
         break;
       case "billingHistory":
-        requireAuth(() => router.push("/billing-history"));
+        requireAuth(() => router.push("./billing-history"));
         break;
       case "language":
         setIsLanguageModalVisible(true);
