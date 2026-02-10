@@ -292,4 +292,3 @@ const styles = StyleSheet.create({
     switchLabel: { fontSize: 17 },
     switchSublabel: { fontSize: 12, color: '#8E8E93', marginTop: 2 }
 });
-

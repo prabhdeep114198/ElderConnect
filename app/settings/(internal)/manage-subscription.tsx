@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import { getSubscriptionStatus } from '../services/PaymentService';
+import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import { getSubscriptionStatus } from '../../../services/PaymentService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -68,7 +68,7 @@ export default function ManageSubscriptionScreen() {
                 {!user?.isSubscribed && (
                     <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                        onPress={() => router.push('/upgrade-plan')}
+                        onPress={() => router.push('/settings/upgrade-plan')}
                     >
                         <Ionicons name="rocket-outline" size={24} color="#FFF" />
                         <Text style={styles.actionButtonText}>Upgrade to Premium</Text>
@@ -77,7 +77,7 @@ export default function ManageSubscriptionScreen() {
 
                 <TouchableOpacity
                     style={[styles.secondaryButton, { borderColor: colors.primary }]}
-                    onPress={() => router.push('/billing-history')}
+                    onPress={() => router.push('/settings/billing-history')}
                 >
                     <Ionicons name="receipt-outline" size={24} color={colors.primary} />
                     <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Billing History</Text>

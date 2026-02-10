@@ -1,5 +1,7 @@
 import { ActionSheetProvider } from "@expo/react-native-action-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { PaperProvider } from "react-native-paper";
+
 import {
   DrawerContentScrollView,
   DrawerItemList,
@@ -277,10 +279,18 @@ function InitialLayout() {
             drawerIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />
           }}
         />
+        <Drawer.Screen
+  name="_index"
+  options={{
+    drawerItemStyle: { display: "none" },
+    headerShown: false,
+  }}
+/>
 
         <Drawer.Screen
           name="events"
           options={{
+            title: "Events",
             headerShown: false,
             drawerIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />
           }}
@@ -303,12 +313,14 @@ function InitialLayout() {
         />
 
         <Drawer.Screen
-          name="SettingsScreen"
-          options={{
-            title: "Settings",
-            drawerIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />
-          }}
-        />
+  name="settings"
+  options={{
+    title: "Settings",
+    drawerIcon: ({ color, size }) => (
+      <Ionicons name="settings" size={size} color={color} />
+    ),
+  }}
+/>
 
         {/* Hidden Routes */}
         <Drawer.Screen
@@ -319,6 +331,7 @@ function InitialLayout() {
           }}
         />
 
+       
         <Drawer.Screen
           name="onboarding/index"
           options={{
@@ -334,6 +347,42 @@ function InitialLayout() {
             headerShown: false,
           }}
         />
+        <Drawer.Screen
+    name="music"
+  options={{
+    title: "Music",
+    drawerIcon: ({ color, size }) => (
+      <Ionicons name="musical-notes" size={size} color={color} />
+    ),
+  }}
+/>
+
+<Drawer.Screen
+  name="chatbot"
+  options={{
+    title: "Chatbot",
+    drawerIcon: ({ color, size }) => (
+      <Ionicons name="chatbubbles" size={size} color={color} />
+    ),
+  }}
+/>
+<Drawer.Screen
+  name="onboarding"
+  options={{
+    drawerItemStyle: { display: "none" }, // hide from drawer
+    headerShown: false,
+  }}
+/>
+<Drawer.Screen
+  name="VideoCallScreen"
+  options={{
+    title: "Video Call",
+    drawerIcon: ({ color, size }) => (
+      <Ionicons name="videocam" size={size} color={color} />
+    ),
+  }}
+/>
+
       </Drawer>
       <VoiceAssistant />
     </>
@@ -408,6 +457,7 @@ const styles = StyleSheet.create({
 
 export default function RootLayout() {
   return (
+    <PaperProvider>
     <FlagsmithProvider
       flagsmith={flagsmith}
       options={{
@@ -432,5 +482,6 @@ export default function RootLayout() {
         </ThemeProvider>
       </AuthProvider>
     </FlagsmithProvider>
+    </PaperProvider>
   );
 }

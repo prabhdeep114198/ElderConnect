@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { getBillingHistory } from '../services/PaymentService';
+import { useTheme } from '../../../context/ThemeContext';
+import { getBillingHistory } from '../../../services/PaymentService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BillingHistoryScreen() {
