@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
+import Constants from "expo-constants";
+
 import {
     ActivityIndicator,
     Animated,
@@ -72,9 +74,21 @@ export default function DevicesScreen() {
     }, []);
 
     useEffect(() => {
-        if (!bleManager && Platform.OS !== 'web') {
-            bleManager = new BleManager();
-        }
+       useEffect(() => {
+    // Do NOT initialize BLE inside Expo Go
+    if (Constants.appOwnership === "expo") {
+        Alert.alert(
+            "Bluetooth Not Supported",
+            "Device connection works only in a development build. Expo Go does not support Bluetooth."
+        );
+        return;
+    }
+
+    if (!bleManager) {
+        bleManager = new BleManager();
+    }
+}, []);
+
 
         if (isScanning && bleManager) {
             startScan();
@@ -91,7 +105,8 @@ export default function DevicesScreen() {
     }, [isScanning]);
 
     const startScan = async () => {
-        if (!bleManager) return;
+    if (Constants.appOwnership === "expo") return;
+    if (!bleManager) return;
 
         const hasPermission = await requestPermissions();
         if (!hasPermission) {

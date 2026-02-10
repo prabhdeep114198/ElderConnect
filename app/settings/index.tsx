@@ -43,7 +43,7 @@ const fetchSettings = (t: any): SettingsSectionType[] => [
     title: t("account"),
     data: [
       { type: "item", title: t("profile"), subtitle: t("profileSubtitle"), action: "profile" },
-      { type: "item", title: t("myDevices"), subtitle: t("myDevicesSubtitle") || "Connect your watch or monitor", action: "devices" },
+      { type: "item", title: t("devices"), subtitle: t("See your devices") || "Connect your watch or monitor", action: "devices" },
       { type: "item", title: t("changePassword"), subtitle: t("changePasswordSubtitle"), action: "changePassword" },
       { type: "item", title: t("emailPreferences"), subtitle: t("emailPreferencesSubtitle"), action: "emailPreferences" },
     ],
@@ -128,44 +128,73 @@ export default function SettingsScreen() {
   };
 
   const handleItemAction = (action?: string) => {
-    if (!action) return;
+  if (!action) return;
 
-    switch (action) {
-      case "profile":
-        requireAuth(() => router.push("./profile"));
-        break;
-      case "devices":
-        requireAuth(() => router.push("./DevicesScreen"));
-        break;
-      case "changePassword":
+  switch (action) {
+    case "profile":
+      requireAuth(() => router.push("/settings/(internal)/profile"));
+      break;
 
-        requireAuth(() => router.push("./change-password"));
-        break;
-      case "upgradePlan":
-        requireAuth(() => router.push("./upgrade-plan"));
-        break;
-      case "manageSubscription":
-        requireAuth(() => router.push("./manage-subscription"));
-        break;
-      case "billingHistory":
-        requireAuth(() => router.push("./billing-history"));
-        break;
-      case "language":
-        setIsLanguageModalVisible(true);
-        break;
-      case "uiMode":
-        setIsUIModalVisible(true);
-        break;
-      case "fontSize":
-        setIsFontSizeModalVisible(true);
-        break;
-      case "accentColor":
-        setIsColorModalVisible(true);
-        break;
-      default:
-        Alert.alert("Action", `Perform ${action}`);
-    }
-  };
+    case "devices":
+  requireAuth(() => router.push("/settings/(internal)/devices"));
+  break;
+
+
+    case "changePassword":
+      requireAuth(() => router.push("/settings/(internal)/change-password"));
+      break;
+
+    case "upgradePlan":
+      requireAuth(() => router.push("/settings/(internal)/upgrade-plan"));
+      break;
+
+    case "manageSubscription":
+      requireAuth(() => router.push("/settings/(internal)/manage-subscription"));
+      break;
+
+    case "billingHistory":
+      requireAuth(() => router.push("/settings/(internal)/billing-history"));
+      break;
+
+    // -------- Preferences --------
+    case "language":
+      setIsLanguageModalVisible(true);
+      break;
+
+    case "uiMode":
+      setIsUIModalVisible(true);
+      break;
+
+    case "fontSize":
+      setIsFontSizeModalVisible(true);
+      break;
+
+    case "accentColor":
+      setIsColorModalVisible(true);
+      break;
+
+    // -------- Support (NEW) --------
+    case "privacyPolicy":
+      router.push("/settings/(internal)/privacy-policy");
+      break;
+
+    case "termsOfService":
+      router.push("/settings/(internal)/terms-condition");
+      break;
+
+    /*case "helpCenter":
+      router.push("/settings/(internal)/help-center"); // create file if needed
+      break;*/
+
+    /*case "contactUs":
+      router.push("/settings/(internal)/contact-us"); // create file if needed
+      break;*/
+
+    default:
+      Alert.alert("Action", `Perform ${action}`);
+  }
+};
+
 
   const handleLogout = async () => {
     try {
