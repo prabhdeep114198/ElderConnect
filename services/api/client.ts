@@ -1,16 +1,16 @@
 import { API_BASE_URL, API_TIMEOUT, DEVICE_API_KEY } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
-interface RequestOptions {
+export interface RequestOptions {
     headers?: Record<string, string>;
     body?: any;
     params?: Record<string, string>;
     requiresAuth?: boolean;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
     status: number;
     data: any;
 

@@ -1,9 +1,8 @@
 import { useRouter } from "expo-router";
-import { ResponsiveView } from "../../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -128,72 +127,72 @@ export default function SettingsScreen() {
   };
 
   const handleItemAction = (action?: string) => {
-  if (!action) return;
+    if (!action) return;
 
-  switch (action) {
-    case "profile":
-      requireAuth(() => router.push("/settings/(internal)/profile"));
-      break;
+    switch (action) {
+      case "profile":
+        requireAuth(() => router.push("/settings/(internal)/profile"));
+        break;
 
-    case "devices":
-  requireAuth(() => router.push("/settings/(internal)/devices"));
-  break;
+      case "devices":
+        requireAuth(() => router.push("/settings/(internal)/devices"));
+        break;
 
 
-    case "changePassword":
-      requireAuth(() => router.push("/settings/(internal)/change-password"));
-      break;
+      case "changePassword":
+        requireAuth(() => router.push("/settings/(internal)/change-password"));
+        break;
 
-    case "upgradePlan":
-      requireAuth(() => router.push("/settings/(internal)/upgrade-plan"));
-      break;
+      case "upgradePlan":
+        requireAuth(() => router.push("/settings/(internal)/upgrade-plan"));
+        break;
 
-    case "manageSubscription":
-      requireAuth(() => router.push("/settings/(internal)/manage-subscription"));
-      break;
+      case "manageSubscription":
+        requireAuth(() => router.push("/settings/(internal)/manage-subscription"));
+        break;
 
-    case "billingHistory":
-      requireAuth(() => router.push("/settings/(internal)/billing-history"));
-      break;
+      case "billingHistory":
+        requireAuth(() => router.push("/settings/(internal)/billing-history"));
+        break;
 
-    // -------- Preferences --------
-    case "language":
-      setIsLanguageModalVisible(true);
-      break;
+      // -------- Preferences --------
+      case "language":
+        setIsLanguageModalVisible(true);
+        break;
 
-    case "uiMode":
-      setIsUIModalVisible(true);
-      break;
+      case "uiMode":
+        setIsUIModalVisible(true);
+        break;
 
-    case "fontSize":
-      setIsFontSizeModalVisible(true);
-      break;
+      case "fontSize":
+        setIsFontSizeModalVisible(true);
+        break;
 
-    case "accentColor":
-      setIsColorModalVisible(true);
-      break;
+      case "accentColor":
+        setIsColorModalVisible(true);
+        break;
 
-    // -------- Support (NEW) --------
-    case "privacyPolicy":
-      router.push("/settings/(internal)/privacy-policy");
-      break;
+      // -------- Support (NEW) --------
+      case "privacyPolicy":
+        router.push("/settings/(internal)/privacy-policy");
+        break;
 
-    case "termsOfService":
-      router.push("/settings/(internal)/terms-condition");
-      break;
+      case "termsOfService":
+        router.push("/settings/(internal)/terms-condition");
+        break;
 
-    /*case "helpCenter":
-      router.push("/settings/(internal)/help-center"); // create file if needed
-      break;*/
+      case "helpCenter":
+        router.push("/settings/(internal)/help-center");
+        break;
 
-    /*case "contactUs":
-      router.push("/settings/(internal)/contact-us"); // create file if needed
-      break;*/
+      case "contactUs":
+        router.push("/settings/(internal)/contact-us");
+        break;
 
-    default:
-      Alert.alert("Action", `Perform ${action}`);
-  }
-};
+      default:
+        Alert.alert("Action", `Perform ${action}`);
+    }
+  };
 
 
   const handleLogout = async () => {

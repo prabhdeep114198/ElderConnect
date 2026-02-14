@@ -2,18 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
@@ -70,7 +69,7 @@ export default function RelaxingMusicScreen() {
   const player = useAudioPlayer();
   const status = useAudioPlayerStatus(player);
 
-  const FREESOUND_API_KEY = "cUBi6vZab4NtW0sC4dJpDFAnQGzRz0HVFTjwsV5c";
+  const FREESOUND_API_KEY = process.env.EXPO_PUBLIC_FREESOUND_API_KEY || process.env.FREESOUND_API_KEY;
 
   const fetchMusic = async (query: string) => {
     setLoading(true);
@@ -78,6 +77,12 @@ export default function RelaxingMusicScreen() {
       const url = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(query)}&fields=id,name,previews,duration,username&token=${FREESOUND_API_KEY}&page_size=15`;
       const res = await fetch(url);
       const data = await res.json();
+
+      if (!data || !data.results) {
+        console.error("Freesound API error or empty results:", data);
+        setTracks([]);
+        return;
+      }
 
       const formatted: Track[] = data.results.map((track: any) => ({
         id: track.id,
@@ -114,13 +119,13 @@ export default function RelaxingMusicScreen() {
   };
 
   const playNext = () => {
-    if (currentIndex === null) return;
+    if (currentIndex === null || tracks.length === 0) return;
     const nextIndex = (currentIndex + 1) % tracks.length;
     playTrack(nextIndex);
   };
 
   const playPrevious = () => {
-    if (currentIndex === null) return;
+    if (currentIndex === null || tracks.length === 0) return;
     const prevIndex = (currentIndex - 1 + tracks.length) % tracks.length;
     playTrack(prevIndex);
   };

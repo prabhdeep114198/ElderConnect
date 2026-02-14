@@ -52,7 +52,7 @@
           "bluetoothAlwaysPermission": "Allow ElderConnect to connect to your health devices."
         }
       ],
-      "expo-secure-store"
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
