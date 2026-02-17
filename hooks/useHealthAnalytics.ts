@@ -14,12 +14,17 @@ export const useHealthAnalytics = (options: AnalyticsQuery = {}) => {
         setLoading(true);
         setError(null);
         try {
-            const analyticsData = await analyticsService.getHealthAnalytics(user.id, {
+            const response = await analyticsService.getHealthAnalytics(user.id, {
                 granularity: options.granularity || TimeGranularity.DAY,
                 days: options.days || 30,
             });
-            setData(analyticsData.data);
+            console.log('[useHealthAnalytics] API Response:', JSON.stringify(response).substring(0, 200));
+
+            // Handle different possible response structures
+            const finalData = response.data || response;
+            setData(finalData);
         } catch (err: any) {
+            console.error('[useHealthAnalytics] API Error:', err);
             setError(err.message || 'Failed to fetch analytics');
         } finally {
             setLoading(false);

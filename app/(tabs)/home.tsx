@@ -24,8 +24,10 @@ import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-import { profileService } from "../../services/api/profile";
+import { usePersonalization } from "../../hooks/usePersonalization";
 import { deviceService } from "../../services/api/device";
+import { personalizationService } from "../../services/api/personalization";
+import { profileService } from "../../services/api/profile";
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -75,6 +77,8 @@ export default function HomeScreen() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
   const [aiMessage, setAiMessage] = useState<string>(t("aiGreeting") || "Select a feature to get started.");
+
+  const { data: personalizationData, loading: personalizationLoading, refetch: refetchPersonalization } = usePersonalization();
 
   // ============================================
   // API FUNCTIONS
@@ -145,8 +149,43 @@ export default function HomeScreen() {
   };
 
   const fetchAIMessage = async () => {
-    // This could call a specialized AI service or use the companion chat history
-    setAiMessage(t("aiDefaultTip") || "Staying active is the key to longevity. Have you taken your steps today?");
+    if (personalizationData?.dailyBriefing) {
+      setAiMessage(personalizationData.dailyBriefing);
+    } else {
+      setAiMessage(t("aiDefaultTip") || "Staying active is the key to longevity. Have you taken your steps today?");
+    }
+  };
+
+  // Smart Notifications based on personalization
+  useEffect(() => {
+    if (personalizationData?.recommendations) {
+      const highPriority = personalizationData.recommendations.filter(r => r.priority === 'high');
+      highPriority.forEach(rec => {
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `🎯 Personal Goal: ${rec.title}`,
+            body: rec.description,
+            data: { url: rec.actionUrl || '/(tabs)/home' },
+          },
+          trigger: null, // Immediate
+        });
+      });
+    }
+  }, [personalizationData]);
+
+  const handleRecommendationPress = async (rec: any) => {
+    if (user) {
+      await personalizationService.trackInteraction('recommendation_click', {
+        title: rec.title,
+        type: rec.type,
+      });
+    }
+
+    if (rec.actionUrl) {
+      router.push(rec.actionUrl as any);
+    } else {
+      Alert.alert(rec.title, rec.description);
+    }
   };
 
   // ============================================
@@ -362,6 +401,7 @@ export default function HomeScreen() {
       fetchHealthMetrics();
       fetchSchedule();
       fetchAIMessage();
+      refetchPersonalization();
     }, 5 * 60 * 1000);
 
     return () => {
@@ -369,6 +409,10 @@ export default function HomeScreen() {
       clearInterval(refreshInterval);
     };
   }, []);
+
+  useEffect(() => {
+    fetchAIMessage();
+  }, [personalizationData]);
 
   useEffect(() => {
     updateHealthMetrics();
@@ -415,6 +459,17 @@ export default function HomeScreen() {
       action: handleReminders,
     },
   ];
+
+  const getRecommendationIcon = (type: string) => {
+    switch (type) {
+      case 'event': return 'calendar';
+      case 'activity': return 'fitness';
+      case 'music': return 'musical-notes';
+      case 'medication': return 'medkit';
+      case 'social': return 'people';
+      default: return 'star';
+    }
+  };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
@@ -465,6 +520,34 @@ export default function HomeScreen() {
           ))}
         </View>
       </View>
+
+      {/* PERSONALIZED RECOMMENDATIONS */}
+      {personalizationData?.recommendations && personalizationData.recommendations.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>🎯 Personalized for You</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsScroll}>
+            {personalizationData.recommendations.map((rec, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.recCard, { backgroundColor: colors.card, borderColor: rec.priority === 'high' ? colors.warning : colors.border }]}
+                onPress={() => handleRecommendationPress(rec)}
+              >
+                <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
+                  <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
+                </View>
+                <Text style={[styles.recTitle, { color: colors.text }]} numberOfLines={1}>{rec.title}</Text>
+                <Text style={[styles.recDesc, { color: colors.mutedText }]} numberOfLines={2}>{rec.description}</Text>
+                {rec.reason && (
+                  <View style={styles.recReasonRow}>
+                    <Ionicons name="sparkles" size={12} color={colors.warning} />
+                    <Text style={[styles.recReason, { color: colors.warning }]}>AI Tip</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* REMINDER MODAL */}
       <Modal visible={showReminderModal} transparent animationType="slide">
@@ -607,6 +690,50 @@ export default function HomeScreen() {
    STYLES
 ---------------------------------------------------- */
 const styles = StyleSheet.create({
+  recsScroll: {
+    paddingRight: 20,
+  },
+  recCard: {
+    width: 200,
+    padding: 16,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  recDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  recReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  recReason: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
   container: { flex: 1 },
   contentContainer: { padding: 20 },
   header: { alignItems: "center", marginBottom: 30, paddingVertical: 20 },

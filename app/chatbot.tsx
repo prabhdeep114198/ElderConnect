@@ -8,17 +8,18 @@ import {
     KeyboardAvoidingView,
     Modal,
     Platform,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
-    SafeAreaView
+    View
 } from "react-native";
 
-import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { useWellnessProfile } from "../hooks/useWellnessProfile";
 import { chatService } from "../services/api/chat";
 
 interface Message {
@@ -42,6 +43,8 @@ export default function ChatbotScreen() {
     const { user } = useAuth();
     const { colors, theme } = useTheme();
     const { t } = useTranslation();
+
+    const { data: wellnessProfile } = useWellnessProfile();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -228,6 +231,37 @@ export default function ChatbotScreen() {
         }
     };
 
+    const renderWellnessPulse = () => {
+        if (!wellnessProfile) return null;
+
+        const scores = [
+            { label: 'Physical', value: wellnessProfile.physicalScore, icon: 'fitness', color: '#4CAF50' },
+            { label: 'Mental', value: wellnessProfile.mentalScore, icon: 'happy', color: '#9C27B0' },
+            { label: 'Social', value: wellnessProfile.socialScore, icon: 'people', color: '#2196F3' },
+            { label: 'Sleep', value: wellnessProfile.sleepScore, icon: 'moon', color: '#FF9800' },
+        ];
+
+        return (
+            <View style={[styles.pulseContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.pulseHeader}>
+                    <Text style={[styles.pulseTitle, { color: colors.text }]}>Today&apos;s Health Pulse</Text>
+                    <View style={[styles.riskBadge, { backgroundColor: wellnessProfile.riskLevel === 'high' ? colors.error : wellnessProfile.riskLevel === 'medium' ? colors.warning : colors.success }]}>
+                        <Text style={styles.riskBadgeText}>{wellnessProfile.riskLevel.toUpperCase()}</Text>
+                    </View>
+                </View>
+                <View style={styles.pulseGrid}>
+                    {scores.map((s, i) => (
+                        <View key={i} style={styles.pulseItem}>
+                            <Ionicons name={s.icon as any} size={16} color={s.color} />
+                            <Text style={[styles.pulseLabel, { color: colors.mutedText }]}>{s.label}</Text>
+                            <Text style={[styles.pulseValue, { color: colors.text }]}>{s.value}%</Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    };
+
     const renderChatList = () => (
         <Modal visible={showHistory} animationType="slide" transparent={false}>
             <SafeAreaView style={[styles.historyModal, { backgroundColor: colors.background }]}>
@@ -303,6 +337,7 @@ export default function ChatbotScreen() {
                 data={messages}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
+                ListHeaderComponent={renderWellnessPulse}
                 onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                 renderItem={({ item }) => (
                     <View
@@ -534,5 +569,54 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
+    },
+    pulseContainer: {
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    pulseHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    pulseTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    riskBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    riskBadgeText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    pulseGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+    },
+    pulseItem: {
+        alignItems: 'center',
+        width: '24%',
+    },
+    pulseLabel: {
+        fontSize: 10,
+        marginTop: 4,
+    },
+    pulseValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginTop: 2,
     },
 });

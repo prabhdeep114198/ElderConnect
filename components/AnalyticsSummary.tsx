@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
-import { Colors } from '../constants/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -13,9 +13,12 @@ interface StatCardProps {
     change?: number;
     icon: string;
     color: string;
+    target?: number;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, unit, trend, change, icon, color }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, unit, trend, change, icon, color, target }) => {
+    const { colors } = useTheme();
+
     const getTrendIcon = () => {
         switch (trend) {
             case 'increasing': return 'trending-up';
@@ -27,29 +30,58 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, unit, trend, change, 
 
     const getTrendColor = () => {
         switch (trend) {
-            case 'increasing': return Colors.success;
-            case 'decreasing': return Colors.error;
-            case 'stable': return Colors.mutedText;
-            default: return Colors.mutedText;
+            case 'increasing': return colors.success;
+            case 'decreasing': return colors.error;
+            case 'stable': return colors.mutedText;
+            default: return colors.mutedText;
         }
     };
 
+    const getProgress = () => {
+        if (!target) return 0;
+        const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.]/g, '')) : value;
+        return Math.min(100, (numValue / target) * 100);
+    };
+
     return (
-        <View style={[styles.card, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{title}</Text>
-                <Ionicons name={icon as any} size={20} color={color} />
+                <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+                    <Ionicons name={icon as any} size={20} color={color} />
+                </View>
+                {trend && (
+                    <View style={styles.trendIconContainer}>
+                        <Ionicons name={getTrendIcon()} size={16} color={getTrendColor()} />
+                    </View>
+                )}
             </View>
-            <View style={styles.cardBody}>
-                <Text style={styles.cardValue}>{value}</Text>
-                {unit && <Text style={styles.cardUnit}>{unit}</Text>}
+
+            <View style={styles.cardContent}>
+                <Text style={[styles.cardValue, { color: colors.text }]}>
+                    {value} <Text style={[styles.cardUnit, { color: colors.mutedText }]}>{unit}</Text>
+                </Text>
+                <Text style={[styles.cardTitle, { color: colors.mutedText }]}>{title}</Text>
             </View>
-            {trend && change !== undefined && (
-                <View style={styles.trendContainer}>
-                    <Ionicons name={getTrendIcon()} size={14} color={getTrendColor()} />
-                    <Text style={[styles.trendText, { color: getTrendColor() }]}>
-                        {Math.abs(change).toFixed(1)}% vs previous
+
+            {target && (
+                <View style={styles.progressSection}>
+                    <View style={[styles.progressBar, { backgroundColor: colors.background }]}>
+                        <View style={[styles.progressFill, { width: `${getProgress()}%`, backgroundColor: color }]} />
+                    </View>
+                    <Text style={[styles.progressText, { color: colors.mutedText }]}>
+                        {Math.round(getProgress())}% of goal
                     </Text>
+                </View>
+            )}
+
+            {trend && change !== undefined && (
+                <View style={styles.trendFooter}>
+                    <View style={styles.trendBadge}>
+                        <Ionicons name={getTrendIcon()} size={14} color={getTrendColor()} />
+                        <Text style={[styles.trendFooterText, { color: getTrendColor() }]}>
+                            {Math.abs(change).toFixed(1)}% vs previous
+                        </Text>
+                    </View>
                 </View>
             )}
         </View>
@@ -62,23 +94,36 @@ interface AnalyticsSummaryProps {
     medication?: any;
     social?: any;
     safety?: any;
+    wellnessProfile?: any;
 }
 
-const AnalyticsSummary: React.FC<AnalyticsSummaryProps> = ({ statistics, trends, medication, social, safety }) => {
+const AnalyticsSummary: React.FC<AnalyticsSummaryProps> = ({ statistics, trends, medication, social, safety, wellnessProfile }) => {
+    const { colors } = useTheme();
+
     if (!statistics || !trends) return null;
 
-    const getSafetyColor = (status: string) => {
-        switch (status) {
-            case 'safe': return Colors.success;
-            case 'notice': return Colors.warning;
-            case 'warning': return Colors.error;
-            default: return Colors.mutedText;
-        }
-    };
+    // Use backend wellness scores if available, otherwise calculate fallback
+    const wellnessScore = wellnessProfile?.physicalScore || Math.round(
+        (Math.min(100, (statistics.steps.avg / 8000) * 100) +
+            Math.min(100, (statistics.sleep.avg / 8) * 100) +
+            Math.min(100, (statistics.water.avg / 2000) * 100) +
+            (medication?.adherenceRate || 80)) / 4
+    );
+
+    const sleepScore = wellnessProfile?.sleepScore || (statistics.sleep.avg / 8) * 100;
 
     return (
         <View style={styles.container}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Today's Metrics</Text>
             <View style={styles.grid}>
+                <StatCard
+                    title="Overall Wellness"
+                    value={wellnessScore}
+                    unit="%"
+                    icon="fitness"
+                    color={wellnessScore > 75 ? colors.success : wellnessScore > 50 ? colors.warning : colors.error}
+                    target={100}
+                />
                 <StatCard
                     title="Avg Heart Rate"
                     value={Math.round(statistics.heartRate.avg)}
@@ -86,62 +131,64 @@ const AnalyticsSummary: React.FC<AnalyticsSummaryProps> = ({ statistics, trends,
                     trend={trends.heartRate.trend}
                     change={trends.heartRate.change}
                     icon="heart"
-                    color={Colors.error}
+                    color={colors.error}
                 />
                 <StatCard
                     title="Daily Steps"
-                    value={Math.round(statistics.steps.avg).toLocaleString()}
+                    value={Math.round(statistics.steps.avg)}
                     unit="steps"
                     trend={trends.steps.trend}
                     change={trends.steps.change}
                     icon="walk"
-                    color={Colors.primary}
+                    color={colors.primary}
+                    target={8000}
                 />
                 <StatCard
-                    title="Avg Sleep"
-                    value={statistics.sleep.avg.toFixed(1)}
-                    unit="hrs"
+                    title="Sleep Quality"
+                    value={Math.round(sleepScore)}
+                    unit="score"
                     trend={trends.sleep.trend}
                     change={trends.sleep.change}
                     icon="moon"
                     color="#8B5CF6"
+                    target={100}
                 />
                 <StatCard
-                    title="Avg Water"
+                    title="Avg Hydration"
                     value={Math.round(statistics.water.avg)}
                     unit="ml"
                     trend={trends.water.trend}
                     change={trends.water.change}
                     icon="water"
                     color="#06B6D4"
+                    target={2000}
+                />
+                <StatCard
+                    title="Mental Score"
+                    value={wellnessProfile?.mentalScore || 70}
+                    unit="%"
+                    icon="happy"
+                    color="#9C27B0"
+                    target={100}
                 />
                 {medication && (
                     <StatCard
-                        title="Medication Adherence"
-                        value={`${medication.adherenceRate}%`}
-                        unit=""
+                        title="Medications"
+                        value={wellnessProfile?.medicationAdherence ?? medication.adherenceRate}
+                        unit="%"
                         icon="medkit"
                         color="#10B981"
-                        trend={medication.adherenceRate >= 90 ? 'stable' : 'decreasing'}
-                        change={0}
+                        target={100}
                     />
                 )}
                 {social && (
                     <StatCard
                         title="Social Engagement"
-                        value={`${social.engagementScore}%`}
-                        unit=""
+                        value={wellnessProfile?.socialScore || social.engagementScore}
+                        unit="%"
                         icon="people"
                         color="#6366F1"
-                    />
-                )}
-                {safety && (
-                    <StatCard
-                        title="Safety Status"
-                        value={safety.status.toUpperCase()}
-                        unit=""
-                        icon="shield-checkmark"
-                        color={getSafetyColor(safety.status)}
+                        target={100}
                     />
                 )}
             </View>
@@ -151,7 +198,12 @@ const AnalyticsSummary: React.FC<AnalyticsSummaryProps> = ({ statistics, trends,
 
 const styles = StyleSheet.create({
     container: {
-        marginVertical: 10,
+        marginVertical: 16,
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 16,
     },
     grid: {
         flexDirection: 'row',
@@ -159,51 +211,76 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     card: {
-        width: (width - 48) / 2, // Slightly adjusted for better padding
-        backgroundColor: Colors.card,
-        padding: 12,
-        borderRadius: 12,
-        marginBottom: 12,
+        width: (width - 48) / 2,
+        padding: 16,
+        borderRadius: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 2,
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
-    cardTitle: {
-        fontSize: 12,
-        color: Colors.mutedText,
-        fontWeight: '600',
+    iconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    cardBody: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
+    trendIconContainer: {
+        padding: 4,
+    },
+    cardContent: {
+        marginBottom: 12,
     },
     cardValue: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: Colors.text,
+        fontWeight: '800',
     },
     cardUnit: {
         fontSize: 12,
-        color: Colors.mutedText,
-        marginLeft: 4,
+        fontWeight: '600',
     },
-    trendContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    cardTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    progressSection: {
         marginTop: 8,
     },
-    trendText: {
+    progressBar: {
+        height: 6,
+        borderRadius: 3,
+        marginBottom: 4,
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    progressText: {
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    trendFooter: {
+        marginTop: 8,
+    },
+    trendBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    trendFooterText: {
         fontSize: 11,
+        fontWeight: 'bold',
         marginLeft: 4,
-        fontWeight: '500',
     },
 });
 

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ActivityIndicator, Dimensions, StyleSheet, Text, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
@@ -10,11 +11,18 @@ interface TrendChartsProps {
     loading?: boolean;
 }
 
-const TrendCharts: React.FC<TrendChartsProps> = ({ timeSeries, loading }) => {
-    if (loading) {
+const TrendCharts: React.FC<TrendChartsProps> = ({ timeSeries = [], loading }) => {
+    console.log('[TrendCharts] Data:', {
+        count: timeSeries?.length || 0,
+        firstPoint: timeSeries?.[0],
+        loading
+    });
+
+    if (loading && (!timeSeries || timeSeries.length === 0)) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
+                <ActivityIndicator size="large" color="#2E5EAA" />
+                <Text style={{ marginTop: 10, color: '#666' }}>Loading charts...</Text>
             </View>
         );
     }
@@ -22,22 +30,30 @@ const TrendCharts: React.FC<TrendChartsProps> = ({ timeSeries, loading }) => {
     if (!timeSeries || timeSeries.length === 0) {
         return (
             <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No trend data available for the selected period.</Text>
+                <Ionicons name="stats-chart-outline" size={32} color="#999" />
+                <Text style={styles.emptyText}>No trend data available for this period.</Text>
+                <Text style={[styles.emptyText, { fontSize: 12, marginTop: 4 }]}>
+                    Try seeding or tracking more metrics.
+                </Text>
             </View>
         );
     }
 
     // Transform data for charts
-    const heartRateData = timeSeries.map(d => ({
-        value: d.heartRate.avg,
-        label: d.period.split('-').slice(1).join('/'), // MM/DD
-        dataPointText: Math.round(d.heartRate.avg).toString(),
-    }));
+    const heartRateData = timeSeries
+        .filter(d => d && d.heartRate)
+        .map(d => ({
+            value: parseFloat(d.heartRate.avg) || 0,
+            label: d.period ? String(d.period).split('-').slice(1).join('/') : '',
+            dataPointText: Math.round(d.heartRate.avg).toString(),
+        }));
 
-    const stepsData = timeSeries.map(d => ({
-        value: d.steps.avg,
-        label: d.period.split('-').slice(1).join('/'),
-    }));
+    const stepsData = timeSeries
+        .filter(d => d && d.steps)
+        .map(d => ({
+            value: parseFloat(d.steps.avg) || 0,
+            label: d.period ? String(d.period).split('-').slice(1).join('/') : '',
+        }));
 
     return (
         <View style={styles.container}>
