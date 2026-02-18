@@ -33,4 +33,10 @@ export const analyticsService = {
 
     getCorrelationAnalysis: (userId: string, days: number = 90) =>
         api.get<any>(`/v1/users/${userId}/analytics/correlation`, { params: { days: days.toString() } }),
+
+    getWellnessProfile: (userId: string) =>
+        api.get<any>(`/v1/users/${userId}/analytics/wellness-profile`),
+
+    seedData: (userId: string) =>
+        api.get<any>(`/v1/users/${userId}/analytics/seed`),
 };

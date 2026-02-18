@@ -27,9 +27,16 @@ import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
+<<<<<<< HEAD
 import { deviceService } from "../../services/api/device";
 import { profileService } from "../../services/api/profile";
 import { getRemindersKey } from "../../utils/userStorageKeys";
+=======
+import { usePersonalization } from "../../hooks/usePersonalization";
+import { deviceService } from "../../services/api/device";
+import { InteractionType, personalizationService } from "../../services/api/personalization";
+import { profileService } from "../../services/api/profile";
+>>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -88,6 +95,8 @@ export default function HomeScreen() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
   const [aiMessage, setAiMessage] = useState<string>(t("aiGreeting") || "Select a feature to get started.");
+
+  const { data: personalizationData, loading: personalizationLoading, refetch: refetchPersonalization } = usePersonalization();
 
   // ============================================
   // API FUNCTIONS
@@ -160,7 +169,7 @@ export default function HomeScreen() {
 
 
   const updateHealthData = async (type: string, value: any) => {
-    if (!user) return;
+    if (!user || !user.id) return;
     try {
       await profileService.updateHealthMetric(user.id, { type, value });
     } catch (error) {
@@ -169,8 +178,63 @@ export default function HomeScreen() {
   };
 
   const fetchAIMessage = async () => {
-    // This could call a specialized AI service or use the companion chat history
-    setAiMessage(t("aiDefaultTip") || "Staying active is the key to longevity. Have you taken your steps today?");
+    if (personalizationData?.dailyBriefing) {
+      setAiMessage(personalizationData.dailyBriefing);
+    } else {
+      setAiMessage(t("aiDefaultTip") || "Staying active is the key to longevity. Have you taken your steps today?");
+    }
+  };
+
+  // Smart Notifications based on personalization
+  useEffect(() => {
+    if (personalizationData?.recommendations) {
+      // Track views
+      personalizationData.recommendations.forEach(rec => {
+        personalizationService.trackInteraction(InteractionType.CONTENT_VIEW, {
+          title: rec.title,
+          type: rec.type,
+        });
+      });
+
+      const highPriority = personalizationData.recommendations.filter(r => r.priority === 'high');
+      highPriority.forEach(rec => {
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `🎯 Personal Goal: ${rec.title}`,
+            body: rec.description,
+            data: { url: rec.actionUrl || '/(tabs)/home' },
+          },
+          trigger: null, // Immediate
+        });
+      });
+    }
+  }, [personalizationData]);
+
+  const handleRecommendationPress = async (rec: any) => {
+    if (user) {
+      await personalizationService.trackInteraction(InteractionType.FEATURE_USE, {
+        feature: 'recommendation_click',
+        title: rec.title,
+        type: rec.type,
+      });
+    }
+
+    if (rec.actionUrl) {
+      router.push(rec.actionUrl as any);
+    } else {
+      Alert.alert(rec.title, rec.description);
+    }
+  };
+
+  const handleDismissRecommendation = async (rec: any) => {
+    if (user) {
+      await personalizationService.trackInteraction(InteractionType.CONTENT_DISMISS, {
+        title: rec.title,
+        type: rec.type,
+      });
+      // In a real app, we would also update local state to hide it until next refresh
+      refetchPersonalization();
+    }
   };
 
   // ============================================
@@ -183,10 +247,14 @@ export default function HomeScreen() {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
 
-      const result = await Pedometer.getStepCountAsync(start, end);
-      if (result) {
-        setSteps(result.steps);
-        updateHealthMetrics();
+      try {
+        const result = await Pedometer.getStepCountAsync(start, end);
+        if (result) {
+          setSteps(result.steps);
+          updateHealthMetrics();
+        }
+      } catch (e) {
+        console.log("Pedometer search not supported on this device/range", e);
       }
 
       // Subscribe to updates
@@ -371,6 +439,7 @@ export default function HomeScreen() {
         fetchSchedule();
       }
       fetchAIMessage();
+      refetchPersonalization();
     }, 5 * 60 * 1000);
 
     return () => {
@@ -380,11 +449,15 @@ export default function HomeScreen() {
   }, [user]);
 
   useEffect(() => {
+    fetchAIMessage();
+  }, [personalizationData]);
+
+  useEffect(() => {
     updateHealthMetrics();
 
     // Sync to backend periodically or on change (debounced)
     const timeoutId = setTimeout(() => {
-      if (user) {
+      if (user && user.id) {
         updateHealthData('steps', steps);
         updateHealthData('heartRate', heartRate);
         updateHealthData('sleep', sleepHours);
@@ -425,7 +498,19 @@ export default function HomeScreen() {
     },
   ];
 
+  const getRecommendationIcon = (type: string) => {
+    switch (type) {
+      case 'event': return 'calendar';
+      case 'activity': return 'fitness';
+      case 'music': return 'musical-notes';
+      case 'medication': return 'medkit';
+      case 'social': return 'people';
+      default: return 'star';
+    }
+  };
+
   return (
+<<<<<<< HEAD
     <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <View style={isDesktop ? styles.desktopMainLayout : null}>
@@ -434,6 +519,119 @@ export default function HomeScreen() {
               <Text style={[styles.greeting, { color: colors.primary, fontSize: getFontSize(isSenior ? 34 : 28) }]}>{greeting}!</Text>
               <Text style={[styles.time, { color: colors.text, fontSize: getFontSize(isSenior ? 48 : 36) }]}>
                 {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+=======
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.header}>
+        <Text style={[styles.greeting, { color: colors.primary }]}>{greeting}!</Text>
+        <Text style={[styles.time, { color: colors.text }]}>
+          {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </Text>
+        <Text style={[styles.date, { color: colors.mutedText }]}>
+          {currentTime.toLocaleDateString(i18n.language, {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </Text>
+      </View>
+
+      {!user && (
+        <TouchableOpacity
+          style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+          onPress={() => router.push("/auth/login")}
+        >
+          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
+          <View style={styles.guestCtaContent}>
+            <Text style={[styles.guestCtaTitle, { color: colors.primary }]}>{t("signInToUnlock") || "Sign in to unlock full access"}</Text>
+            <Text style={[styles.guestCtaSubtitle, { color: colors.mutedText }]}>
+              {t("guestModeMessage") || "Enjoy personalized health tracking and stay connected with your family."}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
+      {/* QUICK ACTIONS */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("quickActions")}</Text>
+        <View style={styles.quickActionsGrid}>
+          {quickActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.quickActionCard, { backgroundColor: action.color }]}
+              onPress={action.action}
+            >
+              <Ionicons name={action.icon as any} size={24} color={colors.buttonText} />
+              <Text style={[styles.quickActionText, { color: colors.buttonText }]}>{action.title}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* PERSONALIZED RECOMMENDATIONS */}
+      {personalizationData?.recommendations && personalizationData.recommendations.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>🎯 Personalized for You</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsScroll}>
+            {personalizationData.recommendations.map((rec, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.recCard, { backgroundColor: colors.card, borderColor: rec.priority === 'high' ? colors.warning : colors.border }]}
+                onPress={() => handleRecommendationPress(rec)}
+              >
+                <View style={styles.recCardHeader}>
+                  <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.dismissButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDismissRecommendation(rec);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.mutedText} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.recTitle, { color: colors.text }]} numberOfLines={1}>{rec.title}</Text>
+                <Text style={[styles.recDesc, { color: colors.mutedText }]} numberOfLines={2}>{rec.description}</Text>
+                {rec.reason && (
+                  <View style={styles.recReasonRow}>
+                    <Ionicons name="sparkles" size={12} color={colors.warning} />
+                    <Text style={[styles.recReason, { color: colors.warning }]}>AI Tip</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* REMINDER MODAL */}
+      <Modal visible={showReminderModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.appleModalBox, { backgroundColor: theme === 'dark' ? colors.card : "#F2F2F7" }]}>
+            <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowReminderModal(false);
+                  setMode("date");
+                }}
+              >
+                <Text style={styles.cancelText}>{t("cancel")}</Text>
+              </TouchableOpacity>
+              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>{t("addReminder")}</Text>
+              <TouchableOpacity onPress={scheduleReminder}>
+                <Text style={styles.saveText}>{t("saveChanges")}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
+              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>{t("remindMeAt")}</Text>
+              <Text style={[styles.selectedTime, { color: colors.text }]}>
+                {selectedDate.toLocaleString()}
+>>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
               </Text>
               {!isSenior && (
                 <Text style={[styles.date, { color: colors.mutedText, fontSize: getFontSize(16) }]}>
@@ -706,6 +904,58 @@ export default function HomeScreen() {
    STYLES
 ---------------------------------------------------- */
 const styles = StyleSheet.create({
+  recsScroll: {
+    paddingRight: 20,
+  },
+  recCard: {
+    width: 200,
+    padding: 16,
+    borderRadius: 20,
+    marginRight: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  dismissButton: {
+    padding: 2,
+  },
+  recIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  recDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  recReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 'auto',
+  },
+  recReason: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
   container: { flex: 1 },
   contentContainer: { padding: 20 },
   header: { alignItems: "center", marginBottom: 30, paddingVertical: 20 },

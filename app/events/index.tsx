@@ -13,8 +13,13 @@ import { useTheme } from "../../context/ThemeContext";
 
 // ... imports ...
 
+<<<<<<< HEAD
 import { profileService } from "../../services/api/profile";
 import { useAuth } from "../../context/AuthContext";
+=======
+import { fetchMockEvents, Event as MockEvent } from "../../services/MockEventService";
+import { InteractionType, personalizationService } from "../../services/api/personalization";
+>>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 export default function EventsHomePage() {
   const { colors, theme } = useTheme();
@@ -95,15 +100,20 @@ export default function EventsHomePage() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() =>
+            onPress={() => {
+              personalizationService.trackInteraction(InteractionType.EVENT_VIEW, {
+                id: item.id,
+                name: item.name,
+                category: item.category
+              });
               router.push({
                 pathname: "/events/[id]",
                 params: {
                   id: item.id,
                   event: JSON.stringify(item),
                 },
-              })
-            }
+              });
+            }}
           >
             <View style={styles.cardHeader}>
               <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>

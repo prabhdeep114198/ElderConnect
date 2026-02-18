@@ -14,10 +14,14 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+<<<<<<< HEAD
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
+=======
+import { InteractionType, personalizationService } from "../services/api/personalization";
+>>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 interface Track {
   id: number;
@@ -108,6 +112,13 @@ export default function RelaxingMusicScreen() {
     player.replace(tracks[index].audio);
     setCurrentIndex(index);
     player.play();
+
+    // Track interaction for personalization
+    personalizationService.trackInteraction(InteractionType.MUSIC_PLAY, {
+      id: tracks[index].id,
+      name: tracks[index].name,
+      genre: 'relaxing' // Default genre from fetch
+    });
   };
 
   const togglePause = async () => {
