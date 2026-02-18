@@ -37,7 +37,7 @@ interface DiaryEntry {
   activity: ActivityValue[];
 }
 
-const API_URL = "http://192.168.1.6:3000"; // Replace with your backend URL
+const API_URL = "http://192.168.1.9:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();
