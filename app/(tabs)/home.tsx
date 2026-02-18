@@ -26,7 +26,7 @@ const { width } = Dimensions.get("window");
 
 import { usePersonalization } from "../../hooks/usePersonalization";
 import { deviceService } from "../../services/api/device";
-import { personalizationService } from "../../services/api/personalization";
+import { InteractionType, personalizationService } from "../../services/api/personalization";
 import { profileService } from "../../services/api/profile";
 
 // NOTIFICATION HANDLER
@@ -140,7 +140,7 @@ export default function HomeScreen() {
 
 
   const updateHealthData = async (type: string, value: any) => {
-    if (!user) return;
+    if (!user || !user.id) return;
     try {
       await profileService.updateHealthMetric(user.id, { type, value });
     } catch (error) {
@@ -159,6 +159,14 @@ export default function HomeScreen() {
   // Smart Notifications based on personalization
   useEffect(() => {
     if (personalizationData?.recommendations) {
+      // Track views
+      personalizationData.recommendations.forEach(rec => {
+        personalizationService.trackInteraction(InteractionType.CONTENT_VIEW, {
+          title: rec.title,
+          type: rec.type,
+        });
+      });
+
       const highPriority = personalizationData.recommendations.filter(r => r.priority === 'high');
       highPriority.forEach(rec => {
         Notifications.scheduleNotificationAsync({
@@ -175,7 +183,8 @@ export default function HomeScreen() {
 
   const handleRecommendationPress = async (rec: any) => {
     if (user) {
-      await personalizationService.trackInteraction('recommendation_click', {
+      await personalizationService.trackInteraction(InteractionType.FEATURE_USE, {
+        feature: 'recommendation_click',
         title: rec.title,
         type: rec.type,
       });
@@ -185,6 +194,17 @@ export default function HomeScreen() {
       router.push(rec.actionUrl as any);
     } else {
       Alert.alert(rec.title, rec.description);
+    }
+  };
+
+  const handleDismissRecommendation = async (rec: any) => {
+    if (user) {
+      await personalizationService.trackInteraction(InteractionType.CONTENT_DISMISS, {
+        title: rec.title,
+        type: rec.type,
+      });
+      // In a real app, we would also update local state to hide it until next refresh
+      refetchPersonalization();
     }
   };
 
@@ -198,10 +218,14 @@ export default function HomeScreen() {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
 
-      const result = await Pedometer.getStepCountAsync(start, end);
-      if (result) {
-        setSteps(result.steps);
-        updateHealthMetrics();
+      try {
+        const result = await Pedometer.getStepCountAsync(start, end);
+        if (result) {
+          setSteps(result.steps);
+          updateHealthMetrics();
+        }
+      } catch (e) {
+        console.log("Pedometer search not supported on this device/range", e);
       }
 
       // Subscribe to updates
@@ -419,7 +443,7 @@ export default function HomeScreen() {
 
     // Sync to backend periodically or on change (debounced)
     const timeoutId = setTimeout(() => {
-      if (user) {
+      if (user && user.id) {
         updateHealthData('steps', steps);
         updateHealthData('heartRate', heartRate);
         updateHealthData('sleep', sleepHours);
@@ -532,8 +556,19 @@ export default function HomeScreen() {
                 style={[styles.recCard, { backgroundColor: colors.card, borderColor: rec.priority === 'high' ? colors.warning : colors.border }]}
                 onPress={() => handleRecommendationPress(rec)}
               >
-                <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
+                <View style={styles.recCardHeader}>
+                  <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.dismissButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDismissRecommendation(rec);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.mutedText} />
+                  </TouchableOpacity>
                 </View>
                 <Text style={[styles.recTitle, { color: colors.text }]} numberOfLines={1}>{rec.title}</Text>
                 <Text style={[styles.recDesc, { color: colors.mutedText }]} numberOfLines={2}>{rec.description}</Text>
@@ -704,6 +739,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  recCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  dismissButton: {
+    padding: 2,
   },
   recIconBadge: {
     width: 44,

@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useWellnessProfile } from "../hooks/useWellnessProfile";
 import { chatService } from "../services/api/chat";
+import { ChatbotContext, InteractionType, personalizationService } from "../services/api/personalization";
 
 interface Message {
     id: string;
@@ -45,6 +46,7 @@ export default function ChatbotScreen() {
     const { t } = useTranslation();
 
     const { data: wellnessProfile } = useWellnessProfile();
+    const [chatbotContext, setChatbotContext] = useState<ChatbotContext | null>(null);
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -60,8 +62,19 @@ export default function ChatbotScreen() {
     useEffect(() => {
         if (user) {
             loadSessions();
+            fetchChatbotContext();
+            personalizationService.trackInteraction(InteractionType.FEATURE_USE, { feature: 'chatbot' });
         }
     }, [user]);
+
+    const fetchChatbotContext = async () => {
+        try {
+            const response = await personalizationService.getChatbotContext();
+            setChatbotContext(response.data);
+        } catch (error) {
+            console.error("Failed to fetch chatbot context", error);
+        }
+    };
 
     // Save when messages change
     useEffect(() => {
@@ -249,6 +262,18 @@ export default function ChatbotScreen() {
                         <Text style={styles.riskBadgeText}>{wellnessProfile.riskLevel.toUpperCase()}</Text>
                     </View>
                 </View>
+
+                {chatbotContext?.primaryConcerns && chatbotContext.primaryConcerns.length > 0 && (
+                    <View style={styles.concernsContainer}>
+                        {chatbotContext.primaryConcerns.map((concern, idx) => (
+                            <View key={idx} style={[styles.concernBadge, { backgroundColor: colors.error + '20' }]}>
+                                <Ionicons name="alert-circle" size={12} color={colors.error} />
+                                <Text style={[styles.concernText, { color: colors.error }]}>{concern}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
                 <View style={styles.pulseGrid}>
                     {scores.map((s, i) => (
                         <View key={i} style={styles.pulseItem}>
@@ -618,5 +643,23 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         marginTop: 2,
+    },
+    concernsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 16,
+        gap: 8,
+    },
+    concernBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    concernText: {
+        fontSize: 11,
+        fontWeight: 'bold',
     },
 });
