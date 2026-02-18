@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
+import { InteractionType, personalizationService } from "../services/api/personalization";
 
 const { width } = Dimensions.get("window");
 
@@ -108,6 +109,13 @@ export default function RelaxingMusicScreen() {
     player.replace(tracks[index].audio);
     setCurrentIndex(index);
     player.play();
+
+    // Track interaction for personalization
+    personalizationService.trackInteraction(InteractionType.MUSIC_PLAY, {
+      id: tracks[index].id,
+      name: tracks[index].name,
+      genre: 'relaxing' // Default genre from fetch
+    });
   };
 
   const togglePause = async () => {
