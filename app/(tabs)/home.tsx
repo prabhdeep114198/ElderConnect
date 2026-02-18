@@ -27,16 +27,11 @@ import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
-<<<<<<< HEAD
-import { deviceService } from "../../services/api/device";
-import { profileService } from "../../services/api/profile";
-import { getRemindersKey } from "../../utils/userStorageKeys";
-=======
 import { usePersonalization } from "../../hooks/usePersonalization";
 import { deviceService } from "../../services/api/device";
 import { InteractionType, personalizationService } from "../../services/api/personalization";
 import { profileService } from "../../services/api/profile";
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
+import { getRemindersKey } from "../../utils/userStorageKeys";
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -360,7 +355,7 @@ export default function HomeScreen() {
     // Navigate to the countdown screen instead of triggering immediately
     // This allows the user to cancel if it was accidental (User is OK)
     router.push({
-      pathname: "/fall-detected",
+      pathname: "/fall-detected" as any,
       params: { type: 'manual' }
     });
   };
@@ -373,7 +368,7 @@ export default function HomeScreen() {
       }
 
       // Navigate to video call screen
-      router.push("/VideoCallScreen");
+      router.push("/videocall" as any);
     });
   };
 
@@ -394,7 +389,7 @@ export default function HomeScreen() {
 
   const handleReminders = () => {
     requireAuth(() => {
-      router.push("/reminders");
+      router.push("/reminders" as any);
     });
   };
 
@@ -510,7 +505,6 @@ export default function HomeScreen() {
   };
 
   return (
-<<<<<<< HEAD
     <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <View style={isDesktop ? styles.desktopMainLayout : null}>
@@ -519,119 +513,6 @@ export default function HomeScreen() {
               <Text style={[styles.greeting, { color: colors.primary, fontSize: getFontSize(isSenior ? 34 : 28) }]}>{greeting}!</Text>
               <Text style={[styles.time, { color: colors.text, fontSize: getFontSize(isSenior ? 48 : 36) }]}>
                 {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-=======
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={[styles.greeting, { color: colors.primary }]}>{greeting}!</Text>
-        <Text style={[styles.time, { color: colors.text }]}>
-          {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </Text>
-        <Text style={[styles.date, { color: colors.mutedText }]}>
-          {currentTime.toLocaleDateString(i18n.language, {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </Text>
-      </View>
-
-      {!user && (
-        <TouchableOpacity
-          style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-          onPress={() => router.push("/auth/login")}
-        >
-          <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
-          <View style={styles.guestCtaContent}>
-            <Text style={[styles.guestCtaTitle, { color: colors.primary }]}>{t("signInToUnlock") || "Sign in to unlock full access"}</Text>
-            <Text style={[styles.guestCtaSubtitle, { color: colors.mutedText }]}>
-              {t("guestModeMessage") || "Enjoy personalized health tracking and stay connected with your family."}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-        </TouchableOpacity>
-      )}
-
-      {/* QUICK ACTIONS */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("quickActions")}</Text>
-        <View style={styles.quickActionsGrid}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.quickActionCard, { backgroundColor: action.color }]}
-              onPress={action.action}
-            >
-              <Ionicons name={action.icon as any} size={24} color={colors.buttonText} />
-              <Text style={[styles.quickActionText, { color: colors.buttonText }]}>{action.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* PERSONALIZED RECOMMENDATIONS */}
-      {personalizationData?.recommendations && personalizationData.recommendations.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>🎯 Personalized for You</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsScroll}>
-            {personalizationData.recommendations.map((rec, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.recCard, { backgroundColor: colors.card, borderColor: rec.priority === 'high' ? colors.warning : colors.border }]}
-                onPress={() => handleRecommendationPress(rec)}
-              >
-                <View style={styles.recCardHeader}>
-                  <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
-                  </View>
-                  <TouchableOpacity
-                    style={styles.dismissButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDismissRecommendation(rec);
-                    }}
-                  >
-                    <Ionicons name="close-circle" size={20} color={colors.mutedText} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={[styles.recTitle, { color: colors.text }]} numberOfLines={1}>{rec.title}</Text>
-                <Text style={[styles.recDesc, { color: colors.mutedText }]} numberOfLines={2}>{rec.description}</Text>
-                {rec.reason && (
-                  <View style={styles.recReasonRow}>
-                    <Ionicons name="sparkles" size={12} color={colors.warning} />
-                    <Text style={[styles.recReason, { color: colors.warning }]}>AI Tip</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* REMINDER MODAL */}
-      <Modal visible={showReminderModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.appleModalBox, { backgroundColor: theme === 'dark' ? colors.card : "#F2F2F7" }]}>
-            <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowReminderModal(false);
-                  setMode("date");
-                }}
-              >
-                <Text style={styles.cancelText}>{t("cancel")}</Text>
-              </TouchableOpacity>
-              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>{t("addReminder")}</Text>
-              <TouchableOpacity onPress={scheduleReminder}>
-                <Text style={styles.saveText}>{t("saveChanges")}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.timeDisplayContainer, { backgroundColor: colors.card }]}>
-              <Text style={[styles.selectedTimeLabel, { color: colors.mutedText }]}>{t("remindMeAt")}</Text>
-              <Text style={[styles.selectedTime, { color: colors.text }]}>
-                {selectedDate.toLocaleString()}
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
               </Text>
               {!isSenior && (
                 <Text style={[styles.date, { color: colors.mutedText, fontSize: getFontSize(16) }]}>
@@ -671,7 +552,7 @@ export default function HomeScreen() {
                         alignSelf: 'flex-start',
                         backgroundColor: colors.success
                       }}
-                      onPress={() => router.push("/fall-detected")}
+                      onPress={() => router.push("/fall-detected" as any)}
                     >
                       <Ionicons name="play" size={16} color="#FFF" />
                       <Text style={{
@@ -689,7 +570,7 @@ export default function HomeScreen() {
             {!user && (
               <TouchableOpacity
                 style={[styles.guestCta, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-                onPress={() => router.push("/auth/login")}
+                onPress={() => router.push("/auth/login" as any)}
               >
                 <Ionicons name="person-circle-outline" size={24} color={colors.primary} />
                 <View style={styles.guestCtaContent}>
@@ -729,6 +610,45 @@ export default function HomeScreen() {
                 ))}
               </View>
             </View>
+
+            {/* PERSONALIZED RECOMMENDATIONS */}
+            {personalizationData?.recommendations && personalizationData.recommendations.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>🎯 Personalized for You</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsScroll}>
+                  {personalizationData.recommendations.map((rec: any, index: number) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.recCard, { backgroundColor: colors.card, borderColor: rec.priority === 'high' ? colors.warning : colors.border }]}
+                      onPress={() => handleRecommendationPress(rec)}
+                    >
+                      <View style={styles.recCardHeader}>
+                        <View style={[styles.recIconBadge, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name={getRecommendationIcon(rec.type) as any} size={24} color={colors.primary} />
+                        </View>
+                        <TouchableOpacity
+                          style={styles.dismissButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleDismissRecommendation(rec);
+                          }}
+                        >
+                          <Ionicons name="close-circle" size={20} color={colors.mutedText} />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={[styles.recTitle, { color: colors.text }]} numberOfLines={1}>{rec.title}</Text>
+                      <Text style={[styles.recDesc, { color: colors.mutedText }]} numberOfLines={2}>{rec.description}</Text>
+                      {rec.reason && (
+                        <View style={styles.recReasonRow}>
+                          <Ionicons name="sparkles" size={12} color={colors.warning} />
+                          <Text style={[styles.recReason, { color: colors.warning }]}>AI Tip</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             {/* WELLNESS & MIND */}
             <View style={styles.section}>
@@ -839,22 +759,23 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* AI COMPANION */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
-            <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
-              <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
-              <View style={styles.companionContent}>
-                <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
-                <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+          <View style={isDesktop ? styles.desktopRightColumn : null}>
+            {/* AI COMPANION */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
+              <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
+                <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
+                <View style={styles.companionContent}>
+                  <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
+                  <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+                </View>
               </View>
+              <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
+                <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
-              <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
-            </TouchableOpacity>
           </View>
         </View>
-
 
         {/* REMINDER MODAL remains full width logic, but centered */}
         <Modal visible={showReminderModal} transparent animationType="slide">

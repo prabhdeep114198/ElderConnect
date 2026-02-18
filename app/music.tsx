@@ -14,14 +14,11 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-<<<<<<< HEAD
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useTheme } from "../context/ThemeContext";
+import { InteractionType, personalizationService } from "../services/api/personalization";
 
 const { width } = Dimensions.get("window");
-=======
-import { InteractionType, personalizationService } from "../services/api/personalization";
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 interface Track {
   id: number;

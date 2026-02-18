@@ -16,13 +16,10 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
-<<<<<<< HEAD
 import { useAuth } from "../../context/AuthContext";
 import { getTicketsKey } from "../../utils/userStorageKeys";
 import { profileService } from "../../services/api/profile";
-=======
 import { InteractionType, personalizationService } from "../../services/api/personalization";
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 interface Event {
   id: string;

@@ -596,9 +596,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
     },
-<<<<<<< HEAD
-});
-=======
     pulseContainer: {
         borderRadius: 20,
         padding: 16,
@@ -667,4 +664,3 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 });
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff

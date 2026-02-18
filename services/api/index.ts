@@ -3,9 +3,13 @@ export * from './auth';
 export * from './client';
 export * from './config';
 export * from './device';
-<<<<<<< HEAD
 export * from './profile';
-
-=======
 export * from './sustainability';
->>>>>>> 21aa20793bff54bc15b33157d6e6fa806a53d4a5
+export * from './personalization';
+export * from './graph';
+export * from './chat';
+export * from './deterioration';
+export * from './emergency';
+export * from './health-score';
+export * from './videoCall';
+export * from './videoCallTypes';

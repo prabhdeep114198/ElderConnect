@@ -10,16 +10,10 @@ import {
   View
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
-
-// ... imports ...
-
-<<<<<<< HEAD
 import { profileService } from "../../services/api/profile";
 import { useAuth } from "../../context/AuthContext";
-=======
 import { fetchMockEvents, Event as MockEvent } from "../../services/MockEventService";
 import { InteractionType, personalizationService } from "../../services/api/personalization";
->>>>>>> 920d16f1c023befab58238e8f1284ccfab3262ff
 
 export default function EventsHomePage() {
   const { colors, theme } = useTheme();
