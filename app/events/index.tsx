@@ -13,21 +13,49 @@ import { useTheme } from "../../context/ThemeContext";
 
 // ... imports ...
 
-import { fetchMockEvents, Event as MockEvent } from "../../services/MockEventService";
+import { profileService } from "../../services/api/profile";
+import { useAuth } from "../../context/AuthContext";
 
 export default function EventsHomePage() {
   const { colors, theme } = useTheme();
-  const [events, setEvents] = useState<MockEvent[]>([]);
+  const { user } = useAuth();
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = async () => {
     try {
-      const lat = 28.6139; // Delhi coordinates
-      const lon = 77.2090;
+      console.log("Fetching events for user:", user?.id);
+      if (!user?.id) return;
 
-      // Use mocked service "Simulated Live Events" 
-      const mockData = await fetchMockEvents(lat, lon);
-      setEvents(mockData);
+      const response: any = await profileService.getSocialEvents(user.id);
+      console.log("Events API Response:", JSON.stringify(response, null, 2));
+
+      // Handle different response structures gracefully
+      const eventsList = response?.data?.events || response?.events || [];
+      console.log("Raw Events List:", eventsList.length);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const mappedEvents = eventsList
+        .map((e: any) => ({
+          ...e,
+          id: e.id,
+          name: e.title,
+          category: e.category,
+          start: e.scheduledAt, // ensure this matches backend field
+          description: e.description
+        }))
+        // Filter: Start date is today or later
+        .filter((e: any) => {
+          const eventDate = new Date(e.start);
+          const isFuture = eventDate >= today;
+          console.log(`Event ${e.name}: ${e.start} -> Future? ${isFuture}`);
+          return isFuture;
+        });
+
+      console.log("Filtered Events:", mappedEvents.length);
+      setEvents(mappedEvents);
     } catch (err) {
       console.error("Event fetch error:", err);
     } finally {
@@ -37,7 +65,7 @@ export default function EventsHomePage() {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -49,7 +77,16 @@ export default function EventsHomePage() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.text }]}>Social Gatherings Near You</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.header, { color: colors.text }]}>Social Gatherings</Text>
+        <TouchableOpacity
+          onPress={() => router.push("/events/my-events")}
+          style={[styles.myTicketsButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <Ionicons name="ticket-outline" size={20} color={colors.primary} />
+          <Text style={[styles.myTicketsText, { color: colors.primary }]}>My Tickets</Text>
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         data={events}
@@ -174,5 +211,25 @@ const styles = StyleSheet.create({
   detailsLink: {
     fontSize: 14,
     fontWeight: '600'
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  myTicketsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  myTicketsText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
   }
 });

@@ -11,8 +11,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  AppState
 } from "react-native";
+import { BarChart } from "react-native-chart-kit";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { profileService } from "../../services/api/profile";
@@ -55,21 +57,55 @@ export default function MedicationsScreen() {
   const [newMedication, setNewMedication] = useState({
     name: '',
     dosage: '',
-    frequency: '',
+    frequency: 'Once daily',
+    frequencyCount: '1',
+    timing: 'After Breakfast',
     instructions: ''
   });
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Dynamic labels for last 7 days
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toLocaleDateString('en-US', { weekday: 'short' });
+  });
+
+  const [lastFetchDate, setLastFetchDate] = useState(new Date().toDateString());
 
   useEffect(() => {
     if (user) {
       fetchData();
     }
-  }, [user]);
 
-  const fetchData = async () => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        const today = new Date().toDateString();
+        if (today !== lastFetchDate) {
+          setLastFetchDate(today);
+          fetchData();
+        } else {
+          fetchData(true); // Silent refresh to sync
+        }
+      }
+    });
+
+    const interval = setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== lastFetchDate) {
+        setLastFetchDate(today);
+        fetchData();
+      }
+    }, 60000 * 5); // Check every 5 minutes
+
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
+  }, [user, lastFetchDate]);
+
+  const fetchData = async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [medsRes, complianceRes]: any = await Promise.all([
         profileService.getMedications(user.id),
@@ -77,21 +113,36 @@ export default function MedicationsScreen() {
       ]);
 
       if (medsRes && medsRes.data) {
+        const logs = (complianceRes && complianceRes.data && complianceRes.data.todayLogs) ? complianceRes.data.todayLogs : [];
+
         // Map backend medication to frontend interface
-        const mapped: Medication[] = medsRes.data.medications.map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          dosage: m.dosage || '',
-          frequency: m.frequency || '',
-          times: m.schedule || ['08:00 AM'],
-          taken: (m.schedule || ['08:00 AM']).map(() => false),
-          color: m.color || '#6366F1',
-          instructions: m.instructions || '',
-          sideEffects: m.sideEffects ? m.sideEffects.split(',') : [],
-          prescribedBy: m.prescribedBy || 'Self',
-          startDate: m.startDate || new Date().toISOString(),
-          endDate: m.endDate
-        }));
+        const mapped: Medication[] = medsRes.data.medications.map((m: any) => {
+          // Parse times
+          const times = Array.isArray(m.schedule) ? m.schedule : (m.schedule ? Object.values(m.schedule) : ['08:00 AM']);
+
+          // Determine taken status from logs
+          // Filter logs for this medication
+          const medLogs = logs.filter((l: any) => l.medication?.id === m.id || l.medicationId === m.id);
+          const takenCount = medLogs.filter((l: any) => l.status === 'taken').length;
+
+          // Map to boolean array (simple sequential assumption)
+          const taken = times.map((_: string, index: number) => index < takenCount);
+
+          return {
+            id: m.id,
+            name: m.name,
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            times,
+            taken,
+            color: m.color || '#6366F1',
+            instructions: m.instructions || '',
+            sideEffects: Array.isArray(m.sideEffects) ? m.sideEffects : (m.sideEffects ? m.sideEffects.split(',') : []),
+            prescribedBy: m.prescribedBy || 'Self',
+            startDate: m.startDate || new Date().toISOString(),
+            endDate: m.endDate
+          };
+        });
         setMedications(mapped);
       }
 
@@ -114,25 +165,30 @@ export default function MedicationsScreen() {
 
   const markAsTaken = async (medId: string, timeIndex: number) => {
     if (!user) return;
+
+    // Optimistic Update
+    const previousMeds = JSON.parse(JSON.stringify(medications));
+    setMedications(prev => prev.map(med => {
+      if (med.id === medId) {
+        const newTaken = [...med.taken];
+        newTaken[timeIndex] = true;
+        return { ...med, taken: newTaken };
+      }
+      return med;
+    }));
+
     try {
       await profileService.logMedication(user.id, medId, {
         scheduledTime: new Date().toISOString(),
         status: 'taken'
       });
-
-      setMedications(prev => prev.map(med => {
-        if (med.id === medId) {
-          const newTaken = [...med.taken];
-          newTaken[timeIndex] = true;
-          return { ...med, taken: newTaken };
-        }
-        return med;
-      }));
-
+      // Silent refresh to update stats
+      fetchData(true);
       Alert.alert(t('success'), t('medicationLogged') || 'Medication logged!');
-      fetchData();
     } catch (error) {
       console.log("Failed to log medication:", error);
+      setMedications(previousMeds); // Revert
+      Alert.alert("Error", "Failed to log medication");
     }
   };
 
@@ -143,18 +199,27 @@ export default function MedicationsScreen() {
       return;
     }
 
+    const generateSchedule = (count: string) => {
+      const num = parseInt(count);
+      if (num === 1) return ['08:00 AM'];
+      if (num === 2) return ['08:00 AM', '08:00 PM'];
+      if (num === 3) return ['08:00 AM', '02:00 PM', '08:00 PM'];
+      if (num === 4) return ['08:00 AM', '12:00 PM', '04:00 PM', '08:00 PM'];
+      return ['08:00 AM'];
+    };
+
     try {
       await profileService.addMedication(user.id, {
         name: newMedication.name,
         dosage: newMedication.dosage,
-        frequency: newMedication.frequency || 'Once daily',
-        instructions: newMedication.instructions,
-        schedule: ['08:00 AM'],
+        frequency: `${newMedication.frequencyCount} times daily`,
+        instructions: `${newMedication.timing}. ${newMedication.instructions}`,
+        schedule: generateSchedule(newMedication.frequencyCount),
         startDate: new Date().toISOString()
       });
 
       fetchData();
-      setNewMedication({ name: '', dosage: '', frequency: '', instructions: '' });
+      setNewMedication({ name: '', dosage: '', frequency: 'Once daily', frequencyCount: '1', timing: 'After Breakfast', instructions: '' });
       setShowAddModal(false);
       Alert.alert(t('success'), t('medicationAdded') || 'Medication added!');
     } catch (error) {
@@ -276,24 +341,38 @@ export default function MedicationsScreen() {
           {/* Weekly Compliance Chart */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("weeklyCompliance")}</Text>
-            <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.chartContainer}>
-                {weeklyCompliance.map((compliance, index) => (
-                  <View key={index} style={styles.chartBar}>
-                    <View
-                      style={[
-                        styles.chartBarFill,
-                        {
-                          height: `${Math.max(5, compliance)}%`,
-                          backgroundColor: getComplianceColor(compliance)
-                        }
-                      ]}
-                    />
-                    <Text style={[styles.chartLabel, { color: colors.mutedText }]}>{weekDays[index]}</Text>
-                    <Text style={[styles.chartValue, { color: colors.mutedText }]}>{compliance}%</Text>
-                  </View>
-                ))}
-              </View>
+            <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 0, paddingVertical: 16, alignItems: 'center' }]}>
+              <BarChart
+                data={{
+                  labels: weekDays,
+                  datasets: [{ data: weeklyCompliance }]
+                }}
+                width={width - 50}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix="%"
+                chartConfig={{
+                  backgroundColor: colors.card,
+                  backgroundGradientFrom: colors.card,
+                  backgroundGradientTo: colors.card,
+                  fillShadowGradientFrom: colors.primary,
+                  fillShadowGradientTo: colors.primary,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => colors.primary, // Using primary color for bars
+                  labelColor: (opacity = 1) => colors.mutedText,
+                  barPercentage: 0.7,
+                  propsForBackgroundLines: {
+                    strokeWidth: 1,
+                    stroke: colors.border,
+                    strokeDasharray: "0",
+                  },
+                }}
+                style={{
+                  borderRadius: 16,
+                }}
+                showValuesOnTopOfBars={true}
+                withInnerLines={true}
+              />
             </View>
           </View>
 
@@ -429,14 +508,49 @@ export default function MedicationsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("frequency")}</Text>
-              <TextInput
-                style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                value={newMedication.frequency}
-                onChangeText={(text) => setNewMedication(prev => ({ ...prev, frequency: text }))}
-                placeholder="e.g., Once daily, Twice daily"
-                placeholderTextColor={colors.mutedText}
-              />
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("howManyTimes") || "How many times daily?"}</Text>
+              <View style={styles.optionsGrid}>
+                {['1', '2', '3', '4'].map(count => (
+                  <TouchableOpacity
+                    key={count}
+                    style={[
+                      styles.optionButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newMedication.frequencyCount === count && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setNewMedication(prev => ({ ...prev, frequencyCount: count }))}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { color: colors.text },
+                      newMedication.frequencyCount === count && { color: colors.buttonText }
+                    ]}>{count}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t("whenToTake") || "When to take?"}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalOptions}>
+                {['Before Breakfast', 'After Breakfast', 'Before Lunch', 'After Lunch', 'Before Dinner', 'After Dinner', 'Before Sleep', 'Empty Stomach'].map(time => (
+                  <TouchableOpacity
+                    key={time}
+                    style={[
+                      styles.timingButton,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      newMedication.timing === time && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setNewMedication(prev => ({ ...prev, timing: time }))}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      { color: colors.text },
+                      newMedication.timing === time && { color: colors.buttonText }
+                    ]}>{time}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.inputGroup}>
@@ -740,6 +854,32 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  optionsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  optionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  horizontalOptions: {
+    flexDirection: 'row',
+  },
+  timingButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+    alignItems: 'center',
   },
   addMedicationButton: {
     padding: 16,

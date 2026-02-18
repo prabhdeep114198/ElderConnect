@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { getProfileKey } from "../../utils/userStorageKeys";
 
 const INTERESTS = ["Gardening", "Reading", "Music", "Walking", "Technology", "Cooking", "Art", "Photography", "Knitting", "Traveling", "Sports", "Puzzles", "Bird Watching"];
 const CONDITIONS = ["Diabetes", "Hypertension", "Mobility Issues", "Vision Impairment", "Hearing Impairment", "Arthritis", "Heart Disease", "Asthma", "Memory Issues", "None"];
@@ -155,7 +157,8 @@ export default function OnboardingScreen() {
         };
 
         try {
-            await AsyncStorage.setItem("user_profile_data", JSON.stringify(profileData));
+            if (!user?.id) throw new Error("User not logged in");
+            await AsyncStorage.setItem(getProfileKey(user.id), JSON.stringify(profileData));
             await completeOnboarding();
             router.replace("/(tabs)/home");
         } catch (error) {
@@ -213,7 +216,7 @@ export default function OnboardingScreen() {
                                 <Ionicons name="calendar-outline" size={20} color={colors.primary} />
                             </TouchableOpacity>
                             {showBirthPicker && (
-                                <DateTimePicker
+                                <PlatformDateTimePicker
                                     value={birthDate || new Date(1950, 0, 1)}
                                     mode="date"
                                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -661,7 +664,7 @@ export default function OnboardingScreen() {
                                 <Ionicons name="time-outline" size={20} color={colors.primary} />
                             </TouchableOpacity>
                             {showWakeUpPicker && (
-                                <DateTimePicker
+                                <PlatformDateTimePicker
                                     value={wakeUpTime || new Date()}
                                     mode="time"
                                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -683,7 +686,7 @@ export default function OnboardingScreen() {
                                 <Ionicons name="moon-outline" size={20} color={colors.primary} />
                             </TouchableOpacity>
                             {showBedTimePicker && (
-                                <DateTimePicker
+                                <PlatformDateTimePicker
                                     value={bedTime || new Date()}
                                     mode="time"
                                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -734,59 +737,70 @@ export default function OnboardingScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={{ flex: 1, backgroundColor: colors.background }}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-                {renderProgressBar()}
-                {renderPage()}
+        <ResponsiveView maxWidth={800} style={{ flex: 1, backgroundColor: colors.background }}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+                <ScrollView contentContainerStyle={{ padding: 16 }}>
+                    {renderProgressBar()}
+                    {renderPage()}
 
-                <View style={styles.navigationContainer}>
-                    {currentPage > 0 && (
-                        <TouchableOpacity
-                            style={[styles.navButton, { backgroundColor: colors.border }]}
-                            onPress={handleBack}
-                        >
-                            <Text style={[styles.navButtonText, { color: colors.text }]}>Back</Text>
-                        </TouchableOpacity>
-                    )}
+                    <View style={styles.navigationContainer}>
+                        {currentPage > 0 && (
+                            <TouchableOpacity
+                                style={[styles.navButton, { backgroundColor: colors.border }]}
+                                onPress={handleBack}
+                            >
+                                <Text style={[styles.navButtonText, { color: colors.text }]}>Back</Text>
+                            </TouchableOpacity>
+                        )}
 
-                    {currentPage < totalPages - 1 ? (
-                        <TouchableOpacity
-                            style={[styles.navButton, { backgroundColor: colors.primary }]}
-                            onPress={handleNext}
-                        >
-                            <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Next</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity
-                            style={[styles.navButton, { backgroundColor: colors.primary }]}
-                            onPress={handleFinish}
-                        >
-                            <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Finish</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                        {currentPage < totalPages - 1 ? (
+                            <TouchableOpacity
+                                style={[styles.navButton, { backgroundColor: colors.primary }]}
+                                onPress={handleNext}
+                            >
+                                <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Next</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.navButton, { backgroundColor: colors.primary }]}
+                                onPress={handleFinish}
+                            >
+                                <Text style={[styles.navButtonText, { color: colors.buttonText }]}>Finish</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </ResponsiveView>
     );
 }
 
 const styles = StyleSheet.create({
     heading: {
-        fontSize: 24,
+        fontSize: Platform.OS === 'web' ? 36 : 28,
         fontWeight: "bold",
-        marginBottom: 8,
+        marginBottom: 12,
+        textAlign: Platform.OS === 'web' ? 'center' : 'left',
     },
     subheading: {
-        fontSize: 16,
-        marginBottom: 16,
+        fontSize: Platform.OS === 'web' ? 18 : 16,
+        marginBottom: 30,
+        textAlign: Platform.OS === 'web' ? 'center' : 'left',
+        opacity: 0.8,
     },
     section: {
-        padding: 16,
-        borderRadius: 8,
-        marginBottom: 24,
+        padding: Platform.OS === 'web' ? 32 : 20,
+        borderRadius: 20,
+        marginBottom: 30,
+        backgroundColor: '#FFFFFF', // Fallback, will be overridden by colors.card in render
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 5,
     },
     sectionHeader: {
         marginBottom: 8,
@@ -805,10 +819,11 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     input: {
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: 16,
+        borderWidth: 1.5,
+        borderRadius: 14,
+        padding: 18,
         fontSize: 16,
+        marginTop: 4,
     },
     multilineInput: {
         minHeight: 80,

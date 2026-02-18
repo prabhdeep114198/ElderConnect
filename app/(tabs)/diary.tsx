@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -17,6 +18,8 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { getDiaryKey } from "../../utils/userStorageKeys";
 
 const { width } = Dimensions.get("window");
 
@@ -34,11 +37,12 @@ interface DiaryEntry {
   activity: ActivityValue[];
 }
 
-const API_URL = "http://192.168.29.13:3000"; // Replace with your backend URL
+const API_URL = "http://192.168.1.9:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
@@ -55,18 +59,19 @@ export default function DiaryScreen() {
 
   /** --- Fetch diary entries from storage --- */
   const fetchDiaryEntries = async () => {
+    if (!user?.id) {
+      setDiaryEntries([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const stored = await AsyncStorage.getItem("user_diary_entries");
+      const key = getDiaryKey(user.id);
+      const stored = await AsyncStorage.getItem(key);
       if (stored) {
         setDiaryEntries(JSON.parse(stored));
       } else {
-        // Initial mock data if empty
-        const mockData: DiaryEntry[] = [
-          { id: '1', date: '2024-12-20', mood: 'happy', notes: 'Had a great walk in the park.', tags: ['walk', 'nature'], weather: 'sunny', activity: ['walk'] },
-        ];
-        setDiaryEntries(mockData);
-        await AsyncStorage.setItem("user_diary_entries", JSON.stringify(mockData));
+        setDiaryEntries([]);
       }
     } catch (err) {
       console.error(err);
@@ -78,7 +83,7 @@ export default function DiaryScreen() {
 
   useEffect(() => {
     fetchDiaryEntries();
-  }, []);
+  }, [user?.id]);
 
   const addDiaryEntry = async () => {
     if (!newEntry.notes) {
@@ -92,10 +97,14 @@ export default function DiaryScreen() {
       date: newEntry.date,
     };
 
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to save diary entries.");
+      return;
+    }
     try {
       const updatedEntries = [entryToAdd as DiaryEntry, ...diaryEntries];
       setDiaryEntries(updatedEntries);
-      await AsyncStorage.setItem("user_diary_entries", JSON.stringify(updatedEntries));
+      await AsyncStorage.setItem(getDiaryKey(user.id), JSON.stringify(updatedEntries));
 
       setNewEntry({
         date: new Date().toISOString().split("T")[0],
@@ -159,7 +168,7 @@ export default function DiaryScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -259,11 +268,11 @@ export default function DiaryScreen() {
                 </Text>
               </TouchableOpacity>
               {showDatePicker && (
-                <DateTimePicker
+                <PlatformDateTimePicker
                   value={newEntry.date ? new Date(newEntry.date) : new Date()}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                  onChange={(event: any, selectedDate?: Date) => {
                     setShowDatePicker(false);
                     if (selectedDate) {
                       const year = selectedDate.getFullYear();
@@ -438,7 +447,7 @@ export default function DiaryScreen() {
           </View>
         )}
       </Modal>
-    </View>
+    </ResponsiveView>
   );
 }
 

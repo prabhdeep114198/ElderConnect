@@ -1,21 +1,22 @@
 import { API_BASE_URL, API_TIMEOUT, DEVICE_API_KEY } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
-interface RequestOptions {
+export interface RequestOptions {
     headers?: Record<string, string>;
     body?: any;
     params?: Record<string, string>;
     requiresAuth?: boolean;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
     status: number;
     data: any;
 
-    constructor(status: number, message: string, data?: any) {
-        super(message);
+    constructor(status: number, message: string | string[], data?: any) {
+        const formattedMessage = Array.isArray(message) ? message.join(', ') : message;
+        super(formattedMessage);
         this.status = status;
         this.data = data;
         this.name = 'ApiError';
@@ -57,8 +58,21 @@ export const apiClient = async <T>(
             // NOTE: We're assuming the token is stored with this key. 
             // Adjust if you store it differently (e.g., inside a user session object)
             const token = await AsyncStorage.getItem('auth_token');
-            if (token) {
-                configHeaders['Authorization'] = `Bearer ${token}`;
+            let authToken = token;
+
+            if (!authToken) {
+                // Fallback: Check user_session object
+                const session = await AsyncStorage.getItem('user_session');
+                if (session) {
+                    try {
+                        const parsed = JSON.parse(session);
+                        authToken = parsed.token || parsed.accessToken || parsed.stsTokenManager?.accessToken;
+                    } catch (e) { /* ignore */ }
+                }
+            }
+
+            if (authToken) {
+                configHeaders['Authorization'] = `Bearer ${authToken}`;
             }
         } catch (error) {
             console.warn('Failed to retrieve auth token', error);

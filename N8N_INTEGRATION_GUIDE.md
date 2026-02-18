@@ -81,3 +81,26 @@ Since you now have n8n connected, you can add:
 *   **Emergency Alerts**: Trigger a different webhook `elder-connect-alert` when a user falls or presses SOS.
 *   **Medication Reminders**: Use n8n "active workflow" (Cron) to push notifications to the app (requires push notification service like Expo Push API).
 *   **Doctor Summaries**: Once a month, generate a PDF in n8n and email it to a doctor using the Gmail node.
+
+---
+
+## 🎙️ Voice Command Processing (AI Suite)
+
+The app now supports a floating voice button. Here is how to handle the `PROCESS_VOICE_COMMAND` action in n8n.
+
+### Required Nodes
+1.  **Webhook Node**: Receives the `.m4a` file.
+2.  **OpenAI Whisper Node**: Connect your OpenAI API key and pass the binary file.
+3.  **OpenAI GPT Node**: Use the "Chat" operation with a system prompt like:
+    > "You are the ElderConnect Assistant. Analyze the user's transcript: {{ $json.text }}. 
+    > Current Context: {{ $json.userContext }}.
+    > If they want to host an event, return JSON: { "action": "CREATE_EVENT", "title": "...", "date": "..." }.
+    > If they share a health metric, return JSON: { "action": "LOG_VITAL", "type": "...", "value": 0 }.
+    > Respond with a friendly confirmation message in the 'message' field."
+4.  **Switch Node**: Routes based on the `action` field.
+5.  **HTTP Request Node**: Calls the ElderConnect API: `POST /api/v1/users/{{$json.userId}}/events` (using the extracted JSON).
+6.  **Response Node**: Returns the friendly message back to the app.
+
+### Example Transcript
+*User says:* "I want to host a birthday party on 3rd Feb 2026."
+*n8n Output:* Calls the API to create the event and returns: "Happy Birthday in advance! I've scheduled your party for February 3rd."

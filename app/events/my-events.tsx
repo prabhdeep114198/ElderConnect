@@ -4,6 +4,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { getTicketsKey } from "../../utils/userStorageKeys";
 
 interface Ticket {
   ticketId: string;
@@ -18,14 +20,40 @@ interface Ticket {
 export default function MyTicketsPage() {
   const router = useRouter();
   const { colors, theme } = useTheme();
+  const { user } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadTickets = async () => {
+    if (!user?.id) {
+      setTickets([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const stored = await AsyncStorage.getItem("user_tickets");
-      const userTickets = stored ? JSON.parse(stored) : [];
-      setTickets(userTickets.reverse()); // Show newest first
+      const stored = await AsyncStorage.getItem(getTicketsKey(user.id));
+      const userTickets: Ticket[] = stored ? JSON.parse(stored) : [];
+
+      // Function to filter tickets: Future tickets + Past tickets (last 1 month)
+      const getRecentTickets = (allTickets: Ticket[]) => {
+        const now = new Date();
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(now.getMonth() - 1);
+        oneMonthAgo.setHours(0, 0, 0, 0);
+
+        return allTickets.filter(ticket => {
+          const ticketDate = new Date(ticket.date);
+          // Include if future OR if within the last month
+          return ticketDate >= oneMonthAgo;
+        });
+      };
+
+      const filteredTickets = getRecentTickets(userTickets);
+
+      // Sort by date descending (newest events first)
+      filteredTickets.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setTickets(filteredTickets);
     } catch (err) {
       console.error(err);
     } finally {
@@ -36,7 +64,7 @@ export default function MyTicketsPage() {
   useFocusEffect(
     useCallback(() => {
       loadTickets();
-    }, [])
+    }, [user?.id])
   );
 
   if (loading) {

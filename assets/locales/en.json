@@ -216,6 +216,25 @@
         "wellnessReport": "Wellness Report",
         "writeAboutDay": "Write about your day, thoughts, or feelings...",
         "yourAICompanion": "Your AI Companion",
-        "yourHealthOverview": "Your Health Overview"
+        "yourHealthOverview": "Your Health Overview",
+        "yourImpact": "Your Impact",
+        "digitalCareSaved": "Your digital care saved",
+        "thisYear": "this year",
+        "co2Saved": "CO2 saved",
+        "paperSaved": "Pages saved",
+        "tripsAvoided": "Trips avoided",
+        "success": "Success",
+        "shareViaWhatsApp": "Share via WhatsApp",
+        "sendSummaryTo": "Send summary to",
+        "send": "Send",
+        "shareWhatsApp": "Share Summary on WhatsApp",
+        "upgradeToDownload": "Upgrade to Premium to download reports",
+        "upgradeNow": "Upgrade Now",
+        "premiumFeature": "Premium Feature",
+        "last7DaysImportantValues": "Last 7 Days Important Values",
+        "physical": "Physical",
+        "mental": "Mental",
+        "sleep": "Sleep",
+        "diet": "Diet"
     }
 }

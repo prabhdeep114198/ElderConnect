@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { PlatformDateTimePicker } from "../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../components/ResponsiveView";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -134,9 +135,9 @@ export default function RemindersScreen() {
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
+        <ResponsiveView maxWidth={600} style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
             <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
                         <Text style={{ color: colors.primary, fontSize: 17 }}>Done</Text>
@@ -149,7 +150,7 @@ export default function RemindersScreen() {
 
                 <View style={styles.section}>
                     <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>SCHEDULED</Text>
-                    <View style={[styles.card, { backgroundColor: colors.card }]}>
+                    <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#1C1C1E' : colors.card, borderWidth: theme === 'dark' ? 1 : 0, borderColor: theme === 'dark' ? '#2C2C2E' : 'transparent' }]}>
                         {reminders.length > 0 ? (
                             reminders.map((item, index) => (
                                 <ReminderItem key={item.id} item={item} isLast={index === reminders.length - 1} />
@@ -161,7 +162,7 @@ export default function RemindersScreen() {
                             </View>
                         )}
                     </View>
-                    <Text style={styles.footerText}>Stay on top of your medications, appointments, and daily routines with smart notifications.</Text>
+                    <Text style={[styles.footerText, { color: colors.mutedText }]}>Stay on top of your medications, appointments, and daily routines with smart notifications.</Text>
                 </View>
             </ScrollView>
 
@@ -182,7 +183,7 @@ export default function RemindersScreen() {
                         </View>
 
                         <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', paddingLeft: 16 }]}>
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', paddingLeft: 16, borderWidth: theme === 'dark' ? 1 : 0, borderColor: theme === 'dark' ? '#2C2C2E' : 'transparent' }]}>
                                 <View style={styles.inputRow}>
                                     <TextInput
                                         style={[styles.input, { color: colors.text }]}
@@ -195,7 +196,7 @@ export default function RemindersScreen() {
                             </View>
 
                             <Text style={[styles.sectionHeader, { color: colors.mutedText, marginTop: 20 }]}>REMINDER TYPE</Text>
-                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
+                            <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', borderWidth: theme === 'dark' ? 1 : 0, borderColor: theme === 'dark' ? '#2C2C2E' : 'transparent' }]}>
                                 <View style={[styles.typeSelectorRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
                                     <TouchableOpacity
                                         style={[styles.typeBtn, type === 'medication' && { backgroundColor: '#FF3B3020' }]}
@@ -232,7 +233,7 @@ export default function RemindersScreen() {
                             </View>
 
                             <View style={[styles.card, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7', marginTop: 20, marginBottom: 40 }]}>
-                                <DateTimePicker
+                                <PlatformDateTimePicker
                                     value={date}
                                     mode="datetime"
                                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -246,17 +247,17 @@ export default function RemindersScreen() {
                     </KeyboardAvoidingView>
                 </View>
             </Modal>
-        </View>
+        </ResponsiveView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingBottom: 40 },
+    scrollContent: { paddingBottom: 40, paddingTop: Platform.OS === 'web' ? 20 : 60 },
     header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
     closeButton: { alignSelf: 'flex-start', position: 'absolute', top: 20, left: 20, zIndex: 1 },
     addButton: { alignSelf: 'flex-end', position: 'absolute', top: 20, right: 20, zIndex: 1 },
-    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5, marginTop: 40 },
+    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5, marginTop: Platform.OS === 'web' ? 10 : 40 },
     section: { marginTop: 25, paddingHorizontal: 20 },
     sectionHeader: { fontSize: 13, fontWeight: '400', marginBottom: 8, marginLeft: 16 },
     card: { borderRadius: 12, overflow: 'hidden' },
@@ -270,8 +271,15 @@ const styles = StyleSheet.create({
     emptyText: { marginTop: 10, fontSize: 15 },
     footerText: { color: '#8E8E93', fontSize: 13, paddingHorizontal: 16, marginTop: 10, lineHeight: 18 },
 
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-    modalContent: { borderTopLeftRadius: 15, borderTopRightRadius: 15, padding: 16, minHeight: 450 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end', alignItems: Platform.OS === 'web' ? 'center' : 'stretch' },
+    modalContent: {
+        borderTopLeftRadius: 15,
+        borderTopRightRadius: 15,
+        padding: 16,
+        minHeight: 450,
+        width: Platform.OS === 'web' ? 500 : '100%',
+        borderRadius: Platform.OS === 'web' ? 20 : 0
+    },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 17, fontWeight: '600' },
     modalBody: { flex: 1 },
@@ -284,4 +292,3 @@ const styles = StyleSheet.create({
     switchLabel: { fontSize: 17 },
     switchSublabel: { fontSize: 12, color: '#8E8E93', marginTop: 2 }
 });
-

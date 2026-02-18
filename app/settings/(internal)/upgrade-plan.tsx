@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import { getCheckoutHtml } from '../services/PaymentService';
-import { API_BASE_URL } from '../services/api/config';
+import { useTheme } from '../../../context/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import { getCheckoutHtml } from '../../../services/PaymentService';
+import { API_BASE_URL } from '../../../services/api/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
@@ -41,7 +41,7 @@ export default function UpgradePlanScreen() {
             setTimeout(async () => {
                 Alert.alert('Success', 'Thank you for your purchase!');
                 await refreshSubscription();
-                router.replace('/manage-subscription');
+                router.replace('/settings/manage-subscription');
             }, 1000);
         }
     };
