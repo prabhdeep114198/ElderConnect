@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,11 +14,13 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { HealthCharts } from "../../components/HealthCharts";
 import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useResponsive } from "../../hooks/useResponsive";
+import { analyticsService, TimeGranularity } from "../../services/api/analytics";
 import { deviceService } from "../../services/api/device";
 import { profileService } from "../../services/api/profile";
 
@@ -52,6 +54,7 @@ interface VitalSign {
 export default function HealthTrackerScreen() {
   const { colors, theme } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const { isWeb, contentWidth } = useResponsive();
   const effectiveWidth = isWeb ? contentWidth : width;
   const [loading, setLoading] = useState(true);
@@ -251,17 +254,32 @@ export default function HealthTrackerScreen() {
         { name: 'Sleep', current: sumHistory('Sleep'), target: 56, unit: 'hours' },
         { name: 'Water', current: sumHistory('Water Intake'), target: 56, unit: 'glasses' }
       ];
-
       console.log('🎯 Weekly Goals Calculated from DB History');
       setWeeklyGoals(newGoals);
 
+      // 4. Update Weekly Goals using Analytics Service if available
+      try {
+        const analyticsRes = await analyticsService.getHealthAnalytics(user.id, { granularity: TimeGranularity.WEEK });
+        if (analyticsRes?.data?.statistics) {
+          const stats = analyticsRes.data.statistics;
+          const updatedGoals = [
+            { name: 'Steps', current: stats.steps.total, target: 56000, unit: 'steps' },
+            { name: 'Exercise', current: Math.round(stats.steps.avg / 100), target: 420, unit: 'minutes' }, // Mocking exercise from steps if not directly available
+            { name: 'Sleep', current: Math.round(stats.sleep.avg * 7), target: 56, unit: 'hours' },
+            { name: 'Water', current: Math.round(stats.water.total * 1000 / 250), target: 56, unit: 'glasses' } // converting L to glasses
+          ];
+          setWeeklyGoals(updatedGoals);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch weekly analytics for goals", e);
+      }
     } catch (error) {
       console.error("Failed to load health data", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id]);
+  }, [user?.id, colors.primary, colors.error, colors.info, colors.success, colors.warning]);
 
   useEffect(() => {
     loadHealthData();
@@ -612,23 +630,15 @@ export default function HealthTrackerScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={[styles.headerTitle, { color: theme === 'dark' ? '#FFFFFF' : '#000000' }]}>Health Tracker</Text>
-              <Text style={[styles.headerSubtitle, { color: theme === 'dark' ? '#E5E5EA' : colors.mutedText }]}>Monitor your daily health metrics</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Health Tracker</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.mutedText }]}>Monitor your daily health metrics</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.info }]}
-                onPress={seedSampleData}
-              >
-                <Ionicons name="flask" size={20} color={colors.buttonText} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowVitalModal(true)}
-              >
-                <Ionicons name="add" size={24} color={colors.buttonText} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowVitalModal(true)}
+            >
+              <Ionicons name="add" size={24} color={colors.buttonText} />
+            </TouchableOpacity>
           </View>
 
           {/* Quick Actions */}
@@ -650,6 +660,25 @@ export default function HealthTrackerScreen() {
                 <Text style={[styles.quickActionText, { color: colors.text }]}>Log Vitals</Text>
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* View Trends Button */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.trendsButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+              onPress={() => router.push("/AnalyticsDashboard")}
+            >
+              <View style={styles.trendsButtonContent}>
+                <View style={[styles.trendsIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="trending-up" size={20} color="#fff" />
+                </View>
+                <View style={styles.trendsTextContainer}>
+                  <Text style={[styles.trendsTitle, { color: colors.text }]}>View Detailed Trends</Text>
+                  <Text style={[styles.trendsSubtitle, { color: colors.mutedText }]}>Check your health progress charts</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Today's Metrics */}
@@ -1040,7 +1069,7 @@ export default function HealthTrackerScreen() {
           </View>
         )}
       </Modal>
-    </View>
+    </View >
   );
 }
 
@@ -1394,6 +1423,35 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 14,
     marginLeft: 8,
+  },
+  trendsButton: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  trendsButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trendsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  trendsTextContainer: {
+    flex: 1,
+  },
+  trendsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  trendsSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
   historyItem: {
     flexDirection: 'row',

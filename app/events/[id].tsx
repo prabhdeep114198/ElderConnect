@@ -19,6 +19,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { getTicketsKey } from "../../utils/userStorageKeys";
 import { profileService } from "../../services/api/profile";
+import { InteractionType, personalizationService } from "../../services/api/personalization";
 
 interface Event {
   id: string;
@@ -98,6 +99,13 @@ export default function EventDetailsPage() {
 
       tickets.push(newTicket);
       await AsyncStorage.setItem(ticketsKey, JSON.stringify(tickets));
+
+      // Track interaction for personalization
+      await personalizationService.trackInteraction(InteractionType.EVENT_JOIN, {
+        id: event.id,
+        name: event.name,
+        category: event.category
+      });
 
       setModalVisible(false);
 

@@ -58,7 +58,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token && savedUser) {
         const parsedUser = JSON.parse(savedUser);
 
-        // Double check onboarding status from its dedicated key
+        // FIX 1: Guard against corrupted session missing the id field.
+        // If id is missing the whole app breaks (undefined in all API URLs).
+        // Clear the bad session and force re-login instead of silently failing.
+        if (!parsedUser.id) {
+          console.warn("[AuthContext] Cached user has no id — clearing session");
+          await AsyncStorage.multiRemove(["auth_token", "user_session"]);
+          setLoading(false);
+          return;
+        }
+
+        // Restore onboarding status from dedicated key
         const onboardingStatus = await AsyncStorage.getItem(`user_onboarded_${parsedUser.id}`);
         if (onboardingStatus === "true") {
           parsedUser.isOnboarded = true;
@@ -71,19 +81,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const response: any = await authService.getProfile();
           if (response && response.data) {
             const userData = response.data;
+
+            // FIX 2: Always use the id from the cached session if backend
+            // response doesn't include it, so user.id is never undefined.
+            const resolvedId = userData.id || parsedUser.id;
+
+            // FIX 3: Build name safely — handle both {name} and {firstName, lastName}
+            // formats from different backend response shapes.
+            const resolvedName = userData.name
+              || `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim()
+              || parsedUser.name
+              || '';
+
             const updatedUser: User = {
-              id: userData.id,
-              name: `${userData.firstName} ${userData.lastName}`.trim(),
-              email: userData.email,
-              isOnboarded: parsedUser.isOnboarded || false,
-              plan_level: userData.plan_level || parsedUser.plan_level,
+              id:           resolvedId,
+              name:         resolvedName,
+              email:        userData.email || parsedUser.email,
+              isOnboarded:  parsedUser.isOnboarded || false,
+              plan_level:   userData.plan_level || parsedUser.plan_level,
               isSubscribed: userData.isSubscribed || false,
             };
+
             setUser(updatedUser);
             await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
           }
         } catch (e) {
           console.log("Failed to refresh profile, using cached data", e);
+          // Keep using parsedUser that was already set above — that's fine
         }
       }
     } catch (error) {
@@ -98,21 +122,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response: any = await authService.login({ email, password });
 
-      // Correctly access data from the backend response structure
       if (response && response.data && response.data.token && response.data.user) {
         const { user: apiUser, token } = response.data;
+
+        // FIX 2 (also here): Build name safely from whatever the backend returns
+        const resolvedName = apiUser.name
+          || `${apiUser.firstName ?? ''} ${apiUser.lastName ?? ''}`.trim()
+          || '';
+
         const newUser: User = {
-          id: apiUser.id,
-          name: `${apiUser.firstName} ${apiUser.lastName}`.trim(),
-          email: apiUser.email,
-          isOnboarded: false,
+          id:           apiUser.id,        // this must come from backend
+          name:         resolvedName,
+          email:        apiUser.email,
+          isOnboarded:  false,
           isSubscribed: apiUser.isSubscribed || false,
+          plan_level:   apiUser.plan_level || "free",
         };
 
         // Check onboarding status
         const profileKey = `user_onboarded_${apiUser.id}`;
         const existingProfile = await AsyncStorage.getItem(profileKey);
-
         if (existingProfile) {
           newUser.isOnboarded = true;
         }
@@ -144,15 +173,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         lastName,
       });
 
-      // Correctly access data from the backend response structure
       if (response && response.data && response.data.token && response.data.user) {
         const { user: apiUser, token } = response.data;
+
+        const resolvedName = apiUser.name
+          || `${apiUser.firstName ?? ''} ${apiUser.lastName ?? ''}`.trim()
+          || name;
+
         const newUser: User = {
-          id: apiUser.id,
-          name: `${apiUser.firstName} ${apiUser.lastName}`.trim(),
-          email: apiUser.email,
-          isOnboarded: false,
+          id:           apiUser.id,
+          name:         resolvedName,
+          email:        apiUser.email,
+          isOnboarded:  false,
           isSubscribed: apiUser.isSubscribed || false,
+          plan_level:   apiUser.plan_level || "free",
         };
 
         await AsyncStorage.setItem("auth_token", token);
@@ -196,8 +230,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProfile = async (name: string) => {
     try {
-      const [firstName, ...lastNameParts] = name.split(' ');
-      const lastName = lastNameParts.join(' ') || '';
       if (user) {
         const updatedUser = { ...user, name };
         setUser(updatedUser);
@@ -253,4 +285,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
