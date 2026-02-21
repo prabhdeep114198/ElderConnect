@@ -92,7 +92,8 @@ export default function ReportsScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const flags = useFeatureFlags(["download_reports"]);
-  const canDownload = flags.download_reports?.enabled ?? false;
+  const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
+  const canDownload = hasSubscription || false;
 
   useFocusEffect(
     useCallback(() => {
@@ -1007,10 +1008,12 @@ export default function ReportsScreen() {
 
 
 
-        <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-          <Ionicons name="download-outline" size={24} color="#fff" />
-          <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
-        </TouchableOpacity>
+        {hasSubscription && (
+          <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
+            <Ionicons name="download-outline" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
@@ -1020,13 +1023,15 @@ export default function ReportsScreen() {
           <Text style={styles.pdfButtonText}>{t("viewTrends") || "View Trends Dashboard"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
-          onPress={sendWhatsAppReport}
-        >
-          <Ionicons name="logo-whatsapp" size={24} color="#fff" />
-          <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
-        </TouchableOpacity>
+        {hasSubscription && (
+          <TouchableOpacity
+            style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
+            onPress={sendWhatsAppReport}
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
+          </TouchableOpacity>
+        )}
 
 
         {/* KNOWLEDGE GRAPH */}
