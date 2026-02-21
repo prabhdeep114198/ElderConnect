@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
-import { ResponsiveView } from "../../components/ResponsiveView";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -17,8 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTheme } from "../../context/ThemeContext";
+import { PlatformDateTimePicker } from "../../components/PlatformDateTimePicker";
+import { ResponsiveView } from "../../components/ResponsiveView";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getDiaryKey } from "../../utils/userStorageKeys";
 
 const { width } = Dimensions.get("window");
@@ -37,7 +37,7 @@ interface DiaryEntry {
   activity: ActivityValue[];
 }
 
-const API_URL = "http://192.168.1.9:3000"; // Replace with your backend URL
+const API_URL = "http://192.168.29.13:3000"; // Replace with your backend URL
 
 export default function DiaryScreen() {
   const { colors, theme } = useTheme();

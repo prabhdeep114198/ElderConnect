@@ -13,7 +13,7 @@ export const SocketProvider = ({
   children: React.ReactNode;
 }) => {
   const socket = useMemo(() => {
-    return io('192.168.1.9:3000'); // NestJS default port
+    return io('192.168.29.13:3000'); // NestJS default port
   }, []);
 
   return (

@@ -1,23 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import {
-    View,
-    StyleSheet,
-    TouchableOpacity,
-    ActivityIndicator,
-    Text,
-    Animated,
-    Dimensions,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
-    useAudioRecorder,
     RecordingPresets,
     requestRecordingPermissionsAsync,
-    setAudioModeAsync
+    setAudioModeAsync,
+    useAudioRecorder
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '../context/ThemeContext';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import { N8NService } from '../services/N8NService';
 import { SpeechToTextService } from '../services/SpeechToTextService';
@@ -142,7 +142,8 @@ export const VoiceAssistant = () => {
         }
     }
 
-    if (!user || !isVoiceEnabled) return null;
+    const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
+    if (!user || !hasSubscription) return null;
 
     return (
         <View style={styles.container}>

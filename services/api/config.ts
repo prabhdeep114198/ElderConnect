@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /**
  * Detect the environment and set the appropriate base URL
@@ -33,7 +33,7 @@ const getDevUrl = () => {
 const DEV_API_URL = getDevUrl();
 
 // You can replace this with your production URL when ready
-const PROD_API_URL = 'http://192.168.1.9:3000/api';
+const PROD_API_URL = 'http://192.168.29.13:3000/api';
 
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
 
