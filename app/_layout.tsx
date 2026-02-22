@@ -282,6 +282,14 @@ function InitialLayout() {
         />
 
         <Drawer.Screen
+          name="fall-risk"
+          options={{
+            title: "Fall Risk",
+            drawerIcon: ({ color, size }) => <Ionicons name="analytics" size={size} color={color} />,
+          }}
+        />
+
+        <Drawer.Screen
           name="music"
           options={{
             title: "Music",
@@ -320,7 +328,7 @@ function InitialLayout() {
         <Drawer.Screen name="onboarding/index" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="fall-detected" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="onboarding" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
-        
+
         {/* HIDE THE ROOM SCREEN FROM SIDEBAR */}
         <Drawer.Screen
           name="videocall/room"
@@ -330,7 +338,7 @@ function InitialLayout() {
             title: "Video Room"
           }}
         />
-        
+
         {/* Ensure the group folder doesn't create a second entry */}
         <Drawer.Screen name="videocall" options={{ drawerItemStyle: { display: "none" } }} />
 
