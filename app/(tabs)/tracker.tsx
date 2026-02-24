@@ -1135,7 +1135,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   metricCard: {
-    width: '48%', // Flexible for mobile/web
+    width: '47%', // Adjusted for 2-column layout with gap on mobile
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,

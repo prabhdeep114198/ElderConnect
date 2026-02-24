@@ -9,9 +9,12 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../../context/ThemeContext';
 
 const PrivacyPolicyScreen = () => {
+  const router = useRouter();
   const { colors, theme } = useTheme();
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -116,6 +119,15 @@ We respond within 2 business days.`,
     setActiveSection(activeSection === id ? null : id);
   };
 
+  const handleAccept = async () => {
+    try {
+      await AsyncStorage.setItem("privacyAccepted", "true");
+      router.replace("/"); // Go back to landing to unblock
+    } catch (error) {
+      console.error("Error saving privacy acceptance:", error);
+    }
+  };
+
   const adjustFontSize = (value: number) => {
     setFontSize((prev) => Math.max(14, Math.min(24, prev + value)));
   };
@@ -213,6 +225,13 @@ We respond within 2 business days.`,
             By using ElderConnect, you agree to this Privacy Policy.
           </Text>
         </View>
+
+        <TouchableOpacity
+          style={[styles.acceptButton, { backgroundColor: colors.primary }]}
+          onPress={handleAccept}
+        >
+          <Text style={styles.acceptButtonText}>Accept & Continue</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -334,5 +353,21 @@ const styles = StyleSheet.create({
   footerText: {
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  acceptButton: {
+    marginTop: 24,
+    paddingVertical: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  acceptButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

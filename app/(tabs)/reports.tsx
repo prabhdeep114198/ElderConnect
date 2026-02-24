@@ -92,7 +92,8 @@ export default function ReportsScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const flags = useFeatureFlags(["download_reports"]);
-  const canDownload = flags.download_reports?.enabled ?? false;
+  const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
+  const canDownload = hasSubscription || false;
 
   useFocusEffect(
     useCallback(() => {
@@ -629,43 +630,6 @@ export default function ReportsScreen() {
     }
   };
 
-  // Function to trigger n8n automation
-  const sendWhatsAppReport = async () => {
-    if (!userData) return;
-
-    const contactName = userData.emergencyContacts?.[0]?.name || t("caregiver");
-
-    Alert.alert(
-      t("shareViaWhatsApp") || "Share via WhatsApp",
-      `${t("sendSummaryTo") || "Send summary to"} ${contactName}?`,
-      [
-        { text: t("cancel"), style: "cancel" },
-        {
-          text: t("send"),
-          onPress: async () => {
-            // Generate a simple dynamic tip
-            let tip = "Great job maintaining health!";
-            if (scores.physical < 60) tip = "Encourage a short 10-minute walk today.";
-            else if (scores.social < 60) tip = "A phone call to a friend would be great for morale.";
-            else if (scores.sleep < 70) tip = "Try to establish a consistent bedtime routine.";
-
-            const result = await N8NService.sendHealthReport(
-              userData,
-              scores,
-              vitalSignsData,
-              tip
-            );
-
-            if (result.success) {
-              Alert.alert("Success", "Report sent to your Caregiver via WhatsApp!");
-            } else {
-              Alert.alert("Error", "Could not connect to automation server.");
-            }
-          }
-        }
-      ]
-    );
-  };
 
   // --- RADAR CHART LOGIC ---
   // On Web, these are in a 2-column layout, so we use half the contentWidth
@@ -1005,12 +969,12 @@ export default function ReportsScreen() {
           </Text>
         </View>
 
-
-
-        <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-          <Ionicons name="download-outline" size={24} color="#fff" />
-          <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
-        </TouchableOpacity>
+        {hasSubscription && (
+          <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
+            <Ionicons name="download-outline" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
@@ -1020,92 +984,7 @@ export default function ReportsScreen() {
           <Text style={styles.pdfButtonText}>{t("viewTrends") || "View Trends Dashboard"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
-          onPress={sendWhatsAppReport}
-        >
-          <Ionicons name="logo-whatsapp" size={24} color="#fff" />
-          <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
-        </TouchableOpacity>
 
-
-        {/* KNOWLEDGE GRAPH */}
-        {renderKnowledgeGraph()}
-
-        {/* RADAR CHART CARD */}
-        <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{t("healthBalanceIndices")}</Text>
-          <View style={{ alignItems: 'center', justifyContent: 'center', height: radarSize }}>
-            <Svg height={radarSize} width={radarSize}>
-              <Polygon points={buildRadarPolygon({ physical: 100, exercise: 100, social: 100, mental: 100, sleep: 100, diet: 100 })} stroke={colors.border} strokeWidth="1" fill="none" />
-              <Polygon points={buildRadarPolygon({ physical: 50, exercise: 50, social: 50, mental: 50, sleep: 50, diet: 50 })} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" fill="none" />
-
-              {METRICS.map((m, i) => {
-                const { x, y } = getRadarCoordinates(100, i);
-                return <Line key={i} x1={radarCenter} y1={radarCenter} x2={x} y2={y} stroke={colors.border} strokeWidth="1" />;
-              })}
-
-              <Polygon points={buildRadarPolygon(scores)} fill={colors.primary} fillOpacity="0.3" stroke={colors.primary} strokeWidth="2" />
-
-              {METRICS.map((m, i) => {
-                const { x, y } = getRadarCoordinates(scores[m.key as keyof typeof scores], i);
-                return <Circle key={i} cx={x} cy={y} r="4" fill={colors.primary} />;
-              })}
-
-              {METRICS.map((m, i) => {
-                const { x, y } = getRadarCoordinates(120, i);
-                return <SvgText key={i} x={x} y={y} fill={colors.text} fontSize="11" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{t(m.key)}</SvgText>;
-              })}
-            </Svg>
-          </View>
-        </View>
-
-        {
-          sustainabilityImpact && (
-            <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
-              <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
-                {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
-              </Text>
-              <View style={styles.impactGrid}>
-                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="leaf-outline" size={20} color="#22C55E" />
-                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.carbonSavedKg} kg</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
-                </View>
-                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
-                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.paperSavedSheets}</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
-                </View>
-                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="car-outline" size={20} color="#8B5CF6" />
-                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.tripsAvoided}</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
-                </View>
-              </View>
-            </View>
-          )
-        }
-
-        {
-          canDownload && (
-            <>
-              <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-                <Ionicons name="download-outline" size={24} color="#fff" />
-                <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.pdfButton, { backgroundColor: '#25D366', marginTop: -10 }]}
-                onPress={sendWhatsAppReport}
-              >
-                <Ionicons name="logo-whatsapp" size={24} color="#fff" />
-                <Text style={styles.pdfButtonText}>{t("shareWhatsApp") || "Share Summary on WhatsApp"}</Text>
-              </TouchableOpacity>
-            </>
-          )
-        }
 
 
         {/* KNOWLEDGE GRAPH + HEALTH INDICES (side by side on web) */}
@@ -1164,6 +1043,35 @@ export default function ReportsScreen() {
                 </View>
               </View>
             </>
+          )
+        }
+
+
+        {
+          sustainabilityImpact && (
+            <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
+              <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
+                {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
+              </Text>
+              <View style={styles.impactGrid}>
+                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                  <Ionicons name="leaf-outline" size={20} color="#22C55E" />
+                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.carbonSavedKg} kg</Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
+                </View>
+                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                  <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
+                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.paperSavedSheets}</Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
+                </View>
+                <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
+                  <Ionicons name="car-outline" size={20} color="#8B5CF6" />
+                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.tripsAvoided}</Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
+                </View>
+              </View>
+            </View>
           )
         }
 
@@ -1386,7 +1294,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   trendCard: {
-    width: '48%', // For mobile/default fallback, web overrides inline
+    width: '47%', // Adjusted for 2-column layout with gap on mobile
     padding: 16,
     borderRadius: 16,
     marginBottom: 0, // Handled by gap/inline styles
