@@ -21,37 +21,9 @@ import { useTheme } from '../context/ThemeContext';
 import { fallRiskService } from '../services/api/fallRisk';
 import { FallRiskAlert, FallRiskAnalysis, FallRiskRecommendation } from '../types/fallRisk';
 
-// Mock Data
-const MOCK_HISTORICAL_DATA = {
-    '7d': [
-        { label: 'Mon', value: 35 },
-        { label: 'Tue', value: 38 },
-        { label: 'Wed', value: 42 },
-        { label: 'Thu', value: 40 },
-        { label: 'Fri', value: 45 },
-        { label: 'Sat', value: 48 },
-        { label: 'Sun', value: 50 },
-    ],
-    '30d': Array.from({ length: 30 }, (_, i) => ({ label: `Day ${i + 1}`, value: 30 + Math.random() * 40 })),
-    '90d': Array.from({ length: 90 }, (_, i) => ({ label: `W${Math.floor(i / 7) + 1}`, value: 25 + Math.random() * 50 })),
-};
+// Feature constants
+const REFRESH_INTERVAL = 30000; // 30 seconds for risk recalculation
 
-const MOCK_FORECAST_DATA = [
-    { days: 7, score: 55, trend: 'up' as const },
-    { days: 30, score: 62, trend: 'up' as const },
-    { days: 90, score: 48, trend: 'stable' as const },
-];
-
-const MOCK_ALERTS = [
-    { id: '1', type: 'warning' as const, message: 'Reduced activity levels detected over the last 48 hours.', timestamp: '2 hours ago' },
-    { id: '2', type: 'info' as const, message: 'Gait stability slightly lower than usual during morning walk.', timestamp: 'Yesterday' },
-];
-
-const MOCK_RECOMMENDATIONS = [
-    { id: '1', icon: 'walk-outline' as const, title: 'Balance Exercises', description: 'Try 10 minutes of standing on one leg with support to improve stability.' },
-    { id: '2', icon: 'bulb-outline' as const, title: 'Home Safety', description: 'Ensure all rugs are secured and walkways are clear of clutter.' },
-    { id: '3', icon: 'water-outline' as const, title: 'Hydration', description: 'Proper hydration supports blood pressure and reduces dizziness.' },
-];
 
 export default function FallRiskDashboard() {
     const { colors, uiMode } = useTheme();
@@ -63,6 +35,8 @@ export default function FallRiskDashboard() {
     const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d');
     const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString());
     const [alertThreshold, setAlertThreshold] = useState(70);
+    const [error, setError] = useState<string | null>(null);
+
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -76,10 +50,13 @@ export default function FallRiskDashboard() {
             setAlerts(alertsData);
             setRecs(recsData);
             setLastUpdate(new Date().toLocaleTimeString());
-        } catch (error) {
+            setError(null);
+        } catch (error: any) {
             console.error("Dashboard fetch error:", error);
+            setError(error.message || "Failed to fetch data");
         }
     }, [user]);
+
 
     useEffect(() => {
         fetchData();
@@ -91,42 +68,62 @@ export default function FallRiskDashboard() {
         setRefreshing(false);
     }, [fetchData]);
 
-    // Real-time update simulation & Threshold Notification
+    // Periodic Refresh from API
     useEffect(() => {
         const interval = setInterval(async () => {
-            if (!analysis) return;
+            if (user) {
+                await fetchData();
+            }
+        }, REFRESH_INTERVAL);
 
-            const change = Math.random() * 4 - 2;
-            const newScore = Math.min(100, Math.max(0, analysis.currentScore + change));
+        return () => clearInterval(interval);
+    }, [user, fetchData]);
 
-            setAnalysis(prev => prev ? { ...prev, currentScore: newScore } : null);
-            setLastUpdate(new Date().toLocaleTimeString());
+    // Threshold Notification (Still kept locally for immediate feedback)
+    useEffect(() => {
+        if (!analysis) return;
 
-            // Trigger Alert if threshold exceeded
-            if (newScore > alertThreshold && analysis.currentScore <= alertThreshold) {
+        const checkThreshold = async () => {
+            if (analysis.currentScore > alertThreshold) {
                 await Notifications.scheduleNotificationAsync({
                     content: {
                         title: "🔴 High Fall Risk Alert",
-                        body: `Patient risk score has exceeded your set threshold of ${alertThreshold}. Current score: ${Math.round(newScore)}`,
-                        data: { score: newScore },
+                        body: `Patient risk score is ${Math.round(analysis.currentScore)}, exceeding threshold of ${alertThreshold}.`,
+                        data: { score: analysis.currentScore },
                     },
                     trigger: null,
                 });
             }
-        }, 15000);
+        };
 
-        return () => clearInterval(interval);
-    }, [analysis, alertThreshold]);
+        checkThreshold();
+    }, [analysis?.currentScore, alertThreshold]);
+
 
     const isCaregiver = uiMode === 'caregiver';
+
+    if (error) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>Analysis Failed</Text>
+                <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: 5 }}>{error}</Text>
+                <TouchableOpacity onPress={onRefresh} style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 20, paddingHorizontal: 30 }]}>
+                    <Text style={styles.actionButtonText}>Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     if (!analysis) {
         return (
             <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
                 <Text style={{ color: colors.text }}>Loading Analysis...</Text>
+                {!user && <Text style={{ color: colors.mutedText, marginTop: 10 }}>Waiting for user session...</Text>}
             </View>
         );
     }
+
 
     const historicalDataFormatted = analysis.historicalData.map(d => ({
         value: d.score,
@@ -259,19 +256,28 @@ export default function FallRiskDashboard() {
                             <Text style={[styles.thresholdLabel, { color: colors.text }]}>Alert Threshold: {alertThreshold}</Text>
                             <View style={styles.thresholdButtons}>
                                 <TouchableOpacity
-                                    onPress={() => setAlertThreshold(prev => Math.max(10, prev - 5))}
+                                    onPress={async () => {
+                                        const newVal = Math.max(10, alertThreshold - 5);
+                                        setAlertThreshold(newVal);
+                                        if (user) await fallRiskService.updateThreshold(user.id, newVal);
+                                    }}
                                     style={[styles.smallBtn, { backgroundColor: colors.border }]}
                                 >
                                     <Ionicons name="remove" size={20} color={colors.text} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    onPress={() => setAlertThreshold(prev => Math.min(95, prev + 5))}
+                                    onPress={async () => {
+                                        const newVal = Math.min(95, alertThreshold + 5);
+                                        setAlertThreshold(newVal);
+                                        if (user) await fallRiskService.updateThreshold(user.id, newVal);
+                                    }}
                                     style={[styles.smallBtn, { backgroundColor: colors.border, marginLeft: 10 }]}
                                 >
                                     <Ionicons name="add" size={20} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
                         </View>
+
 
                         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 15 }]}>
                             <Ionicons name="notifications-outline" size={20} color="#FFF" />
