@@ -9,7 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../../context/ThemeContext';
 
@@ -121,7 +121,7 @@ We respond within 2 business days.`,
 
   const handleAccept = async () => {
     try {
-      await SecureStore.setItemAsync("privacyAccepted", "true");
+      await AsyncStorage.setItem("privacyAccepted", "true");
       router.replace("/"); // Go back to landing to unblock
     } catch (error) {
       console.error("Error saving privacy acceptance:", error);

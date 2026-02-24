@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Dimensions,
@@ -182,7 +182,7 @@ export default function LandingScreen() {
                   : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
               ]}
               onPress={async () => {
-                const accepted = await SecureStore.getItemAsync("privacyAccepted");
+                const accepted = await AsyncStorage.getItem("privacyAccepted");
 
                 if (!accepted) {
                   router.push("/home");
