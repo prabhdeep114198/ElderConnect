@@ -1,4 +1,5 @@
 import { authService } from "@/services/api/auth";
+import { profileService } from "@/services/api/profile";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
@@ -25,7 +26,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  updateProfile: (name: string) => Promise<void>;
+  updateProfile: (name: string, avatar?: string) => Promise<void>;
   updatePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
   requireAuth: (action: () => void) => void;
   refreshSubscription: () => Promise<void>;
@@ -79,27 +80,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Optionally refresh profile from backend
         try {
           const response: any = await authService.getProfile();
-          if (response && response.data) {
-            const userData = response.data;
+          if (response && response.data && response.data.user) {
+            const apiUser = response.data.user;
 
             // FIX 2: Always use the id from the cached session if backend
             // response doesn't include it, so user.id is never undefined.
-            const resolvedId = userData.id || parsedUser.id;
+            const resolvedId = apiUser.id || parsedUser.id;
 
             // FIX 3: Build name safely — handle both {name} and {firstName, lastName}
             // formats from different backend response shapes.
-            const resolvedName = userData.name
-              || `${userData.firstName ?? ''} ${userData.lastName ?? ''}`.trim()
+            const resolvedName = apiUser.name
+              || `${apiUser.firstName ?? ''} ${apiUser.lastName ?? ''}`.trim()
               || parsedUser.name
               || '';
 
             const updatedUser: User = {
-              id:           resolvedId,
-              name:         resolvedName,
-              email:        userData.email || parsedUser.email,
-              isOnboarded:  parsedUser.isOnboarded || false,
-              plan_level:   userData.plan_level || parsedUser.plan_level,
-              isSubscribed: userData.isSubscribed || false,
+              id: resolvedId,
+              name: resolvedName,
+              email: apiUser.email || parsedUser.email,
+              isOnboarded: parsedUser.isOnboarded || false,
+              plan_level: apiUser.isSubscribed ? "premium" : "free",
+              isSubscribed: apiUser.isSubscribed || false,
+              avatar: apiUser.avatar || parsedUser.avatar,
             };
 
             setUser(updatedUser);
@@ -131,12 +133,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           || '';
 
         const newUser: User = {
-          id:           apiUser.id,        // this must come from backend
-          name:         resolvedName,
-          email:        apiUser.email,
-          isOnboarded:  false,
+          id: apiUser.id,
+          name: resolvedName,
+          email: apiUser.email,
+          isOnboarded: false,
           isSubscribed: apiUser.isSubscribed || false,
-          plan_level:   apiUser.plan_level || "free",
+          plan_level: apiUser.isSubscribed ? "premium" : "free",
+          avatar: apiUser.avatar || null,
         };
 
         // Check onboarding status
@@ -181,12 +184,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           || name;
 
         const newUser: User = {
-          id:           apiUser.id,
-          name:         resolvedName,
-          email:        apiUser.email,
-          isOnboarded:  false,
+          id: apiUser.id,
+          name: resolvedName,
+          email: apiUser.email,
+          isOnboarded: false,
           isSubscribed: apiUser.isSubscribed || false,
-          plan_level:   apiUser.plan_level || "free",
+          plan_level: apiUser.isSubscribed ? "premium" : "free",
+          avatar: apiUser.avatar || null,
         };
 
         await AsyncStorage.setItem("auth_token", token);
@@ -228,12 +232,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
   };
 
-  const updateProfile = async (name: string) => {
+  const updateProfile = async (name: string, avatar?: string) => {
     try {
       if (user) {
-        const updatedUser = { ...user, name };
+        // Update local state first for instant feedback (Optimistic Update)
+        const updatedUser = { ...user, name, avatar: avatar || user.avatar };
         setUser(updatedUser);
         await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
+
+        // Update Backend
+        await profileService.updateProfile(user.id, {
+          name,
+          avatar: avatar || user.avatar,
+        });
       }
     } catch (error: any) {
       console.error("Update profile failed", error);

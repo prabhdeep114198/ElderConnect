@@ -17,6 +17,8 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
 
 import * as Notifications from "expo-notifications";
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { VoiceAssistant } from "../components/VoiceAssistant";
 import "../i18n";
 import { fallDetectionEngine } from "../services/fallDetection/FallDetectionEngine";
@@ -33,7 +35,7 @@ Notifications.setNotificationHandler({
 });
 
 function InitialLayout() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateProfile } = useAuth();
   const { theme, colors, toggleTheme, uiMode } = useTheme();
   const segments = useSegments();
   const router = useRouter();
@@ -150,18 +152,41 @@ function InitialLayout() {
   }
 
   const CustomDrawerContent = (props: any) => {
+    const pickImage = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets[0].uri) {
+        await updateProfile(user?.name || "User", result.assets[0].uri);
+      }
+    };
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
           <View style={[styles.drawerHeader, { backgroundColor: colors.primary }]}>
-            <View style={styles.avatarContainer}>
-              <Ionicons name="person-circle" size={64} color="#FFF" />
+            <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+              {user?.avatar ? (
+                <Image
+                  source={{ uri: user.avatar }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Ionicons name="person-circle" size={64} color="#FFF" />
+              )}
+              <View style={styles.editIconContainer}>
+                <Ionicons name="camera" size={12} color="#FFF" />
+              </View>
               {user?.plan_level === 'premium' && (
                 <View style={styles.premiumBadge}>
                   <Ionicons name="star" size={12} color="#FFD700" />
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
             <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
             <Text style={styles.userEmail}>{user?.email || 'Sign in for full access'}</Text>
             <View style={styles.uiModeBadge}>
@@ -320,7 +345,7 @@ function InitialLayout() {
         <Drawer.Screen name="onboarding/index" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="fall-detected" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="onboarding" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
-        
+
         {/* HIDE THE ROOM SCREEN FROM SIDEBAR */}
         <Drawer.Screen
           name="videocall/room"
@@ -330,7 +355,7 @@ function InitialLayout() {
             title: "Video Room"
           }}
         />
-        
+
         {/* Ensure the group folder doesn't create a second entry */}
         <Drawer.Screen name="videocall" options={{ drawerItemStyle: { display: "none" } }} />
 
@@ -352,15 +377,19 @@ const styles = StyleSheet.create({
   footerItemText: { fontSize: 16, marginLeft: 15, fontWeight: '500' },
   uiModeBadge: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignSelf: 'flex-start' },
   uiModeText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
+  avatarImage: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#FFF' },
+  editIconContainer: { position: 'absolute', bottom: 0, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 4, borderWidth: 1, borderColor: '#FFF' },
+});
+
+// Initialize Flagsmith before providing it
+flagsmith.init({
+  environmentID: process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID!,
 });
 
 export default function RootLayout() {
   return (
     <PaperProvider>
-      <FlagsmithProvider
-        flagsmith={flagsmith}
-        environmentID={process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID!}
-      >
+      <FlagsmithProvider flagsmith={flagsmith}>
         <AuthProvider>
           <ThemeProvider>
             <ActionSheetProvider>

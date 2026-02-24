@@ -182,19 +182,19 @@ export default function LandingScreen() {
                   : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
               ]}
               onPress={async () => {
-  const accepted = await SecureStore.getItemAsync("privacyAccepted");
+                const accepted = await SecureStore.getItemAsync("privacyAccepted");
 
-  if (!accepted) {
-    router.push("./settings/privacy");
-    return;
-  }
+                if (!accepted) {
+                  router.push("/home");
+                  return;
+                }
 
-  if (btn.actionType === "login") {
-    setShowLogin(true);
-  } else if (btn.actionType === "route" && btn.route) {
-    router.push(btn.route as any);
-  }
-}}
+                if (btn.actionType === "login") {
+                  setShowLogin(true);
+                } else if (btn.actionType === "route" && btn.route) {
+                  router.push(btn.route as any);
+                }
+              }}
             >
               <Text style={[
                 styles.buttonText,
@@ -212,7 +212,7 @@ export default function LandingScreen() {
       <Modal visible={showLogin} animationType="slide" transparent>
         <LoginModal onClose={() => setShowLogin(false)} />
       </Modal>
-      
+
     </ScrollView>
   );
 }
@@ -230,18 +230,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerText: {
-  fontSize: 12,
-  color: "#6b7280", // gray-500
-  textAlign: "center",
-  marginTop: 8,
-},
+    fontSize: 12,
+    color: "#6b7280", // gray-500
+    textAlign: "center",
+    marginTop: 8,
+  },
   footerDot: {
-  width: 8,
-  height: 8,
-  borderRadius: 4,
-  backgroundColor: "#9ca3af",
-  marginHorizontal: 4,
-},
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#9ca3af",
+    marginHorizontal: 4,
+  },
   heroSection: {
     alignItems: 'center',
     marginBottom: 40,
@@ -253,12 +253,12 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   footer: {
-  paddingVertical: 16,
-  paddingHorizontal: 16,
-  borderTopWidth: 1,
-  borderColor: "#e5e7eb",
-  backgroundColor: "#fff",
-},
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+  },
   title: {
     fontSize: 32,
     fontWeight: "bold",
