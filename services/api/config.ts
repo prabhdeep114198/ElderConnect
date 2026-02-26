@@ -39,4 +39,4 @@ export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
 
 export const API_TIMEOUT = 10000; // 10 seconds
 
-export const DEVICE_API_KEY = 'dev-device-key-123';
+export const DEVICE_API_KEY = process.env.EXPO_PUBLIC_DEVICE_API_KEY || 'dev-device-key-123';

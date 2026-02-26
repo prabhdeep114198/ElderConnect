@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useFeatureFlag } from '../hooks/useFeatureFlags';
-import { N8NService } from '../services/N8NService';
+import { VoiceAssistantService } from '../services/VoiceAssistantService';
 import { SpeechToTextService } from '../services/SpeechToTextService';
 
 const { width } = Dimensions.get('window');
@@ -112,13 +112,12 @@ export const VoiceAssistant = () => {
                     await new Promise(r => setTimeout(r, 1200));
                     setMessage("Connecting to AI Assistant...");
 
-                    // 2. Send Text -> n8n Webhook
-                    const response = await N8NService.sendTextCommand(sttResult.text, {
-                        userId: user?.id,
+                    // 2. Send Text -> Backend directly (No n8n)
+                    const response = await VoiceAssistantService.processCommand(sttResult.text, {
+                        userId: user?.id || "unknown-user",
                         name: user?.name,
-                        currentTime: new Date().toISOString()
                     });
-                    console.log("[VoiceAssistant] n8n Response:", response);
+                    console.log("[VoiceAssistant] Backend Response:", response);
 
                     if (response && response.message) {
                         setMessage(response.message);

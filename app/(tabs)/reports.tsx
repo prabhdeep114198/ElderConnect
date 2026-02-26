@@ -14,7 +14,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useFeatureFlags } from "../../hooks/useFeatureFlags";
 import { useResponsive } from "../../hooks/useResponsive";
-import { N8NService } from "../../services/N8NService";
 import { deviceService } from "../../services/api/device";
 import { GraphData, graphService } from "../../services/api/graph";
 import { profileService } from "../../services/api/profile";

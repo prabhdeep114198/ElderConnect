@@ -7,10 +7,12 @@ class PeerService {
   }
 
   init() {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof RTCPeerConnection !== "undefined") {
       this.peer = new RTCPeerConnection({
         iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
       });
+    } else {
+      console.warn("RTCPeerConnection is not available in this environment");
     }
   }
 

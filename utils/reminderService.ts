@@ -48,13 +48,13 @@ export const ReminderService = {
             status: 'active',
         };
 
-        // If notify family is enabled, ping n8n
+        // If notify family is enabled, ping backend for external notification
         if (notifyFamily && userData) {
             try {
                 const { N8NService } = require('../services/N8NService');
                 await N8NService.sendReminderAlert(userData, newReminder);
             } catch (err) {
-                console.error("N8N Notification failed", err);
+                console.error("External notification failed", err);
             }
         }
 
