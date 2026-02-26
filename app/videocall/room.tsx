@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getSocket } from "../../services/socket";
@@ -12,15 +12,15 @@ export default function RoomScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
 
-  const myVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const myVideoRef = useRef<any>(null);
+  const remoteVideoRef = useRef<any>(null);
+  const streamRef = useRef<any>(null);
 
   const [status, setStatus] = useState("Initializing...");
   const [isRemoteConnected, setIsRemoteConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const candidatesQueue = useRef<RTCIceCandidateInit[]>([]);
+  const candidatesQueue = useRef<any[]>([]);
 
   const isDark = theme === 'dark';
 
@@ -43,7 +43,7 @@ export default function RoomScreen() {
   const handleEndCall = useCallback(() => {
     socket?.emit("peer:leave", { to: roomId });
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track: any) => track.stop());
     }
     peer.recreatePeer();
     router.replace("/videocall");
@@ -66,7 +66,10 @@ export default function RoomScreen() {
     await peer.setRemoteDescription(ans);
     while (candidatesQueue.current.length > 0) {
       const c = candidatesQueue.current.shift();
-      if (c && peer.peer) await peer.peer.addIceCandidate(new RTCIceCandidate(c));
+      if (c && peer.peer) {
+        // @ts-ignore
+        await peer.peer.addIceCandidate(c);
+      }
     }
   }, []);
 
@@ -82,6 +85,10 @@ export default function RoomScreen() {
       const pc = peer.recreatePeer();
       if (!pc) return;
       try {
+        // Guard navigator for native
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+          throw new Error("MediaDevices not supported");
+        }
         const localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
         streamRef.current = localStream;
         localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
@@ -106,20 +113,21 @@ export default function RoomScreen() {
     socket.on("call:accepted", handleCallAccepted);
     socket.on("peer:left", handlePeerLeft);
     socket.on("peer:ice:candidate", async ({ candidate }) => {
-      if (peer.peer?.remoteDescription) await peer.peer.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+      // @ts-ignore
+      if (peer.peer?.remoteDescription) await peer.peer.addIceCandidate(candidate).catch(console.error);
       else candidatesQueue.current.push(candidate);
     });
     return () => {
       socket.off("user:joined"); socket.off("incomming:call"); socket.off("call:accepted");
       socket.off("peer:left"); socket.off("peer:ice:candidate");
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (streamRef.current) streamRef.current.getTracks().forEach((t: any) => t.stop());
     };
   }, [socket, roomId, handleUserJoined, handleIncomingCall, handleCallAccepted, handlePeerLeft]);
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#F2F2F7' }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
+
       <View style={styles.topInfo}>
         <Text style={[styles.header, { color: colors.text }]}>Room: {roomId}</Text>
         <Text style={[styles.status, { color: isRemoteConnected ? '#4caf50' : colors.mutedText }]}>{status}</Text>
@@ -128,7 +136,12 @@ export default function RoomScreen() {
       <View style={styles.videoGrid}>
         {/* Local Video - Reverted to your exact sizing */}
         <View style={[styles.videoBox, { backgroundColor: isDark ? '#111' : '#E5E5EA', borderColor: colors.border }]}>
-          <video ref={myVideoRef} autoPlay playsInline muted style={styles.videoElement} />
+          {Platform.OS === 'web' ? (
+            // @ts-ignore
+            <video ref={myVideoRef} autoPlay playsInline muted style={styles.videoElement} />
+          ) : (
+            <View style={styles.placeholder}><Ionicons name="person" size={40} color={colors.mutedText} /></View>
+          )}
           {isCameraOff && (
             <View style={styles.overlay}><Text style={[styles.overlayText, { color: colors.mutedText }]}>Camera Off</Text></View>
           )}
@@ -137,13 +150,17 @@ export default function RoomScreen() {
 
         {/* Remote Video - Reverted to your exact sizing */}
         <View style={[styles.videoBox, { backgroundColor: isDark ? '#111' : '#E5E5EA', borderColor: colors.border }]}>
-          <video
-            ref={remoteVideoRef}
-            autoPlay playsInline
-            style={{
-              ...styles.videoElement,
-              display: isRemoteConnected ? 'block' : 'none'
-            }} />
+          {Platform.OS === 'web' && isRemoteConnected ? (
+            // @ts-ignore
+            <video
+              ref={remoteVideoRef}
+              autoPlay playsInline
+              style={styles.videoElement} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Ionicons name="videocam-off" size={40} color={colors.mutedText} />
+            </View>
+          )}
           {!isRemoteConnected && (
             <View style={styles.placeholder}>
               <Text style={{ color: colors.mutedText }}>Connecting...</Text>
