@@ -32,6 +32,7 @@ export const VoiceAssistant = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [pulseAnim] = useState(new Animated.Value(1));
     const [message, setMessage] = useState<string | null>(null);
+    const [pendingIntent, setPendingIntent] = useState<any>(null);
 
     const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
         // Handle status changes if needed
@@ -119,7 +120,13 @@ export const VoiceAssistant = () => {
                     });
                     console.log("[VoiceAssistant] Backend Response:", response);
 
-                    if (response && response.message) {
+                    if (response && response.requiresConfirmation) {
+                        setMessage(response.message);
+                        setPendingIntent(response.pendingIntent);
+                        // Do not clear message or processing state yet; wait for user action
+                        setIsProcessing(false);
+                        return;
+                    } else if (response && response.message) {
                         setMessage(response.message);
                     } else if (response && response.reply) {
                         setMessage(response.reply);
@@ -141,6 +148,37 @@ export const VoiceAssistant = () => {
         }
     }
 
+    const acceptConfirmation = async () => {
+        setIsProcessing(true);
+        setMessage("Saving...");
+        try {
+            const response = await VoiceAssistantService.processCommand(
+                "",
+                { userId: user?.id || "unknown-user", name: user?.name },
+                true,
+                pendingIntent
+            );
+            if (response && response.message) {
+                setMessage(response.message);
+            } else {
+                setMessage("Successfully saved.");
+            }
+        } catch (error) {
+            console.error("Error confirming action:", error);
+            setMessage("Failed to save.");
+        } finally {
+            setPendingIntent(null);
+            setIsProcessing(false);
+            setTimeout(() => setMessage(null), 4000);
+        }
+    };
+
+    const cancelConfirmation = () => {
+        setPendingIntent(null);
+        setMessage("Action cancelled.");
+        setTimeout(() => setMessage(null), 2000);
+    };
+
     const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
     if (!user || !hasSubscription) return null;
 
@@ -149,6 +187,16 @@ export const VoiceAssistant = () => {
             {message && (
                 <View style={[styles.messageBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <Text style={[styles.messageText, { color: colors.text }]}>{message}</Text>
+                    {pendingIntent && (
+                        <View style={styles.confirmationActions}>
+                            <TouchableOpacity style={[styles.confirmButton, { backgroundColor: colors.error }]} onPress={cancelConfirmation}>
+                                <Text style={styles.confirmButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.confirmButton, { backgroundColor: colors.primary }]} onPress={acceptConfirmation}>
+                                <Text style={styles.confirmButtonText}>OK</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -216,5 +264,23 @@ const styles = StyleSheet.create({
     messageText: {
         fontSize: 14,
         fontWeight: '500',
+    },
+    confirmationActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 12,
+        paddingHorizontal: 8,
+    },
+    confirmButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 10,
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    confirmButtonText: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
     }
 });

@@ -8,8 +8,10 @@ export const VoiceAssistantService = {
      * This replaces the previous n8n workflow.
      * @param transcript The transcribed text from the voice command
      * @param userContext Information about the current user
+     * @param isConfirmation Whether this is confirming a pending action
+     * @param pendingIntent The intent state to execute if confirming
      */
-    async processCommand(transcript: string, userContext: { userId: string; name?: string }) {
+    async processCommand(transcript: string, userContext: { userId: string; name?: string }, isConfirmation?: boolean, pendingIntent?: any) {
         try {
             // Get the JWT to include in the payload so the backend can call protected endpoints
             const jwt = await AsyncStorage.getItem("auth_token");
@@ -17,6 +19,8 @@ export const VoiceAssistantService = {
             const payload = {
                 text: transcript,
                 jwt: jwt || "no-token-available",
+                isConfirmation: isConfirmation || false,
+                pendingIntent: pendingIntent || null,
                 userContext: {
                     userId: userContext.userId,
                     name: userContext.name,
