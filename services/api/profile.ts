@@ -55,3 +55,7 @@ export const profileService = {
     getStreaks: (userId: string) => api.get(`/v1/users/${userId}/gamification/streaks`),
     getAchievements: (userId: string) => api.get(`/v1/users/${userId}/gamification/achievements`),
 };
+
+export const eventService = {
+  getExternalEvents: () => api.get('/events/external'),
+};
