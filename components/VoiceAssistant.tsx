@@ -191,7 +191,7 @@ export const VoiceAssistant = () => {
                 }
             }
         } catch (err) {
-            console.error('Failed to stop recording', err);
+            console.error('[VoiceAssistant] Error during stop or processing:', err);
             setMessage("Error processing voice.");
         } finally {
             setIsProcessing(false);

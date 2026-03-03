@@ -8,18 +8,19 @@ import { Platform } from 'react-native';
  * - Physical Device: Detected from Expo hostUri or fallback to your local IP
  */
 const getDevUrl = () => {
-    // 1. Priority: Explicit Environment Variable
-    if (process.env.EXPO_PUBLIC_API_BASE_URL) {
-        return process.env.EXPO_PUBLIC_API_BASE_URL;
-    }
-
-    // 2. Discover the host IP from Expo's Metro server
+    // 1. Priority: Discover the host IP from Expo's Metro server
     // This is the most reliable way to connect a physical phone to your Mac
     const debuggerHost = Constants.expoConfig?.hostUri;
     const hostIP = debuggerHost ? debuggerHost.split(':')[0] : null;
 
     if (hostIP) {
+        // Use local IP for physical devices connecting to your local machine
         return `http://${hostIP}:3000/api`;
+    }
+
+    // 2. Fallback: Explicit Environment Variable
+    if (process.env.EXPO_PUBLIC_API_BASE_URL) {
+        return process.env.EXPO_PUBLIC_API_BASE_URL;
     }
 
     // 3. Fallbacks for simulators when hostIP detection fails
@@ -33,7 +34,7 @@ const getDevUrl = () => {
 const DEV_API_URL = getDevUrl();
 
 // You can replace this with your production URL when ready
-const PROD_API_URL = 'http://192.168.29.13:3000/api';
+const PROD_API_URL = 'https://elderconnectbe-production.up.railway.app/api';
 
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
 
