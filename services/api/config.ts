@@ -34,7 +34,7 @@ const getDevUrl = () => {
 const DEV_API_URL = getDevUrl();
 
 // You can replace this with your production URL when ready
-const PROD_API_URL = 'https://elderconnectbe-production.up.railway.app/api';
+const PROD_API_URL = process.env.EXPO_PUBLIC_PROD_API_URL || 'https://elderconnectbe-production.up.railway.app/api';
 
 export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
 
