@@ -307,6 +307,14 @@ function InitialLayout() {
         />
 
         <Drawer.Screen
+          name="fall-risk"
+          options={{
+            title: "Fall Risk",
+            drawerIcon: ({ color, size }) => <Ionicons name="analytics" size={size} color={color} />,
+          }}
+        />
+
+        <Drawer.Screen
           name="music"
           options={{
             title: "Music",

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { API_BASE_URL } from './api/config';
 
 const HF_API_URL = `https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3`;
 export interface TranscriptionResult {
@@ -72,12 +73,7 @@ export const SpeechToTextService = {
      */
     async transcribeViaBackend(audioUri: string): Promise<TranscriptionResult> {
         try {
-            const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-            if (!baseUrl) {
-                return { success: false, error: "API_BASE_URL not configured" };
-            }
-
-            const backendUrl = `${baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl}/voice/transcribe`;
+            const backendUrl = `${API_BASE_URL}/voice/transcribe`;
             console.log(`[STT Service] Calling backend: ${backendUrl}`);
 
             const formData = new FormData();
