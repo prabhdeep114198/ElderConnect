@@ -1,4 +1,6 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
+
 import { RequestMethod } from '../api/client';
 
 export interface QueuedRequest {
@@ -13,7 +15,7 @@ export interface QueuedRequest {
 }
 
 class OfflineQueue {
-    private db: SQLite.SQLiteDatabase | null = null;
+    private db: any = null;
 
     async init() {
         this.db = await SQLite.openDatabaseAsync('offline_requests.db');
@@ -43,9 +45,9 @@ class OfflineQueue {
 
     async getPendingRequests(): Promise<QueuedRequest[]> {
         if (!this.db) await this.init();
-        return await this.db!.getAllAsync<QueuedRequest>(
+        return await this.db!.getAllAsync(
             `SELECT * FROM queued_requests WHERE status IN ('PENDING', 'RETRYING') ORDER BY timestamp ASC`
-        );
+        ) as QueuedRequest[];
     }
 
     async updateRetry(id: number, retryCount: number, status: QueuedRequest['status']) {

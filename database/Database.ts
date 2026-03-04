@@ -1,13 +1,16 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
+
 
 /**
  * Main application database for caching server data.
  * This patterns allows us to have a local mirror of the remote REST API.
  */
 class AppDatabase {
-  private db: SQLite.SQLiteDatabase | null = null;
+  private db: any = null;
 
   async getDb() {
+    if (Platform.OS === 'web') return null;
     if (!this.db) {
       this.db = await SQLite.openDatabaseAsync('elderconnect_main.db');
       await this.initSchema();
