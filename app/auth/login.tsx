@@ -13,14 +13,18 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Dimensions
 } from "react-native";
+import { Image } from "expo-image";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useResponsive } from "../../hooks/useResponsive";
+import { getFontSize } from "../../utils/typography";
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { colors, theme } = useTheme();
+    const { colors, theme, fontSize, uiMode } = useTheme();
     const { t } = useTranslation();
     const { login, signup, loginWithGoogle, loading, user } = useAuth();
 
@@ -56,109 +60,130 @@ export default function LoginScreen() {
         }
     };
 
+    const { isDesktop, isWeb } = useResponsive();
+
     return (
-        <ResponsiveView maxWidth={480} style={[styles.container, { backgroundColor: Platform.OS === 'web' ? '#F0F2F5' : colors.background }]}>
+        <ResponsiveView maxWidth={isDesktop ? 1000 : 480} style={[styles.container, { backgroundColor: colors.background }]}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 style={{ flex: 1, justifyContent: 'center' }}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <View style={styles.content}>
-                        {/* Logo */}
-                        <View style={[styles.logoContainer, { backgroundColor: colors.card }]}>
-                            <Ionicons name="medical" size={64} color={colors.primary} />
-                        </View>
+                <ScrollView contentContainerStyle={isWeb ? styles.webScrollContent : styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <View style={[styles.content, isDesktop && styles.desktopContent, { backgroundColor: isWeb ? colors.card : 'transparent' }]}>
 
-                        <Text style={[styles.title, { color: colors.text }]}>
-                            {isLogin ? t("welcomeBack") : t("createAccount")}
-                        </Text>
-                        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-                            {isLogin
-                                ? t("loginSubtitle")
-                                : t("signupSubtitle")}
-                        </Text>
-
-                        {/* Inputs */}
-                        {!isLogin && (
-                            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                                <Ionicons name="person-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
-                                <TextInput
-                                    placeholder={t("fullName")}
-                                    placeholderTextColor={colors.mutedText}
-                                    style={[styles.input, { color: colors.text }]}
-                                    value={name}
-                                    onChangeText={setName}
+                        {/* Split Screen Image for Desktop */}
+                        {isDesktop && (
+                            <View style={styles.imageContainer}>
+                                <Image
+                                    source={require("../../assets/images/login_banner.png")}
+                                    style={styles.bannerImage}
+                                    contentFit="cover"
+                                    transition={500}
                                 />
+                                <View style={styles.imageOverlay}>
+                                    <Text style={styles.overlayTitle}>{t("ElderConnect") || "ElderConnect"}</Text>
+                                    <Text style={styles.overlaySubtitle}>{t("Compassionate care, connected technology.") || "Compassionate care, connected technology."}</Text>
+                                </View>
                             </View>
                         )}
 
-                        <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                            <Ionicons name="mail-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
-                            <TextInput
-                                placeholder={t("emailAddress")}
-                                placeholderTextColor={colors.mutedText}
-                                style={[styles.input, { color: colors.text }]}
-                                value={email}
-                                onChangeText={setEmail}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                            />
-                        </View>
+                        <View style={[styles.formSection, isDesktop && styles.desktopFormSection]}>
+                            {/* Logo */}
+                            <View style={[styles.logoContainer, { backgroundColor: colors.card }]}>
+                                <Ionicons name="medical" size={isWeb ? 48 : 64} color={colors.primary} />
+                            </View>
 
-                        <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                            <Ionicons name="lock-closed-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
-                            <TextInput
-                                placeholder={t("password")}
-                                placeholderTextColor={colors.mutedText}
-                                style={[styles.input, { color: colors.text }]}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.mainButton, { backgroundColor: colors.primary }]}
-                            onPress={handleAuth}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#FFF" />
-                            ) : (
-                                <Text style={styles.mainButtonText}>
-                                    {isLogin ? t("signIn") : t("signUp")}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.toggleContainer}>
-                            <Text style={[styles.toggleText, { color: colors.mutedText }]}>
-                                {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
-                                <Text style={{ color: colors.primary, fontWeight: "bold" }}>
-                                    {isLogin ? t("signUp") : t("signIn")}
-                                </Text>
+                            <Text style={[styles.title, { color: colors.text, fontSize: getFontSize(isWeb ? 24 : 28, fontSize) }]}>
+                                {isLogin ? t("welcomeBack") : t("createAccount")}
                             </Text>
-                        </TouchableOpacity>
+                            <Text style={[styles.subtitle, { color: colors.mutedText, fontSize: getFontSize(16, fontSize) }]}>
+                                {isLogin
+                                    ? t("loginSubtitle")
+                                    : t("signupSubtitle")}
+                            </Text>
 
-                        <View style={styles.dividerContainer}>
-                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                            <Text style={[styles.dividerText, { color: colors.mutedText }]}>{t("or")}</Text>
-                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            {/* Inputs */}
+                            {!isLogin && (
+                                <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                    <Ionicons name="person-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
+                                    <TextInput
+                                        placeholder={t("fullName")}
+                                        placeholderTextColor={colors.mutedText}
+                                        style={[styles.input, { color: colors.text }]}
+                                        value={name}
+                                        onChangeText={setName}
+                                    />
+                                </View>
+                            )}
+
+                            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                <Ionicons name="mail-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
+                                <TextInput
+                                    placeholder={t("emailAddress")}
+                                    placeholderTextColor={colors.mutedText}
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                />
+                            </View>
+
+                            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                <Ionicons name="lock-closed-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
+                                <TextInput
+                                    placeholder={t("password")}
+                                    placeholderTextColor={colors.mutedText}
+                                    style={[styles.input, { color: colors.text }]}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.mainButton, { backgroundColor: colors.primary }]}
+                                onPress={handleAuth}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : (
+                                    <Text style={[styles.mainButtonText, { color: colors.buttonText, fontSize: getFontSize(18, fontSize) }]}>
+                                        {isLogin ? t("signIn") : t("signUp")}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.toggleContainer}>
+                                <Text style={[styles.toggleText, { color: colors.mutedText, fontSize: getFontSize(14, fontSize) }]}>
+                                    {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
+                                    <Text style={{ color: colors.primary, fontWeight: "bold" }}>
+                                        {" "}{isLogin ? t("signUp") : t("signIn")}
+                                    </Text>
+                                </Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.dividerContainer}>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                <Text style={[styles.dividerText, { color: colors.mutedText }]}>{t("or")}</Text>
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            </View>
+
+                            {/* Google Login Button */}
+                            <TouchableOpacity
+                                style={[styles.socialButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                                onPress={loginWithGoogle}
+                                disabled={loading}
+                            >
+                                <Ionicons name="logo-google" size={24} color={colors.text} style={{ marginRight: 12 }} />
+                                <Text style={[styles.socialButtonText, { color: colors.text, fontSize: getFontSize(16, fontSize) }]}>{t("continueWithGoogle")}</Text>
+                            </TouchableOpacity>
+
+                            <Text style={[styles.footerText, { color: colors.mutedText, fontSize: getFontSize(12, fontSize) }]}>
+                                {t("termsPrivacy")}
+                            </Text>
                         </View>
-
-                        {/* Google Login Button */}
-                        <TouchableOpacity
-                            style={[styles.socialButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                            onPress={loginWithGoogle}
-                            disabled={loading}
-                        >
-                            <Ionicons name="logo-google" size={24} color={colors.text} style={{ marginRight: 12 }} />
-                            <Text style={[styles.socialButtonText, { color: colors.text }]}>{t("continueWithGoogle")}</Text>
-                        </TouchableOpacity>
-
-                        <Text style={[styles.footerText, { color: colors.mutedText }]}>
-                            {t("termsPrivacy")}
-                        </Text>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -173,19 +198,66 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         justifyContent: "center",
-        padding: Platform.OS === 'web' ? 24 : 16,
+        padding: 16,
+    },
+    webScrollContent: {
+        flexGrow: 1,
+        justifyContent: "center",
+        padding: 24,
+        alignItems: 'center',
     },
     content: {
         alignItems: "center",
         width: "100%",
-        backgroundColor: Platform.OS === 'web' ? '#FFFFFF' : 'transparent',
-        padding: Platform.OS === 'web' ? 40 : 0,
         borderRadius: 24,
+        overflow: 'hidden', // Required for split screen rounded corners
+    },
+    desktopContent: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: Platform.OS === 'web' ? 0.05 : 0,
-        shadowRadius: 20,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.15,
+        shadowRadius: 24,
+        elevation: 10,
+        minHeight: 650,
+    },
+    imageContainer: {
+        flex: 1.1,
+        position: 'relative',
+    },
+    bannerImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 40,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    overlayTitle: {
+        color: '#FFFFFF',
+        fontSize: 32,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    overlaySubtitle: {
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 18,
+        lineHeight: 24,
+    },
+    formSection: {
+        width: "100%",
+        alignItems: "center",
+        padding: Platform.OS === 'web' ? 40 : 0,
+    },
+    desktopFormSection: {
+        flex: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 60,
     },
     logoContainer: {
         width: 100,
@@ -244,7 +316,7 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     mainButtonText: {
-        color: "#FFF",
+        color: "#FFFFFF",
         fontSize: 18,
         fontWeight: "bold",
     },

@@ -98,11 +98,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               id: resolvedId,
               name: resolvedName,
               email: apiUser.email || parsedUser.email,
-              isOnboarded: parsedUser.isOnboarded || false,
+              isOnboarded: apiUser.isOnboarded || parsedUser.isOnboarded || false,
               plan_level: apiUser.isSubscribed ? "premium" : "free",
               isSubscribed: apiUser.isSubscribed || false,
               avatar: apiUser.avatar || parsedUser.avatar,
             };
+
+            // PASSIVE SYNC: If local storage knows user is onboarded but backend doesn't, sync it up.
+            if (!apiUser.isOnboarded && parsedUser.isOnboarded) {
+              profileService.updateProfile(resolvedId, { isOnboarded: true })
+                .catch(err => console.log("[AuthContext] Passive sync failed", err));
+            }
 
             setUser(updatedUser);
             await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
@@ -136,18 +142,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: apiUser.id,
           name: resolvedName,
           email: apiUser.email,
-          isOnboarded: false,
+          isOnboarded: apiUser.isOnboarded || false,
           isSubscribed: apiUser.isSubscribed || false,
           plan_level: apiUser.isSubscribed ? "premium" : "free",
           avatar: apiUser.avatar || null,
         };
-
-        // Check onboarding status
-        const profileKey = `user_onboarded_${apiUser.id}`;
-        const existingProfile = await AsyncStorage.getItem(profileKey);
-        if (existingProfile) {
-          newUser.isOnboarded = true;
-        }
 
         await AsyncStorage.setItem("auth_token", token);
         await AsyncStorage.setItem("user_session", JSON.stringify(newUser));
@@ -187,7 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           id: apiUser.id,
           name: resolvedName,
           email: apiUser.email,
-          isOnboarded: false,
+          isOnboarded: apiUser.isOnboarded || false,
           isSubscribed: apiUser.isSubscribed || false,
           plan_level: apiUser.isSubscribed ? "premium" : "free",
           avatar: apiUser.avatar || null,
@@ -226,10 +225,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const completeOnboarding = async () => {
     if (!user) return;
-    const updatedUser = { ...user, isOnboarded: true };
-    setUser(updatedUser);
-    await AsyncStorage.setItem(`user_onboarded_${user.id}`, "true");
-    await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
+    try {
+      const updatedUser = { ...user, isOnboarded: true };
+      setUser(updatedUser);
+      await AsyncStorage.setItem(`user_onboarded_${user.id}`, "true");
+      await AsyncStorage.setItem("user_session", JSON.stringify(updatedUser));
+
+      // SYNC TO BACKEND
+      await profileService.updateProfile(user.id, { isOnboarded: true });
+    } catch (error) {
+      console.error("Failed to sync onboarding status to backend", error);
+    }
   };
 
   const updateProfile = async (name: string, avatar?: string) => {

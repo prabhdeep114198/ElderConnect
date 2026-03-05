@@ -9,8 +9,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Colors } from "../constants/colors";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -34,6 +34,7 @@ interface ButtonConfig {
 export default function LoginModal({ onClose }: LoginModalProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { colors, theme } = useTheme();
 
   // Dynamic form fields
   const formFields: FormField[] = [
@@ -85,27 +86,27 @@ export default function LoginModal({ onClose }: LoginModalProps) {
         router.push("/auth/login");
       },
       primary: false,
-      textColor: Colors.primary,
+      textColor: colors.primary,
     },
     {
       text: t("close"),
       onPress: onClose,
       primary: false,
-      textColor: Colors.mutedText,
+      textColor: colors.mutedText,
     },
   ];
 
   return (
-    <View style={styles.overlay}>
-      <View style={styles.modal}>
-        <Text style={styles.title}>{t("loginToElderConnect")}</Text>
+    <View style={[styles.overlay, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(0, 0, 0, 0.5)' }]}>
+      <View style={[styles.modal, { backgroundColor: colors.card }]}>
+        <Text style={[styles.title, { color: colors.primary }]}>{t("loginToElderConnect")}</Text>
 
         {formFields.map((field) => (
           <TextInput
             key={field.key}
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
             placeholder={field.placeholder}
-            placeholderTextColor={Colors.mutedText}
+            placeholderTextColor={colors.mutedText}
             value={formValues[field.key]}
             onChangeText={(val) => handleChange(field.key, val)}
             secureTextEntry={field.secure}
@@ -119,15 +120,16 @@ export default function LoginModal({ onClose }: LoginModalProps) {
             key={index}
             style={[
               styles.button,
-              !btn.primary && styles.secondaryButton,
-              btn.primary && { backgroundColor: Colors.primary },
+              !btn.primary && [styles.secondaryButton, { backgroundColor: colors.card, borderColor: colors.primary }],
+              btn.primary && { backgroundColor: colors.primary },
             ]}
             onPress={btn.onPress}
           >
             <Text
               style={[
                 styles.buttonText,
-                !btn.primary && { color: btn.textColor || Colors.primary },
+                !btn.primary && { color: btn.textColor || colors.primary },
+                btn.primary && { color: colors.buttonText }
               ]}
             >
               {btn.text}
@@ -142,12 +144,10 @@ export default function LoginModal({ onClose }: LoginModalProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   modal: {
-    backgroundColor: Colors.card,
     padding: 24,
     borderRadius: 12,
     width: "90%",
@@ -156,16 +156,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: Colors.primary,
     textAlign: "center",
     marginBottom: 24,
   },
   input: {
-    backgroundColor: Colors.background,
     padding: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
     marginBottom: 16,
     fontSize: 16,
   },
@@ -176,9 +173,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   secondaryButton: {
-    backgroundColor: Colors.card,
     borderWidth: 1,
-    borderColor: Colors.primary,
   },
   buttonText: {
     fontWeight: "bold",
