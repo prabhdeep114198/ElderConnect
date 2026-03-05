@@ -62,6 +62,7 @@ const AnimatedFeatureCard = ({ feature, index, colors, fontSize }: { feature: Fe
 
 export default function LandingScreen() {
   const router = useRouter();
+  const { isWeb, gridColumns, isDesktop } = useResponsive();
   const { colors, theme, fontSize } = useTheme();
   const { t } = useTranslation();
   const { user } = useAuth(); // Check auth state to adjust buttons if needed
@@ -138,8 +139,6 @@ export default function LandingScreen() {
       </View>
     );
   }
-
-  const { isWeb, gridColumns, isDesktop } = useResponsive();
 
   return (
     <ResponsiveView style={{ flex: 1, backgroundColor: colors.background }}>

@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AlertSection } from '../components/fallRisk/AlertSection';
 import { ForecastCards } from '../components/fallRisk/ForecastCards';
 import { RecommendationsSection } from '../components/fallRisk/RecommendationsSection';
@@ -28,6 +29,7 @@ const REFRESH_INTERVAL = 30000; // 30 seconds for risk recalculation
 export default function FallRiskDashboard() {
     const { colors, uiMode } = useTheme();
     const { user } = useAuth();
+    const { t } = useTranslation();
     const [refreshing, setRefreshing] = useState(false);
     const [analysis, setAnalysis] = useState<FallRiskAnalysis | null>(null);
     const [alerts, setAlerts] = useState<FallRiskAlert[]>([]);
@@ -106,10 +108,10 @@ export default function FallRiskDashboard() {
         return (
             <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
                 <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-                <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>Analysis Failed</Text>
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>{t("analysisFailed")}</Text>
                 <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: 5 }}>{error}</Text>
                 <TouchableOpacity onPress={onRefresh} style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 20, paddingHorizontal: 30 }]}>
-                    <Text style={styles.actionButtonText}>Retry</Text>
+                    <Text style={styles.actionButtonText}>{t("retry")}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -118,8 +120,8 @@ export default function FallRiskDashboard() {
     if (!analysis) {
         return (
             <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: colors.text }}>Loading Analysis...</Text>
-                {!user && <Text style={{ color: colors.mutedText, marginTop: 10 }}>Waiting for user session...</Text>}
+                <Text style={{ color: colors.text }}>{t("loadingAnalysis")}</Text>
+                {!user && <Text style={{ color: colors.mutedText, marginTop: 10 }}>{t("waitingForSession")}</Text>}
             </View>
         );
     }
@@ -134,7 +136,7 @@ export default function FallRiskDashboard() {
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <Stack.Screen
                 options={{
-                    title: isCaregiver ? "Caregiver: Fall Risk" : "My Fall Risk",
+                    title: isCaregiver ? t("caregiverFallRisk") : t("myFallRisk"),
                     headerRight: () => (
                         <TouchableOpacity onPress={onRefresh} style={{ marginRight: 15 }}>
                             <Ionicons name="refresh" size={24} color={colors.primary} />
@@ -152,10 +154,10 @@ export default function FallRiskDashboard() {
                 {/* Header Section */}
                 <View style={styles.header}>
                     <Text style={[styles.title, { color: colors.text }]}>
-                        {isCaregiver ? "Patient's Current Risk" : "Your Risk Analysis"}
+                        {isCaregiver ? t("patientsCurrentRisk") : t("yourRiskAnalysis")}
                     </Text>
                     <Text style={[styles.timestamp, { color: colors.mutedText }]}>
-                        Last updated: {lastUpdate}
+                        {t("lastUpdated")}: {lastUpdate}
                     </Text>
                 </View>
 
@@ -170,14 +172,14 @@ export default function FallRiskDashboard() {
                     />
                     <View style={[styles.statusBadge, { backgroundColor: analysis.currentScore > 70 ? colors.error + '20' : analysis.currentScore > 40 ? colors.warning + '20' : colors.success + '20' }]}>
                         <Text style={[styles.statusText, { color: analysis.currentScore > 70 ? colors.error : analysis.currentScore > 40 ? colors.warning : colors.success }]}>
-                            {analysis.currentScore > 70 ? 'High Risk' : analysis.currentScore > 40 ? 'Moderate Risk' : 'Low Risk'}
+                            {analysis.currentScore > 70 ? t('highRisk') : analysis.currentScore > 40 ? t('moderateRisk') : t('lowRisk')}
                         </Text>
                     </View>
                 </View>
 
                 {/* Detailed Indicators Section */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>Risk Indicators</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>{t("riskIndicators")}</Text>
                     <View style={styles.indicatorsGrid}>
                         <View style={[styles.indicatorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                             <Ionicons name="footsteps" size={24} color={colors.primary} />
@@ -204,14 +206,14 @@ export default function FallRiskDashboard() {
 
                 {/* Forecast Cards */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Future Outlook</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("futureOutlook")}</Text>
                     <ForecastCards data={analysis.forecasts.map(f => ({ days: f.days, score: f.predictedScore, trend: f.trend }))} />
                 </View>
 
                 {/* Risk Trend Line Chart */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Risk History</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("riskHistory")}</Text>
                         <View style={styles.filterContainer}>
                             {(['7d', '30d', '90d'] as const).map((range) => (
                                 <TouchableOpacity
@@ -250,10 +252,10 @@ export default function FallRiskDashboard() {
                 {/* Caregiver Specific Section */}
                 {isCaregiver && (
                     <View style={[styles.caregiverSection, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-                        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>Caregiver Actions</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>{t("caregiverActions")}</Text>
 
                         <View style={styles.thresholdControl}>
-                            <Text style={[styles.thresholdLabel, { color: colors.text }]}>Alert Threshold: {alertThreshold}</Text>
+                            <Text style={[styles.thresholdLabel, { color: colors.text }]}>{t("alertThreshold")}: {alertThreshold}</Text>
                             <View style={styles.thresholdButtons}>
                                 <TouchableOpacity
                                     onPress={async () => {
@@ -281,15 +283,15 @@ export default function FallRiskDashboard() {
 
                         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary, marginTop: 15 }]}>
                             <Ionicons name="notifications-outline" size={20} color="#FFF" />
-                            <Text style={styles.actionButtonText}>Update Preferences</Text>
+                            <Text style={styles.actionButtonText}>{t("updatePreferences")}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.secondary, marginTop: 10 }]}>
                             <Ionicons name="call-outline" size={20} color="#FFF" />
-                            <Text style={styles.actionButtonText}>Contact Patient</Text>
+                            <Text style={styles.actionButtonText}>{t("contactPatient")}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.error, marginTop: 10 }]}>
                             <Ionicons name="warning-outline" size={20} color="#FFF" />
-                            <Text style={styles.actionButtonText}>Emergency Protocols</Text>
+                            <Text style={styles.actionButtonText}>{t("emergencyProtocols")}</Text>
                         </TouchableOpacity>
                     </View>
                 )}

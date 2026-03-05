@@ -13,7 +13,7 @@ export const fallRiskService = {
      */
     getAnalysis: async (userId: string): Promise<FallRiskAnalysis> => {
         try {
-            return await api.get<FallRiskAnalysis>(`/fall-risk/analysis/${userId}`);
+            return await api.get<FallRiskAnalysis>(`/v1/fall-risk/analysis/${userId}`);
         } catch (error) {
             console.warn("API unavailable, using local sensor-driven Fall Risk Engine", error);
             // This ensures logic works with real values from the device when server is down
@@ -27,7 +27,7 @@ export const fallRiskService = {
      */
     getAlerts: async (userId: string): Promise<FallRiskAlert[]> => {
         try {
-            return await api.get<FallRiskAlert[]>(`/fall-risk/alerts/${userId}`);
+            return await api.get<FallRiskAlert[]>(`/v1/fall-risk/alerts/${userId}`);
         } catch (error) {
             console.error("Failed to fetch fall risk alerts", error);
             // Return empty array instead of throwing to keep dashboard functional
@@ -40,7 +40,7 @@ export const fallRiskService = {
      */
     getRecommendations: async (userId: string): Promise<FallRiskRecommendation[]> => {
         try {
-            return await api.get<FallRiskRecommendation[]>(`/fall-risk/recommendations/${userId}`);
+            return await api.get<FallRiskRecommendation[]>(`/v1/fall-risk/recommendations/${userId}`);
         } catch (error) {
             console.error("Failed to fetch fall risk recommendations", error);
             return [];
@@ -52,7 +52,7 @@ export const fallRiskService = {
      */
     updateThreshold: async (userId: string, threshold: number): Promise<void> => {
         try {
-            await api.patch(`/fall-risk/settings/${userId}`, { alertThreshold: threshold });
+            await api.patch(`/v1/fall-risk/settings/${userId}`, { alertThreshold: threshold });
             console.log(`Successfully updated threshold for ${userId} to ${threshold}`);
         } catch (error) {
             console.error("Failed to update threshold on server", error);

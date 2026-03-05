@@ -709,7 +709,7 @@ export default function HealthTrackerScreen() {
                   </View>
 
                   <Text style={[styles.metricValue, { color: colors.text }]}>
-                    {metric.value} {metric.unit}
+                    {typeof metric.value === 'number' ? parseFloat(metric.value.toFixed(1)) : metric.value} {metric.unit}
                   </Text>
                   <Text style={[styles.metricName, { color: colors.mutedText }]}>{metric.name}</Text>
 

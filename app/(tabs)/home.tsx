@@ -268,7 +268,7 @@ export default function HomeScreen() {
     setHealthMetrics([
       { label: t("stepsToday"), value: steps.toLocaleString(), icon: "walk", trend: steps > 5000 ? "up" : "down" },
       { label: t("heartRate"), value: `${heartRate} ${t("bpm")}`, icon: "heart", trend: "stable" },
-      { label: t("sleepQuality"), value: `${sleepHours} ${t("hrs")}`, icon: "moon", trend: sleepHours >= 7 ? "up" : "down" },
+      { label: t("sleepQuality"), value: `${Number(sleepHours).toFixed(1)} ${t("hrs")}`, icon: "moon", trend: sleepHours >= 7 ? "up" : "down" },
       { label: t("hydration"), value: `${waterIntake}/8 ${t("cups")}`, icon: "water", trend: waterIntake >= 6 ? "up" : "down" },
     ]);
   };
@@ -532,14 +532,14 @@ export default function HomeScreen() {
                 <View style={[styles.safetyCard, { backgroundColor: colors.success + '10', borderColor: colors.success }]}>
                   <View style={styles.safetyHeader}>
                     <Ionicons name="shield-checkmark" size={24} color={colors.success} />
-                    <Text style={[styles.safetyTitle, { color: colors.success, fontSize: getFontSize(20) }]}>Safety Status</Text>
+                    <Text style={[styles.safetyTitle, { color: colors.success, fontSize: getFontSize(20) }]}>{t("safetyStatus")}</Text>
                   </View>
                   <View style={styles.safetyBody}>
                     <View style={styles.safetyItem}>
                       <Ionicons name="radio-button-on" size={16} color={colors.success} />
-                      <Text style={[styles.safetyText, { color: colors.text, fontSize: getFontSize(16) }]}>Fall Detection Active</Text>
+                      <Text style={[styles.safetyText, { color: colors.text, fontSize: getFontSize(16) }]}>{t("fallDetectionActive")}</Text>
                     </View>
-                    <Text style={[styles.safetySubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>Monitoring movement for emergency assistance.</Text>
+                    <Text style={[styles.safetySubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>{t("monitoringMovement")}</Text>
 
                     <TouchableOpacity
                       style={{
@@ -560,7 +560,7 @@ export default function HomeScreen() {
                         fontWeight: 'bold',
                         marginLeft: 6,
                         fontSize: 14,
-                      }}>Simulate Fall Alert (Test)</Text>
+                      }}>{t("simulateFallAlert")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -614,7 +614,7 @@ export default function HomeScreen() {
             {/* PERSONALIZED RECOMMENDATIONS */}
             {personalizationData?.recommendations && personalizationData.recommendations.length > 0 && (
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>🎯 Personalized for You</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>🎯 {t("personalizedForYou")}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsScroll}>
                   {personalizationData.recommendations.map((rec: any, index: number) => (
                     <TouchableOpacity
@@ -652,7 +652,7 @@ export default function HomeScreen() {
 
             {/* WELLNESS & MIND */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>Wellness & Mind</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("wellnessAndMind")}</Text>
               <TouchableOpacity
                 style={[styles.wellnessCard, { backgroundColor: colors.info + '15', borderColor: colors.info }]}
                 onPress={() => router.push("/music" as any)}
@@ -665,9 +665,9 @@ export default function HomeScreen() {
                   <Ionicons name="musical-notes" size={32} color={colors.primary} />
                 </View>
                 <View style={styles.wellnessContent}>
-                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Relaxing Music</Text>
+                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("relaxingMusic")}</Text>
                   <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
-                    Calm sounds for meditation and better sleep.
+                    {t("calmSounds")}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={24} color={colors.primary} />
@@ -753,7 +753,7 @@ export default function HomeScreen() {
               ))}
               {upcomingEvents.length === 0 && (
                 <View style={[styles.eventCard, { backgroundColor: colors.card, justifyContent: 'center', padding: 30 }]}>
-                  <Text style={{ color: colors.mutedText, textAlign: 'center' }}>No events scheduled for today.</Text>
+                  <Text style={{ color: colors.mutedText, textAlign: 'center' }}>{t("noEventsScheduled")}</Text>
                 </View>
               )}
             </View>
