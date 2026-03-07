@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import * as Print from 'expo-print';
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, useLocalSearchParams } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,14 +49,13 @@ export default function ReportsScreen() {
   const { t } = useTranslation();
   const { user, requireAuth } = useAuth();
   const { isWeb, contentWidth } = useResponsive();
+  const params = useLocalSearchParams();
+  const targetUserId = (params.userId as string) || user?.id;
 
   const isSenior = uiMode === "senior";
   const width = isWeb ? contentWidth : staticWidth;
 
-  const getFontSize = (base: number) => {
-    const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
-    return base * (scales[fontSize] || 1);
-  };
+
   const [userData, setUserData] = useState<any>(null);
   const [exerciseData, setExerciseData] = useState<any>(null);
   const [vitalSignsData, setVitalSignsData] = useState<any[]>([]);
@@ -98,6 +97,17 @@ export default function ReportsScreen() {
   const [donationDate, setDonationDate] = useState("Tomorrow, 10:00 AM");
   const [donationAddress, setDonationAddress] = useState((user as any)?.address || "");
   const [donationDevice, setDonationDevice] = useState("");
+  const [recentAlerts, setRecentAlerts] = useState<any[]>([
+    { id: '1', type: 'Fall Detected', user: 'George Miller', time: '10m ago', status: 'Handled' },
+    { id: '2', type: 'SOS Button', user: 'Martha Stewart', time: '1h ago', status: 'Active' },
+  ]);
+
+  const [systemStats, setSystemStats] = useState({
+    totalUsers: 124,
+    activeElders: 86,
+    alertsLast24h: 3,
+    avgCompliance: 92
+  });
 
   const flags = useFeatureFlags(["download_reports"]);
   const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
@@ -119,7 +129,7 @@ export default function ReportsScreen() {
   );
 
   const loadSustainabilityImpact = async () => {
-    const userId = user?.id;
+    const userId = targetUserId;
     if (!userId) {
       const savedUser = await AsyncStorage.getItem("user_session");
       if (savedUser) {
@@ -151,7 +161,7 @@ export default function ReportsScreen() {
     try {
       const savedUser = await AsyncStorage.getItem("user_session");
       const sessionData = savedUser ? JSON.parse(savedUser) : null;
-      const userId = user?.id || sessionData?.id;
+      const userId = targetUserId || sessionData?.id;
       if (userId) {
         const gData = await graphService.getUserGraph(userId);
         if (gData && gData.nodes && gData.nodes.length > 0) {
@@ -167,7 +177,7 @@ export default function ReportsScreen() {
     try {
       const savedUser = await AsyncStorage.getItem("user_session");
       const sessionData = savedUser ? JSON.parse(savedUser) : null;
-      const userId = user?.id || sessionData?.id;
+      const userId = targetUserId || sessionData?.id;
 
       if (userId) {
         const streaksRes: any = await profileService.getStreaks(userId);
@@ -189,7 +199,7 @@ export default function ReportsScreen() {
     try {
       const savedUser = await AsyncStorage.getItem("user_session");
       const sessionData = savedUser ? JSON.parse(savedUser) : null;
-      const userId = user?.id || sessionData?.id;
+      const userId = targetUserId || sessionData?.id;
 
       const profileKey = userId ? getProfileKey(userId) : "user_profile_data";
       const ticketsKey = userId ? getTicketsKey(userId) : "user_tickets";
@@ -588,10 +598,10 @@ export default function ReportsScreen() {
               <Text style={styles.modalValue}>{selectedNode.label}</Text>
             </View>
             <View style={[styles.statusBadge, {
-              backgroundColor: selectedNode.status === 'normal' ? '#E8F5E9' : '#FFEBEE'
+              backgroundColor: selectedNode.status === 'normal' ? colors.success + '20' : colors.error + '20'
             }]}>
               <Text style={[styles.statusText, {
-                color: selectedNode.status === 'normal' ? '#2E7D32' : '#C62828'
+                color: selectedNode.status === 'normal' ? colors.success : colors.error
               }]}>
                 {selectedNode.status?.toUpperCase() || 'NORMAL'}
               </Text>
@@ -609,7 +619,7 @@ export default function ReportsScreen() {
               <Text style={[styles.modalValue, { marginLeft: 10 }]}>{selectedNode.sublabel}</Text>
             </View>
             {latestEntry && (
-              <View style={styles.noteContainer}>
+              <View style={[styles.noteContainer, { backgroundColor: colors.background }]}>
                 <Text style={styles.noteText}>"{latestEntry.notes}"</Text>
                 <Text style={styles.noteDate}>{new Date(latestEntry.date).toLocaleDateString()}</Text>
               </View>
@@ -640,11 +650,10 @@ export default function ReportsScreen() {
 
 
   // --- RADAR CHART LOGIC ---
-  // On Web, these are in a 2-column layout, so we use half the contentWidth
   const responsiveWidth = isWeb ? (contentWidth / 2) - 40 : width;
   const radarSize = Math.min(responsiveWidth - 60, 400);
   const radarCenter = radarSize / 2;
-  const radarRadius = (radarSize - 120) / 2; // Increased padding for labels
+  const radarRadius = (radarSize - 120) / 2;
   const angleSlice = (Math.PI * 2) / METRICS.length;
 
   const getRadarCoordinates = (value: number, index: number) => {
@@ -673,129 +682,10 @@ export default function ReportsScreen() {
     };
 
     const nodes: any[] = [];
-
-    if (remoteGraphData && remoteGraphData.nodes && remoteGraphData.nodes.length > 0) {
-      // Use remote data from Neo4j
-      remoteGraphData.nodes.forEach(node => {
-        nodes.push({
-          ...node,
-          // Map backend colors/labels to frontend expectations if needed
-          id: node.id,
-          label: node.label,
-          type: node.type,
-          color: node.color || colors.primary
-        });
-      });
+    if (remoteGraphData?.nodes && remoteGraphData.nodes.length > 0) {
+      remoteGraphData.nodes.forEach(node => nodes.push({ ...node, color: node.color || colors.primary }));
     } else {
-      // Fallback to local construction logic
       nodes.push({ id: 'User', label: (user?.name || userData.name)?.split(" ")[0] || 'User', type: 'main', color: colors.primary });
-
-      // Add Exercise nodes (from health metrics)
-      if (exerciseData) {
-        const exerciseMetric = exerciseData.find((m: any) => m.name === 'Exercise');
-        const stepsMetric = exerciseData.find((m: any) => m.name === 'Steps');
-
-        if (exerciseMetric) {
-          nodes.push({
-            id: 'exercise_main',
-            label: `${exerciseMetric.value}min`,
-            sublabel: 'Exercise',
-            type: 'exercise',
-            color: '#FF9800'
-          });
-        }
-
-        if (stepsMetric) {
-          nodes.push({
-            id: 'steps',
-            label: `${stepsMetric.value}`,
-            sublabel: 'Steps',
-            type: 'exercise',
-            color: '#FF9800'
-          });
-        }
-      }
-
-      // Add Vital Signs nodes (health summaries)
-      if (vitalSignsData && vitalSignsData.length > 0) {
-        vitalSignsData.forEach((vital: any, i: number) => {
-          const displayValue = vital.systolic && vital.diastolic
-            ? `${vital.systolic}/${vital.diastolic}`
-            : vital.value;
-
-          nodes.push({
-            id: `vital_${i}`,
-            label: `${displayValue}`,
-            sublabel: vital.name,
-            type: 'vital',
-            color: '#E91E63',
-            status: vital.status
-          });
-        });
-      }
-
-      // Add Diary/Mood nodes
-      if (diaryEntries && diaryEntries.length > 0) {
-        const recentMood = diaryEntries[0]?.mood;
-        if (recentMood) {
-          const moodEmojiMap: Record<string, string> = {
-            'happy': '😊',
-            'sad': '😢',
-            'neutral': '😐',
-            'anxious': '😰',
-            'angry': '😠'
-          };
-          const moodEmoji = moodEmojiMap[recentMood] || '😊';
-
-          nodes.push({
-            id: 'mood',
-            label: moodEmoji,
-            sublabel: recentMood,
-            type: 'mood',
-            color: '#9C27B0'
-          });
-        }
-
-        // Add recent activities from diary
-        const recentActivities = diaryEntries[0]?.activity;
-        if (recentActivities && recentActivities.length > 0) {
-          nodes.push({
-            id: 'activity',
-            label: recentActivities[0],
-            sublabel: 'Activity',
-            type: 'activity',
-            color: '#00BCD4'
-          });
-        }
-      }
-
-      // Add Interest nodes
-      if (userData.interests) {
-        userData.interests.slice(0, 2).forEach((int: string) => {
-          nodes.push({
-            id: `int_${int}`,
-            label: int,
-            type: 'interest',
-            color: '#448AFF'
-          });
-        });
-      }
-
-      // Add Condition nodes
-      if (userData.conditions) {
-        userData.conditions.slice(0, 2).forEach((cond: string) => {
-          if (cond !== "None") {
-            nodes.push({
-              id: `cond_${cond}`,
-              label: cond,
-              type: 'condition',
-              color: '#FF5252'
-            });
-          }
-        });
-      }
-
-      // Add Health Summary node
       const avgScore = Math.round((scores.physical + scores.social + scores.mental + scores.sleep + scores.diet + scores.exercise) / 6);
       nodes.push({
         id: 'health_summary',
@@ -804,149 +694,100 @@ export default function ReportsScreen() {
         type: 'summary',
         color: avgScore > 70 ? '#4CAF50' : avgScore > 50 ? '#FFC107' : '#FF5252'
       });
-
-      // Add Contact nodes (reduced to 1)
-      if (userData.emergencyContacts && userData.emergencyContacts.length > 0) {
-        const contact = userData.emergencyContacts[0];
-        if (contact.name) {
-          nodes.push({
-            id: 'cont_0',
-            label: contact.name.split(" ")[0],
-            sublabel: contact.relation || 'Contact',
-            type: 'contact',
-            color: '#69F0AE'
-          });
-        }
-      }
     }
 
-    const nodeDist = kgSize / 3.5; // Slightly more compact to avoid edge cutoff
-    const nodeLabelOffset = 30;
-
+    const nodeDist = kgSize / 3.5;
     return (
-      <View style={[styles.kgCard, inRow && styles.graphCardInRow, { backgroundColor: theme === 'dark' ? '#1C1C1E' : colors.card, borderColor: theme === 'dark' ? '#2C2C2E' : 'rgba(0,0,0,0.1)' }]}>
+      <View style={[styles.kgCard, inRow && styles.graphCardInRow, { backgroundColor: theme === 'dark' ? colors.background : colors.card, borderColor: theme === 'dark' ? '#2C2C2E' : 'rgba(0,0,0,0.1)' }]}>
         <Text style={[styles.cardTitle, { color: colors.text }]}>{t("dataKnowledgeGraph") || "Data Knowledge Graph"}</Text>
-        <Text style={[styles.cardSubtitle, { color: colors.mutedText }]}>Live data from your health ecosystem</Text>
-
         <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: fadeAnim }], marginVertical: 15 }}>
           <Svg height={kgSize} width={kgSize}>
-            {/* Draw edges from center to all other nodes */}
             {nodes.map((node, i) => {
-              if (i === 0) return null;
-              const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
-              const nx = kgCenter + nodeDist * Math.cos(angle);
-              const ny = kgCenter + nodeDist * Math.sin(angle);
-              return (
-                <G key={`edge_${node.id}`}>
-                  <Line
-                    x1={kgCenter}
-                    y1={kgCenter}
-                    x2={nx}
-                    y2={ny}
-                    stroke={node.color}
-                    strokeWidth="2"
-                    strokeDasharray="5,5"
-                    opacity={0.6}
-                  />
-                </G>
-              );
-            })}
-
-            {/* Draw nodes */}
-            {nodes.map((node, i) => {
-              let nx = kgCenter;
-              let ny = kgCenter;
+              let nx = kgCenter, ny = kgCenter;
               if (i > 0) {
                 const angle = (i - 1) * ((Math.PI * 2) / (nodes.length - 1));
                 nx = kgCenter + nodeDist * Math.cos(angle);
                 ny = kgCenter + nodeDist * Math.sin(angle);
               }
-
               const r = i === 0 ? 40 : 30;
-              const fontSize = i === 0 ? 13 : 11;
-
               return (
                 <G key={node.id} onPress={() => onNodePress(node)}>
-                  {/* Node circle with gradient effect */}
-                  <Circle cx={nx} cy={ny} r={r + 3} fill={node.color} opacity={0.2} />
-                  <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={i === 0 ? 1 : 0.9} />
-
-                  {/* Status indicator for vitals */}
-                  {node.status && node.status === 'normal' && (
-                    <Circle cx={nx + r - 8} cy={ny - r + 8} r={5} fill="#4CAF50" stroke="#fff" strokeWidth="1" />
-                  )}
-
-                  {/* Main label */}
-                  <SvgText
-                    x={nx}
-                    y={node.sublabel ? ny - 3 : ny}
-                    fill="#fff"
-                    fontSize={fontSize}
-                    fontWeight="bold"
-                    textAnchor="middle"
-                    alignmentBaseline="middle"
-                  >
-                    {node.label.length > 8 ? node.label.substring(0, 8) + '...' : node.label}
-                  </SvgText>
-
-                  {/* Sublabel */}
-                  {node.sublabel && (
-                    <SvgText
-                      x={nx}
-                      y={ny + 10}
-                      fill="#fff"
-                      fontSize={8}
-                      fontWeight="normal"
-                      textAnchor="middle"
-                      alignmentBaseline="middle"
-                      opacity={0.9}
-                    >
-                      {node.sublabel}
-                    </SvgText>
-                  )}
+                  <Circle cx={nx} cy={ny} r={r} fill={node.color} opacity={0.9} />
+                  <SvgText x={nx} y={ny} fill="#fff" fontSize={11} fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{node.label}</SvgText>
                 </G>
               );
             })}
           </Svg>
         </Animated.View>
-
-        {/* Enhanced Legend */}
-        <View style={[styles.kgLegend, { backgroundColor: theme === 'dark' ? '#000' : '#F5F5F7', borderColor: theme === 'dark' ? '#2C2C2E' : '#E5E5EA' }]}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
-            <Text style={[styles.legendText, { color: colors.mutedText }]}>Exercise</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#E91E63' }]} />
-            <Text style={[styles.legendText, { color: colors.mutedText }]}>Vitals</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#9C27B0' }]} />
-            <Text style={[styles.legendText, { color: colors.mutedText }]}>Mood</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#448AFF' }]} />
-            <Text style={[styles.legendText, { color: colors.mutedText }]}>Interests</Text>
-          </View>
-        </View>
-
-        {/* Data Summary */}
-        <View style={[styles.dataSummary, { backgroundColor: theme === 'dark' ? '#000' : '#F5F5F7', borderTopColor: theme === 'dark' ? '#2C2C2E' : '#E5E5EA' }]}>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Last Updated:</Text>
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{new Date().toLocaleTimeString()}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.mutedText }]}>Active Nodes:</Text>
-            <Text style={[styles.summaryValue, { color: colors.primary }]}>{nodes.length}</Text>
-          </View>
-        </View>
       </View>
     );
   };
 
+  const getFontSize = (base: number) => {
+    const scales: any = { small: 0.9, medium: 1, large: 1.2, extraLarge: 1.5 };
+    return base * (scales[fontSize] || 1);
+  };
+
+  if (user?.roles?.includes('admin')) {
+    return (
+      <ResponsiveView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.adminHeader}>
+            <Text style={[styles.pageTitle, { color: colors.text }]}>Admin Command Center</Text>
+            <Text style={[styles.pageSubtitle, { color: colors.mutedText }]}>System-wide analytics and safety monitoring</Text>
+          </View>
+
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="people" size={24} color={colors.primary} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{systemStats.totalUsers}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Total Users</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="warning" size={24} color={colors.error} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{systemStats.alertsLast24h}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Alerts (24h)</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+              <Text style={[styles.statValue, { color: colors.text }]}>{systemStats.avgCompliance}%</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedText }]}>Med Compliance</Text>
+            </View>
+          </View>
+
+          {/* Recent Alerts */}
+          <View style={styles.adminSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Safety Alerts</Text>
+            {recentAlerts.map(alert => (
+              <View key={alert.id} style={[styles.alertCard, { backgroundColor: colors.card, borderLeftColor: alert.status === 'Active' ? colors.error : colors.success }]}>
+                <View style={styles.alertMain}>
+                  <Text style={[styles.alertType, { color: colors.text }]}>{alert.type}</Text>
+                  <Text style={[styles.alertUser, { color: colors.mutedText }]}>{alert.user} • {alert.time}</Text>
+                </View>
+                <View style={[styles.alertStatus, { backgroundColor: alert.status === 'Active' ? colors.error + '20' : colors.success + '20' }]}>
+                  <Text style={{ color: alert.status === 'Active' ? colors.error : colors.success, fontWeight: 'bold' }}>{alert.status}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* User Management Quick Action */}
+          <TouchableOpacity style={[styles.adminAction, { backgroundColor: colors.primary }]}>
+            <Ionicons name="person-add" size={20} color="#FFF" />
+            <Text style={styles.adminActionText}>Manage User Access</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </ResponsiveView>
+    );
+  }
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       <Modal
         animationType="fade"
         transparent={true}
@@ -956,7 +797,7 @@ export default function ReportsScreen() {
         <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
                 {getDetailContent()}
                 <Pressable
                   style={{ marginTop: 20, padding: 10 }}
@@ -1034,20 +875,19 @@ export default function ReportsScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <ResponsiveView style={styles.responsiveContent}>
+      <Animated.View style={{ opacity: fadeAnim }}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-            {userData ? `${t("analysisFor")} ${userData.name}` : t("yourHealthOverview")}
-          </Text>
-        </View>
-
-        {hasSubscription && (
-          <TouchableOpacity style={[styles.pdfButton, { backgroundColor: colors.primary }]} onPress={generatePDF}>
-            <Ionicons name="download-outline" size={24} color="#fff" />
-            <Text style={styles.pdfButtonText}>{t("downloadPDF")}</Text>
+          <View>
+            <Text style={[styles.title, { color: colors.text, fontSize: getFontSize(24) }]}>{t("healthReports")}</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedText, fontSize: getFontSize(16) }]}>{t("yourActivitySummary")}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.downloadButton, { backgroundColor: colors.primary + '15' }]}
+            onPress={generatePDF}
+          >
+            <Ionicons name="download-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
-        )}
+        </View>
 
         <TouchableOpacity
           style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
@@ -1275,64 +1115,91 @@ export default function ReportsScreen() {
           )}
         </View>
         <View style={{ height: 40 }} />
-      </ResponsiveView>
+      </Animated.View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 100 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  title: { fontWeight: "bold" },
+  subtitle: { marginTop: 4 },
+  downloadButton: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
+
+  // Admin Styles
+  adminHeader: { marginBottom: 30 },
+  pageTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 6 },
+  pageSubtitle: { fontSize: 16 },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
+  statCard: { flex: 1, padding: 16, borderRadius: 16, marginRight: 10, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  statValue: { fontSize: 22, fontWeight: 'bold', marginVertical: 4 },
+  statLabel: { fontSize: 12 },
+  adminSection: { marginBottom: 30 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  alertCard: { flexDirection: 'row', padding: 16, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4, alignItems: 'center', justifyContent: 'space-between' },
+  alertMain: { flex: 1 },
+  alertType: { fontSize: 16, fontWeight: 'bold' },
+  alertUser: { fontSize: 14, marginTop: 2 },
+  alertStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  adminAction: { flexDirection: 'row', height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  adminActionText: { color: '#FFF', fontWeight: 'bold', marginLeft: 10, fontSize: 16 },
+
+  // Existing Styles
   responsiveContent: { paddingHorizontal: 20 },
-  header: { marginBottom: 20, marginTop: 20 },
-  title: { fontSize: 32, fontWeight: "bold" },
   impactCard: { borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1 },
   impactTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 4 },
   impactSubtitle: { fontSize: 14, marginBottom: 12 },
-  impactGrid: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
-  impactItem: { flex: 1, padding: 12, borderRadius: 12, alignItems: "center" },
-  impactValue: { fontSize: 16, fontWeight: "bold", marginTop: 6 },
-  impactLabel: { fontSize: 11, marginTop: 2 },
-  subtitle: { fontSize: 16 },
-  pdfButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, marginBottom: 24, elevation: 2 },
-  pdfButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
-  kgCard: {
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    borderWidth: 1.5,
-  },
-  cardSubtitle: { fontSize: 14, marginBottom: 8, alignSelf: 'flex-start', fontStyle: 'italic', opacity: 0.7 },
-  kgLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  impactGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  impactItem: { width: "48%", padding: 12, borderRadius: 12, marginBottom: 16, alignItems: "center" },
+  impactLabel: { fontSize: 12, marginTop: 4, textAlign: "center" },
+  impactValue: { fontSize: 18, fontWeight: "bold" },
+  pdfButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", padding: 16, borderRadius: 12, marginBottom: 24 },
+  pdfButtonText: { color: "#fff", fontWeight: "bold", marginLeft: 8, fontSize: 16 },
+  graphCard: { padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, alignItems: "center" },
+  graphCardInRow: { marginBottom: 0, height: '100%', flex: 1 },
+  cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 4, alignSelf: 'flex-start' },
+  cardSubtitle: { fontSize: 14, marginBottom: 16, alignSelf: 'flex-start' },
+  kgCard: { padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, alignItems: "center" },
+  kgLegend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", padding: 12, borderRadius: 12, borderWidth: 1, marginTop: 10 },
+  legendItem: { flexDirection: "row", alignItems: "center", marginHorizontal: 8, marginVertical: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  legendText: { fontSize: 11 },
+  dataSummary: { width: "100%", padding: 12, borderTopWidth: 1, marginTop: 15 },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  summaryLabel: { fontSize: 11 },
+  summaryValue: { fontSize: 11, fontWeight: "bold" },
+  kgRadarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  kgRadarHalf: { width: '48.5%' },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContent: { width: "100%", borderRadius: 20, padding: 24, alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 16 },
+  modalRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  modalValue: { fontSize: 28, fontWeight: "bold", marginLeft: 12 },
+  modalSubtext: { fontSize: 14, textAlign: "center" },
+  scoreCircle: { width: 100, height: 100, borderRadius: 50, borderWidth: 8, justifyContent: "center", alignItems: "center" },
+  scoreText: { fontSize: 24, fontWeight: "bold" },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginTop: 12 },
+  statusText: { fontSize: 12, fontWeight: "bold" },
+  noteContainer: { padding: 16, borderRadius: 12, marginTop: 16, width: "100%" },
+  noteText: { fontSize: 14, fontStyle: "italic" },
+  noteDate: { fontSize: 11, color: "#8E8E93", marginTop: 8, textAlign: "right" },
+  historyContainer: { width: "100%", marginTop: 20 },
+  historyTitle: { fontSize: 14, fontWeight: "bold", marginBottom: 8 },
+  historyRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#E5E5EA" },
+  historyDate: { fontSize: 13 },
+  historyVal: { fontSize: 13, fontWeight: "bold" },
+  input: {
     width: '100%',
-    marginTop: 20,
-    padding: 12,
-    borderRadius: 12,
+    height: 50,
     borderWidth: 1,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 4 },
-  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
-  legendText: { fontSize: 11, fontWeight: '500' },
-  dataSummary: {
-    marginTop: 20,
-    width: '100%',
-    paddingTop: 16,
-    paddingHorizontal: 12,
-    paddingBottom: 4,
-    borderTopWidth: 1.5,
     borderRadius: 12,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    fontSize: 16,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  summaryLabel: { fontSize: 13, fontWeight: '600' },
-  summaryValue: { fontSize: 13, fontWeight: '700' },
-  horizontalScroll: { marginBottom: 15, paddingBottom: 5 },
+  section: { marginBottom: 20 },
   streakCard: {
     width: 140,
     padding: 16,
@@ -1345,6 +1212,7 @@ const styles = StyleSheet.create({
   streakHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   streakValue: { fontSize: 18, fontWeight: '800', marginLeft: 6 },
   streakLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  horizontalScroll: { marginBottom: 15, paddingBottom: 5 },
   badgesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1372,70 +1240,27 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   badgeName: { fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
-  graphCard: { borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24, elevation: 2, borderWidth: 1.5 },
-  kgRadarRow: { flexDirection: 'row', marginHorizontal: -10, marginBottom: 24, gap: 24 },
-  kgRadarHalf: { flex: 1, minWidth: 0, paddingHorizontal: 10 },
-  graphCardInRow: { marginBottom: 0 },
-  cardTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, alignSelf: 'flex-start' },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
-  insightText: { fontSize: 14, lineHeight: 20 },
   insightCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4 },
   insightContent: { marginLeft: 16, flex: 1 },
   insightTitle: { fontSize: 16, fontWeight: 'bold' },
+  insightText: { fontSize: 14, lineHeight: 20 },
   trendsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16,
+    marginTop: 10
   },
   trendCard: {
-    width: '47%', // Adjusted for 2-column layout with gap on mobile
+    width: '48%',
     padding: 16,
     borderRadius: 16,
-    marginBottom: 0, // Handled by gap/inline styles
+    marginBottom: 16,
     alignItems: 'center',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
   },
-  trendValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  trendLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  input: {
-    width: '100%',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 14,
-    marginBottom: 15,
-  },
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 25, borderRadius: 20, width: '85%', alignItems: 'center', elevation: 5 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#2D3748' },
-  modalRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  modalValue: { fontSize: 24, fontWeight: 'bold', marginLeft: 10, color: '#2D3748' },
-  modalSubtext: { fontSize: 14, color: '#718096', textAlign: 'center', marginBottom: 10 },
-  historyContainer: { marginTop: 15, width: '100%' },
-  historyTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: '#4A5568' },
-  historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#EDF2F7' },
-  historyDate: { fontSize: 12, color: '#718096' },
-  historyVal: { fontSize: 12, fontWeight: 'bold', color: '#2D3748' },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 15 },
-  statusText: { fontSize: 12, fontWeight: 'bold' },
-  noteContainer: { backgroundColor: '#F7FAFC', padding: 15, borderRadius: 12, marginTop: 10, width: '100%' },
-  noteText: { fontSize: 14, fontStyle: 'italic', color: '#4A5568', textAlign: 'center' },
-  noteDate: { fontSize: 10, color: '#A0AEC0', textAlign: 'right', marginTop: 5 },
-  scoreCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 6, justifyContent: 'center', alignItems: 'center' },
-  scoreText: { fontSize: 22, fontWeight: 'bold' }
+  trendValue: { fontSize: 18, fontWeight: 'bold', marginVertical: 4 },
+  trendLabel: { fontSize: 12 },
 });

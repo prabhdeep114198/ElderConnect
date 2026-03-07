@@ -33,9 +33,15 @@ export default function LoginScreen() {
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
 
+    const [role, setRole] = useState("elder");
+
     useEffect(() => {
         if (user) {
-            if (user.isOnboarded) {
+            if (user.roles?.includes("admin")) {
+                router.replace("/(tabs)/reports"); // Admins go to reports/analytics
+            } else if (user.roles?.includes("caregiver")) {
+                router.replace("/(tabs)/home"); // Caregivers also see home but filtered
+            } else if (user.isOnboarded) {
                 router.replace("/(tabs)/home");
             } else {
                 router.replace("/onboarding");
@@ -53,7 +59,7 @@ export default function LoginScreen() {
             if (isLogin) {
                 await login(email, password);
             } else {
-                await signup(email, password, name);
+                await signup(email, password, name, [role]);
             }
         } catch (error: any) {
             Alert.alert(t("authFailed"), error.message || t("errorOccurred"));
@@ -101,6 +107,35 @@ export default function LoginScreen() {
                                     ? t("loginSubtitle")
                                     : t("signupSubtitle")}
                             </Text>
+
+                            {/* Role Selector (Always Visible now, for clarity) */}
+                            <View style={styles.roleSelector}>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    style={[
+                                        styles.roleButton,
+                                        { backgroundColor: colors.card, borderColor: role === "elder" ? colors.primary : colors.border },
+                                        role === "elder" && { backgroundColor: colors.primary + '10' }
+                                    ]}
+                                    onPress={() => setRole("elder")}
+                                >
+                                    <Ionicons name="person" size={24} color={role === "elder" ? colors.primary : colors.mutedText} />
+                                    <Text style={[styles.roleLabel, { color: role === "elder" ? colors.primary : colors.mutedText }]}>{t("elder") || "Elderly User"}</Text>
+                                </TouchableOpacity>
+                                <View style={{ width: 16 }} />
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    style={[
+                                        styles.roleButton,
+                                        { backgroundColor: colors.card, borderColor: role === "caregiver" ? colors.primary : colors.border },
+                                        role === "caregiver" && { backgroundColor: colors.primary + '10' }
+                                    ]}
+                                    onPress={() => setRole("caregiver")}
+                                >
+                                    <Ionicons name="heart" size={24} color={role === "caregiver" ? colors.primary : colors.mutedText} />
+                                    <Text style={[styles.roleLabel, { color: role === "caregiver" ? colors.primary : colors.mutedText }]}>{t("caregiver") || "Caregiver/Family"}</Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* Inputs */}
                             {!isLogin && (
@@ -271,6 +306,27 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 12,
         elevation: 5,
+    },
+    roleSelector: {
+        flexDirection: 'row',
+        width: '100%',
+        marginBottom: 24,
+    },
+    roleButton: {
+        flex: 1,
+        height: 80,
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 8,
+    },
+    roleLabel: {
+        marginTop: 4,
+        fontSize: 14,
+        fontWeight: '600',
     },
     title: {
         fontSize: 28,

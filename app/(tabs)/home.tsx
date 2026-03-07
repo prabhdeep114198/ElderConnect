@@ -89,6 +89,9 @@ export default function HomeScreen() {
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
+  const [monitoredElders, setMonitoredElders] = useState<any[]>([]);
+  const [selectedElder, setSelectedElder] = useState<any>(null);
+
   const [aiMessage, setAiMessage] = useState<string>(t("aiGreeting") || "Select a feature to get started.");
 
   const { data: personalizationData, loading: personalizationLoading, refetch: refetchPersonalization } = usePersonalization();
@@ -96,10 +99,28 @@ export default function HomeScreen() {
   // ============================================
   // API FUNCTIONS
   // ============================================
+  const fetchMonitoredElders = async () => {
+    if (user?.id && user?.roles?.includes('caregiver')) {
+      try {
+        const response: any = await profileService.getMonitoredElders(user.id);
+        if (response && response.data && response.data.elders) {
+          const elders = response.data.elders;
+          setMonitoredElders(elders);
+          if (!selectedElder && elders.length > 0) {
+            setSelectedElder(elders[0]);
+          }
+        }
+      } catch (error) {
+        console.log("Failed to fetch monitored elders:", error);
+      }
+    }
+  };
+
   const fetchHealthMetrics = async () => {
-    if (!user) return;
+    const targetUserId = selectedElder?.id || user?.id;
+    if (!targetUserId) return;
     try {
-      const response: any = await profileService.getDailyMetrics(user.id);
+      const response: any = await profileService.getDailyMetrics(targetUserId);
       if (response && response.data && response.data.metrics) {
         setHealthMetrics(response.data.metrics);
         const raw = response.data.raw;
@@ -107,6 +128,7 @@ export default function HomeScreen() {
           if (raw.heartRate) setHeartRate(raw.heartRate);
           if (raw.sleepHours) setSleepHours(raw.sleepHours);
           if (raw.waterIntake) setWaterIntake(raw.waterIntake);
+          if (raw.steps) setSteps(raw.steps);
         }
       }
     } catch (error) {
@@ -115,12 +137,13 @@ export default function HomeScreen() {
   };
 
   const fetchSchedule = async () => {
-    if (!user) return;
+    const targetUserId = selectedElder?.id || user?.id;
+    if (!targetUserId) return;
     try {
       // Get medications and appointments and merge them for the schedule
       const [medsRes, apptsRes]: any = await Promise.all([
-        profileService.getMedicationReminders(user.id),
-        profileService.getAppointments(user.id)
+        profileService.getMedicationReminders(targetUserId),
+        profileService.getAppointments(targetUserId)
       ]);
 
       const events: any[] = [];
@@ -416,6 +439,9 @@ export default function HomeScreen() {
       loadReminders();
       fetchHealthMetrics();
       fetchSchedule();
+      if (user.roles?.includes('caregiver')) {
+        fetchMonitoredElders();
+      }
     }
     startStepTracking();
     fetchAIMessage();
@@ -442,6 +468,13 @@ export default function HomeScreen() {
       clearInterval(refreshInterval);
     };
   }, [user]);
+
+  useEffect(() => {
+    if (selectedElder) {
+      fetchHealthMetrics();
+      fetchSchedule();
+    }
+  }, [selectedElder]);
 
   useEffect(() => {
     fetchAIMessage();
@@ -564,6 +597,74 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+              </View>
+            )}
+
+            {/* CAREGIVER DASHBOARD - MONITORED ELDERS */}
+            {user?.roles?.includes('caregiver') && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>👨‍👩‍👧‍👦 {t("monitoredElders") || "Monitored Elders"}</Text>
+                  <TouchableOpacity onPress={async () => {
+                    Alert.alert("Seeding...", "Creating demo accounts and data...");
+                    await profileService.seedDemoData();
+                    fetchMonitoredElders();
+                  }}>
+                    <Text style={{ color: colors.primary }}>{monitoredElders.length === 0 ? "Seed Demo Data" : (t("addElder") || "+ Add Guest")}</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eldersScroll}>
+                  {monitoredElders.map((elder) => (
+                    <TouchableOpacity
+                      key={elder.id}
+                      style={[
+                        styles.elderCard,
+                        { backgroundColor: colors.card, borderColor: selectedElder?.id === elder.id ? colors.primary : colors.border }
+                      ]}
+                      onPress={() => setSelectedElder(elder)}
+                    >
+                      <View style={[styles.statusPoint, { 
+                        backgroundColor: elder.statusType === 'critical' ? colors.error : elder.statusType === 'warning' ? colors.warning : colors.success 
+                      }]} />
+                      
+                      <Text style={[styles.elderName, { color: colors.text }]} numberOfLines={1}>{elder.name}</Text>
+                      
+                      <View style={styles.elderMetricRow}>
+                        <Ionicons name="walk" size={14} color={colors.primary} />
+                        <Text style={[styles.elderMetricText, { color: colors.text }]}>{elder.metrics?.steps || 0}</Text>
+                      </View>
+                      
+                      <View style={styles.elderMetricRow}>
+                        <Ionicons name="heart" size={14} color={colors.error} />
+                        <Text style={[styles.elderMetricText, { color: colors.text }]}>{elder.metrics?.heartRate || 0} bpm</Text>
+                      </View>
+
+                      <View style={styles.elderInfoRow}>
+                        <Ionicons name="battery-charging" size={12} color={colors.mutedText} />
+                        <Text style={[styles.elderStatus, { color: colors.mutedText }]}>{elder.battery}% • {elder.status}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  {monitoredElders.length === 0 && (
+                    <View style={styles.emptyElders}>
+                      <Text style={{ color: colors.mutedText }}>No elders assigned yet.</Text>
+                    </View>
+                  )}
+                </ScrollView>
+
+                {selectedElder && (
+                  <TouchableOpacity 
+                    style={[styles.viewReportButton, { backgroundColor: colors.primary }]}
+                    onPress={() => router.push({
+                      pathname: "/(tabs)/reports" as any,
+                      params: { userId: selectedElder.id }
+                    })}
+                  >
+                    <Ionicons name="bar-chart" size={20} color="#FFF" />
+                    <Text style={styles.viewReportText}>View Detailed Report for {selectedElder.name.split(' ')[0]}</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -884,7 +985,68 @@ const styles = StyleSheet.create({
   time: { fontSize: 36, fontWeight: "300", marginBottom: 4 },
   date: { fontSize: 16 },
   section: { marginBottom: 30 },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 16 },
+  sectionTitle: {
+    fontWeight: "bold",
+    marginBottom: 15,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  eldersScroll: {
+    paddingRight: 20,
+    paddingBottom: 5,
+  },
+  elderCard: {
+    width: 160,
+    padding: 15,
+    borderRadius: 16,
+    marginRight: 15,
+    borderWidth: 2,
+    backgroundColor: '#FFF',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statusPoint: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  elderName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  elderInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  elderStatus: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  elderMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  elderMetricText: {
+    fontSize: 13,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  emptyElders: {
+    padding: 20,
+    paddingLeft: 0,
+  },
   quickActionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1188,5 +1350,24 @@ const styles = StyleSheet.create({
   },
   safetySubtitle: {
     fontSize: 14,
+  },
+  viewReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  viewReportText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 12,
   },
 });
