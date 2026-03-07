@@ -6,6 +6,7 @@ import {
     useAudioRecorder
 } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 import { useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -19,39 +20,44 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useFeatureFlag } from '../hooks/useFeatureFlags';
+import { useVoiceNavigation, detectLocalIntent } from '../hooks/useVoiceNavigation';
 import { SpeechToTextService } from '../services/SpeechToTextService';
 import { VoiceAssistantService } from '../services/VoiceAssistantService';
 
 const { width } = Dimensions.get('window');
 
+// Intents that need user confirmation before executing
+const CONFIRMATION_INTENTS = ['CREATE_EVENT', 'LOG_VITAL', 'REMINDER'];
+
 export const VoiceAssistant = () => {
     const { colors } = useTheme();
     const { user } = useAuth();
-    const isVoiceEnabled = useFeatureFlag('voice_assistant');
+    const { handleVoiceResponse, executeLocalIntent, speak } = useVoiceNavigation();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [pendingIntent, setPendingIntent] = useState<any>(null);
-
-    // Track whether user has slid into the cancel zone (replaces pan.x._value access)
     const [isCancelZone, setIsCancelZone] = useState(false);
 
     // Animations
     const pulseAnim = useRef(new Animated.Value(1)).current;
-    const expandAnim = useRef(new Animated.Value(0)).current; // 0 to 1
+    const expandAnim = useRef(new Animated.Value(0)).current;
     const pan = useRef(new Animated.ValueXY()).current;
 
-    // Timer state
     const [duration, setDuration] = useState(0);
     const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
     const isCancelledRef = useRef(false);
+    const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
 
-    const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
-        // Handle status changes if needed
-    });
-
+    const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, () => { });
     const isRecording = recorder.isRecording;
+
+    const showMessage = (text: string, autoDismiss = true) => {
+        setMessage(text);
+        if (autoDismiss) {
+            setTimeout(() => setMessage(null), 5000);
+        }
+    };
 
     const startTimer = () => {
         setDuration(0);
@@ -69,61 +75,44 @@ export const VoiceAssistant = () => {
     };
 
     const resetAnimations = () => {
-        pulseAnim.stopAnimation();
+        pulseLoop.current?.stop();
         pulseAnim.setValue(1);
-
         Animated.parallel([
-            Animated.spring(expandAnim, {
-                toValue: 0,
-                friction: 8,
-                tension: 50,
-                useNativeDriver: false,
-            }),
-            Animated.spring(pan, {
-                toValue: { x: 0, y: 0 },
-                friction: 5,
-                useNativeDriver: false,
-            })
+            Animated.spring(expandAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: false }),
+            Animated.spring(pan, { toValue: { x: 0, y: 0 }, friction: 5, useNativeDriver: false })
         ]).start();
     };
 
     async function startRecording() {
         try {
+            // Stop any ongoing speech before recording
+            Speech.stop();
+
             const { status } = await requestRecordingPermissionsAsync();
             if (status !== 'granted') {
-                setMessage("Microphone permission denied");
+                showMessage("Microphone permission denied. Please enable it in Settings.");
                 return;
             }
 
-            await setAudioModeAsync({
-                allowsRecording: true,
-                playsInSilentMode: true,
-            });
-
+            await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
             await recorder.prepareToRecordAsync();
             recorder.record();
             startTimer();
 
-            // Start animations
-            Animated.loop(
+            pulseLoop.current = Animated.loop(
                 Animated.sequence([
-                    Animated.timing(pulseAnim, { toValue: 1.2, duration: 400, useNativeDriver: false }),
-                    Animated.timing(pulseAnim, { toValue: 1, duration: 400, useNativeDriver: false }),
+                    Animated.timing(pulseAnim, { toValue: 1.25, duration: 350, useNativeDriver: false }),
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 350, useNativeDriver: false }),
                 ])
-            ).start();
+            );
+            pulseLoop.current.start();
 
-            Animated.spring(expandAnim, {
-                toValue: 1,
-                friction: 7,
-                tension: 40,
-                useNativeDriver: false,
-            }).start();
-
+            Animated.spring(expandAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: false }).start();
         } catch (err) {
             console.error('Failed to start recording', err);
-            setMessage("Failed to start recording");
+            showMessage("Failed to start recording. Please try again.");
             resetAnimations();
             stopTimer();
         }
@@ -134,12 +123,10 @@ export const VoiceAssistant = () => {
         resetAnimations();
         setIsCancelZone(false);
         try {
-            if (recorder.isRecording) {
-                await recorder.stop();
-            }
-        } catch (e) {
-            console.error("Cancel err", e);
-        }
+            if (recorder.isRecording) await recorder.stop();
+        } catch (e) { /* ignore */ }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        showMessage("Recording cancelled.");
     }
 
     async function stopAndProcessRecording() {
@@ -150,58 +137,80 @@ export const VoiceAssistant = () => {
         if (!recorder.isRecording && !isProcessing) return;
 
         setIsProcessing(true);
-        setMessage("Processing...");
+        setMessage("Listening... 🎤");
 
         try {
             const uri = recorder.uri;
             await recorder.stop();
 
-            if (uri) {
-                console.log("[VoiceAssistant] Audio recorded at:", uri);
-                const sttResult = await SpeechToTextService.transcribe(uri);
-                console.log("[VoiceAssistant] STT Result:", sttResult);
+            if (!uri) {
+                showMessage("No audio captured. Please try again.");
+                setIsProcessing(false);
+                return;
+            }
 
-                if (sttResult.success && sttResult.text) {
-                    setMessage(`Heard: "${sttResult.text}"`);
+            setMessage("Understanding your request...");
+            const sttResult = await SpeechToTextService.transcribe(uri);
 
-                    await new Promise(r => setTimeout(r, 1200));
-                    setMessage("Connecting to AI Assistant...");
+            if (!sttResult.success || !sttResult.text) {
+                const errMsg = sttResult.error || "Could not understand audio. Please try again.";
+                speak(errMsg);
+                showMessage(errMsg);
+                setIsProcessing(false);
+                return;
+            }
 
-                    const response = await VoiceAssistantService.processCommand(sttResult.text, {
-                        userId: user?.id || "unknown-user",
-                        name: user?.name,
-                    });
-                    console.log("[VoiceAssistant] Backend Response:", response);
+            const heard = sttResult.text;
+            setMessage(`Heard: "${heard}"`);
 
-                    if (response && response.requiresConfirmation) {
-                        setMessage(response.message);
-                        setPendingIntent(response.pendingIntent);
-                        setIsProcessing(false);
-                        return;
-                    } else if (response && response.message) {
-                        setMessage(response.message);
-                    } else if (response && response.reply) {
-                        setMessage(response.reply);
-                    } else {
-                        setMessage("Action processed successfully.");
-                    }
-                } else {
-                    console.error("[VoiceAssistant] STT Failed:", sttResult.error);
-                    setMessage(sttResult.error || "Could not understand audio.");
+            // ── FAST PATH: local keyword detection (instant, no AI needed) ──
+            const localIntent = detectLocalIntent(heard);
+            if (localIntent) {
+                console.log('[VoiceAssistant] Local intent detected:', localIntent.action, localIntent.destination);
+                const result = executeLocalIntent(localIntent);
+                if (result) {
+                    showMessage(result);
+                    setIsProcessing(false);
+                    setDuration(0);
+                    return;
                 }
             }
+
+            // ── SLOW PATH: send to AI backend for complex intents ──
+            await new Promise(r => setTimeout(r, 800));
+            setMessage("Processing with AI... 🤖");
+
+            const response = await VoiceAssistantService.processCommand(heard, {
+                userId: user?.id || "unknown-user",
+                name: user?.name,
+            });
+
+            if (response?.requiresConfirmation) {
+                // State-changing action: show confirmation before executing
+                const confirmMsg = response.message;
+                setMessage(confirmMsg);
+                setPendingIntent(response.pendingIntent);
+                speak(confirmMsg);
+                setIsProcessing(false);
+                return;
+            }
+
+            // Handle navigation and other instant intents
+            const displayMessage = handleVoiceResponse(response);
+            showMessage(displayMessage);
+
         } catch (err) {
-            console.error('[VoiceAssistant] Error during stop or processing:', err);
-            setMessage("Error processing voice.");
+            console.error('[VoiceAssistant] Error:', err);
+            const errMsg = "Error processing voice command. Please try again.";
+            speak(errMsg);
+            showMessage(errMsg);
         } finally {
             setIsProcessing(false);
             setDuration(0);
-            setTimeout(() => setMessage(null), 4000);
         }
     }
 
-    // Determine Pan Responder bounds
-    const maxSlide = -130; // pixels to slide left for cancel
+    const maxSlide = -130;
 
     const panResponder = useRef(
         PanResponder.create({
@@ -212,17 +221,14 @@ export const VoiceAssistant = () => {
                 await startRecording();
             },
             onPanResponderMove: (e, gestureState) => {
-                // Allow sliding left only
                 if (gestureState.dx < 0) {
                     pan.setValue({ x: Math.max(gestureState.dx, maxSlide - 20), y: 0 });
                 }
-
                 if (gestureState.dx < maxSlide && !isCancelledRef.current) {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                     isCancelledRef.current = true;
                     setIsCancelZone(true);
                 } else if (gestureState.dx >= maxSlide && isCancelledRef.current) {
-                    // User moved back to right — un-cancel
                     isCancelledRef.current = false;
                     setIsCancelZone(false);
                 }
@@ -250,25 +256,21 @@ export const VoiceAssistant = () => {
                 true,
                 pendingIntent
             );
-            if (response?.message) {
-                setMessage(response.message);
-            } else {
-                setMessage("Successfully saved.");
-            }
+            const displayMsg = handleVoiceResponse(response);
+            showMessage(displayMsg);
         } catch (error) {
-            console.error("Error confirming action:", error);
-            setMessage("Failed to save.");
+            speak("Failed to save. Please try again.");
+            showMessage("Failed to save.");
         } finally {
             setPendingIntent(null);
             setIsProcessing(false);
-            setTimeout(() => setMessage(null), 4000);
         }
     };
 
     const cancelConfirmation = () => {
         setPendingIntent(null);
-        setMessage("Action cancelled.");
-        setTimeout(() => setMessage(null), 2000);
+        speak("Action cancelled.");
+        showMessage("Action cancelled.");
     };
 
     const formatTime = (secs: number) => {
@@ -277,12 +279,11 @@ export const VoiceAssistant = () => {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
-    if (!user || !hasSubscription) return null;
+    // Show for ALL signed-in users (not just subscribers)
+    if (!user) return null;
 
-    // Mic button background color — uses isCancelZone state instead of pan.x._value
-    const micButtonColor = isRecording
-        ? (isCancelZone ? colors.error : '#ff3b30')
+    const micBgColor = isRecording
+        ? (isCancelZone ? colors.error : '#FF3B30')
         : colors.primary;
 
     return (
@@ -296,13 +297,15 @@ export const VoiceAssistant = () => {
                                 style={[styles.confirmButton, { backgroundColor: colors.error }]}
                                 onPress={cancelConfirmation}
                             >
-                                <Text style={styles.confirmButtonText}>Cancel</Text>
+                                <Ionicons name="close" size={14} color="#FFF" />
+                                <Text style={styles.confirmButtonText}>No</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.confirmButton, { backgroundColor: colors.primary }]}
+                                style={[styles.confirmButton, { backgroundColor: colors.success }]}
                                 onPress={acceptConfirmation}
                             >
-                                <Text style={styles.confirmButtonText}>OK</Text>
+                                <Ionicons name="checkmark" size={14} color="#FFF" />
+                                <Text style={styles.confirmButtonText}>Yes, Save</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -310,22 +313,22 @@ export const VoiceAssistant = () => {
             )}
 
             <View style={styles.recordWrapper}>
-                {/* Expandable background container */}
+                {/* Expanded recording bar */}
                 <Animated.View style={[
                     styles.expandedContainer,
                     {
                         backgroundColor: colors.card,
-                        borderColor: colors.border,
+                        borderColor: isCancelZone ? colors.error : colors.border,
                         width: expandAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [64, width * 0.75]
+                            outputRange: [0, width * 0.75]
                         }),
                         opacity: expandAnim
                     }
                 ]}>
                     <View style={styles.expandedContent}>
                         <View style={styles.timerContainer}>
-                            <View style={styles.redDot} />
+                            <View style={[styles.redDot, { backgroundColor: isCancelZone ? colors.error : '#FF3B30' }]} />
                             <Text style={[styles.timerText, { color: colors.text }]}>
                                 {formatTime(duration)}
                             </Text>
@@ -340,39 +343,44 @@ export const VoiceAssistant = () => {
                                 extrapolate: 'clamp'
                             })
                         }}>
-                            <Ionicons name="chevron-back" size={20} color={colors.text} style={{ opacity: 0.5 }} />
-                            <Text style={[styles.slideText, { color: colors.text }]}>
-                                Slide to cancel
+                            <Ionicons name="chevron-back" size={18} color={colors.mutedText} />
+                            <Text style={[styles.slideText, { color: isCancelZone ? colors.error : colors.mutedText }]}>
+                                {isCancelZone ? "Release to cancel" : "Slide to cancel"}
                             </Text>
                         </Animated.View>
                     </View>
                 </Animated.View>
 
-                {/* Draggable Mic Button */}
+                {/* Mic Button */}
                 <Animated.View
                     {...(!isProcessing ? panResponder.panHandlers : {})}
                     style={[
                         styles.micButtonContainer,
                         {
-                            transform: [
-                                { translateX: pan.x },
-                                { scale: pulseAnim }
-                            ],
-                            backgroundColor: micButtonColor
+                            transform: [{ translateX: pan.x }, { scale: pulseAnim }],
+                            backgroundColor: micBgColor,
+                            shadowColor: micBgColor,
                         }
                     ]}
                 >
                     {isProcessing ? (
-                        <ActivityIndicator color="#FFF" />
+                        <ActivityIndicator color="#FFF" size="small" />
                     ) : (
                         <Ionicons
                             name={isRecording ? "mic" : "mic-outline"}
-                            size={32}
+                            size={30}
                             color="#FFF"
                         />
                     )}
                 </Animated.View>
             </View>
+
+            {/* Tooltip hint (only when idle) */}
+            {!isRecording && !isProcessing && !message && (
+                <Text style={[styles.hintText, { color: colors.mutedText }]}>
+                    Hold to speak
+                </Text>
+            )}
         </View>
     );
 };
@@ -409,8 +417,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingRight: 70,
-        paddingLeft: 20,
+        paddingRight: 72,
+        paddingLeft: 18,
     },
     timerContainer: {
         flexDirection: 'row',
@@ -420,7 +428,6 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#ff3b30',
         marginRight: 6,
     },
     timerText: {
@@ -429,8 +436,7 @@ const styles = StyleSheet.create({
         fontVariant: ['tabular-nums'],
     },
     slideText: {
-        fontSize: 14,
-        opacity: 0.6,
+        fontSize: 13,
         marginLeft: 4,
     },
     micButtonContainer: {
@@ -439,40 +445,51 @@ const styles = StyleSheet.create({
         borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        elevation: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
     },
     messageBubble: {
-        padding: 12,
-        borderRadius: 15,
+        padding: 14,
+        borderRadius: 18,
         borderWidth: 1,
-        marginBottom: 10,
-        maxWidth: width * 0.7,
-        elevation: 2,
+        marginBottom: 12,
+        maxWidth: width * 0.75,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 4,
     },
     messageText: {
         fontSize: 14,
         fontWeight: '500',
+        lineHeight: 20,
     },
     confirmationActions: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
+        gap: 8,
         marginTop: 12,
-        paddingHorizontal: 8,
     },
     confirmButton: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 10,
-        minWidth: 80,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 4,
     },
     confirmButtonText: {
         color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 14,
-    }
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    hintText: {
+        fontSize: 11,
+        marginTop: 4,
+        marginRight: 4,
+        textAlign: 'right',
+    },
 });

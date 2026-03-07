@@ -7,6 +7,9 @@ export interface SustainabilityImpact {
   carbonSavedKg: number;
   tripsAvoided: number;
   year: number;
+  powerDraw?: number;
+  solarActive?: boolean;
+  devicesRecycled?: number;
 }
 
 export interface PublicImpact {

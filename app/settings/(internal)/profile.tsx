@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ResponsiveView } from "../../../components/ResponsiveView";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,29 +13,28 @@ import {
     TextInput,
     TouchableOpacity,
     View,
-    StatusBar
 } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 
 export default function ProfileScreen() {
     const router = useRouter();
-    const { colors, theme } = useTheme();
+    const { colors, accentColor } = useTheme();
     const { t } = useTranslation();
     const { user, updateProfile } = useAuth();
     const [name, setName] = useState(user?.name || "");
     const [loading, setLoading] = useState(false);
+    const [nameActive, setNameActive] = useState(false);
 
     const handleSave = async () => {
         if (!name.trim()) {
             Alert.alert("Error", "Name cannot be empty");
             return;
         }
-
         setLoading(true);
         try {
             await updateProfile(name);
-            Alert.alert("Success", "Profile updated successfully");
+            Alert.alert("✅ Success", "Profile updated successfully");
             router.back();
         } catch (error: any) {
             Alert.alert("Error", error.message || "Failed to update profile");
@@ -44,107 +43,120 @@ export default function ProfileScreen() {
         }
     };
 
+    const initials = (user?.name || "?")
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+
     return (
-        <ResponsiveView maxWidth={600} style={[styles.container, { backgroundColor: theme === 'dark' ? '#000' : '#F2F2F7' }]}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={{ flex: 1 }}
-            >
-                <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-                            <Text style={{ color: colors.primary, fontSize: 17 }}>Cancel</Text>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                {/* Header */}
+                <LinearGradient colors={[accentColor + "30", "transparent"]} style={styles.hero}>
+                    <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.card }]}>
+                        <Ionicons name="chevron-back" size={22} color={colors.text} />
+                    </TouchableOpacity>
+
+                    {/* Avatar */}
+                    <View style={styles.avatarWrapper}>
+                        <LinearGradient colors={[accentColor, accentColor + "BB"]} style={styles.avatar}>
+                            <Text style={styles.avatarText}>{initials}</Text>
+                        </LinearGradient>
+                        <TouchableOpacity style={[styles.cameraBtn, { backgroundColor: accentColor }]}>
+                            <Ionicons name="camera" size={16} color="#FFF" />
                         </TouchableOpacity>
-                        <Text style={[styles.largeTitle, { color: colors.text }]}>Profile</Text>
                     </View>
 
-                    <View style={styles.avatarSection}>
-                        <View style={[styles.avatarCircle, { backgroundColor: colors.card }]}>
-                            <Ionicons name="person" size={80} color={colors.primary} />
-                            <TouchableOpacity style={styles.editAvatarBtn}>
-                                <Ionicons name="camera" size={20} color="#FFF" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                    <Text style={[styles.heroName, { color: colors.text }]}>{user?.name || "Your Name"}</Text>
+                    <Text style={[styles.heroSub, { color: colors.mutedText }]}>{user?.email}</Text>
+                </LinearGradient>
 
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>PERSONAL INFORMATION</Text>
-                        <View style={[styles.card, { backgroundColor: colors.card }]}>
-                            <View style={[styles.inputRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
-                                <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+                <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                    {/* Personal Info Card */}
+                    <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>PERSONAL INFORMATION</Text>
+                    <View style={[styles.card, { backgroundColor: colors.card }]}>
+                        {/* Name field */}
+                        <View style={[styles.fieldRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                            <View style={[styles.fieldIcon, { backgroundColor: accentColor + "18" }]}>
+                                <Ionicons name="person" size={18} color={accentColor} />
+                            </View>
+                            <View style={styles.fieldContent}>
+                                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>{t("fullName")}</Text>
                                 <TextInput
-                                    style={[styles.input, { color: colors.text }]}
+                                    style={[styles.fieldInput, { color: colors.text, borderColor: nameActive ? accentColor : "transparent" }]}
                                     value={name}
                                     onChangeText={setName}
-                                    placeholder="Full Name"
+                                    placeholder={t("fullName")}
                                     placeholderTextColor={colors.mutedText}
+                                    onFocus={() => setNameActive(true)}
+                                    onBlur={() => setNameActive(false)}
                                 />
                             </View>
-                            <View style={styles.inputRow}>
-                                <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-                                <Text style={[styles.readOnlyText, { color: colors.mutedText }]}>{user?.email}</Text>
+                        </View>
+                        {/* Email field (read-only) */}
+                        <View style={styles.fieldRow}>
+                            <View style={[styles.fieldIcon, { backgroundColor: "#5856D618" }]}>
+                                <Ionicons name="mail" size={18} color="#5856D6" />
+                            </View>
+                            <View style={styles.fieldContent}>
+                                <Text style={[styles.fieldLabel, { color: colors.mutedText }]}>{t("email")}</Text>
+                                <Text style={[styles.fieldValue, { color: colors.text }]}>{user?.email}</Text>
+                            </View>
+                            <View style={[styles.lockBadge, { backgroundColor: colors.border + "80" }]}>
+                                <Ionicons name="lock-closed" size={12} color={colors.mutedText} />
                             </View>
                         </View>
-                        <Text style={styles.footerText}>Your email address cannot be changed. It is used for account recovery and security notifications.</Text>
                     </View>
+                    <Text style={[styles.hint, { color: colors.mutedText }]}>
+                        Your email is locked and used for account security. It cannot be changed.
+                    </Text>
 
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={[styles.saveButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
-                            onPress={handleSave}
-                            disabled={loading}
-                        >
-                            <Text style={styles.saveButtonText}>{loading ? "Saving..." : "Save Changes"}</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Save Button */}
+                    <TouchableOpacity
+                        style={[styles.saveBtn, { backgroundColor: accentColor, opacity: loading ? 0.7 : 1 }]}
+                        onPress={handleSave}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        {loading ? (
+                            <Text style={styles.saveBtnText}>{t("saving")}</Text>
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                                <Text style={styles.saveBtnText}>{t("saveChanges")}</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
                 </ScrollView>
-            </KeyboardAvoidingView>
-        </ResponsiveView>
+            </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { paddingBottom: 40 },
-    header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-    closeButton: { alignSelf: 'flex-start', paddingBottom: 10 },
-    largeTitle: { fontSize: 34, fontWeight: 'bold', letterSpacing: -0.5 },
-    avatarSection: { alignItems: 'center', marginVertical: 30 },
-    avatarCircle: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    editAvatarBtn: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: '#007AFF',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: '#FFF',
-    },
-    section: { marginTop: 10, paddingHorizontal: 20 },
-    sectionHeader: { fontSize: 13, fontWeight: '400', marginBottom: 8, marginLeft: 16 },
-    card: { borderRadius: 12, overflow: 'hidden' },
-    inputRow: { flexDirection: 'row', alignItems: 'center', padding: 12, marginLeft: 16, paddingLeft: 0 },
-    label: { fontSize: 17, width: 80 },
-    input: { flex: 1, fontSize: 17, textAlign: 'right' },
-    readOnlyText: { flex: 1, fontSize: 17, textAlign: 'right' },
-    footerText: { color: '#8E8E93', fontSize: 13, paddingHorizontal: 16, marginTop: 10, lineHeight: 18 },
-    buttonContainer: { marginTop: 40, paddingHorizontal: 20 },
-    saveButton: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    saveButtonText: { color: "#FFF", fontSize: 17, fontWeight: "600" },
+    hero: { paddingTop: Platform.OS === "web" ? 24 : 60, paddingHorizontal: 20, paddingBottom: 30, alignItems: "center" },
+    backBtn: { position: "absolute", top: Platform.OS === "web" ? 24 : 56, left: 20, width: 38, height: 38, borderRadius: 19, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
+    avatarWrapper: { marginTop: 20, marginBottom: 14, position: "relative" },
+    avatar: { width: 100, height: 100, borderRadius: 50, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8 },
+    avatarText: { fontSize: 38, fontWeight: "800", color: "#FFF", letterSpacing: 1 },
+    cameraBtn: { position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center", borderWidth: 3, borderColor: "#FFF" },
+    heroName: { fontSize: 24, fontWeight: "800", letterSpacing: -0.3 },
+    heroSub: { fontSize: 14, marginTop: 4 },
+
+    body: { padding: 20, paddingBottom: 48 },
+    sectionLabel: { fontSize: 12, fontWeight: "600", letterSpacing: 0.8, marginBottom: 10, marginLeft: 4 },
+    card: { borderRadius: 18, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+    fieldRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
+    fieldIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 14 },
+    fieldContent: { flex: 1 },
+    fieldLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 3 },
+    fieldInput: { fontSize: 16, fontWeight: "500", borderBottomWidth: 1.5, paddingBottom: 2 },
+    fieldValue: { fontSize: 16, fontWeight: "500" },
+    lockBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: "row", alignItems: "center" },
+    hint: { fontSize: 12, lineHeight: 18, marginTop: 10, marginLeft: 4, marginBottom: 32 },
+    saveBtn: { flexDirection: "row", height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    saveBtnText: { color: "#FFF", fontSize: 17, fontWeight: "700" },
 });

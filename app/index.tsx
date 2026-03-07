@@ -23,6 +23,9 @@ import Animated, {
 import LoginModal from "../components/LoginModal";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useResponsive } from "../hooks/useResponsive";
+import { ResponsiveView } from "../components/ResponsiveView";
+import { getFontSize } from "../utils/typography";
 
 const { width } = Dimensions.get("window");
 
@@ -42,7 +45,7 @@ interface ButtonItem {
 }
 
 // Reusable Animated Card
-const AnimatedFeatureCard = ({ feature, index, colors }: { feature: Feature, index: number, colors: any }) => {
+const AnimatedFeatureCard = ({ feature, index, colors, fontSize }: { feature: Feature, index: number, colors: any, fontSize: string }) => {
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 100).springify()}
@@ -51,15 +54,16 @@ const AnimatedFeatureCard = ({ feature, index, colors }: { feature: Feature, ind
       <View style={[styles.iconCircle, { backgroundColor: feature.color + '20' }]}>
         <Ionicons name={feature.icon as any} size={28} color={feature.color} />
       </View>
-      <Text style={[styles.cardTitle, { color: colors.text }]}>{feature.title}</Text>
-      <Text style={[styles.cardDesc, { color: colors.mutedText }]}>{feature.description}</Text>
+      <Text style={[styles.cardTitle, { color: colors.text, fontSize: getFontSize(16, fontSize) }]}>{feature.title}</Text>
+      <Text style={[styles.cardDesc, { color: colors.mutedText, fontSize: getFontSize(14, fontSize) }]}>{feature.description}</Text>
     </Animated.View>
   );
 };
 
 export default function LandingScreen() {
   const router = useRouter();
-  const { colors, theme } = useTheme();
+  const { isWeb, gridColumns, isDesktop } = useResponsive();
+  const { colors, theme, fontSize } = useTheme();
   const { t } = useTranslation();
   const { user } = useAuth(); // Check auth state to adjust buttons if needed
   const [showLogin, setShowLogin] = useState(false);
@@ -137,83 +141,95 @@ export default function LandingScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Hero Section */}
-      <Animated.View style={[styles.heroSection, heroStyle]}>
-        <View style={[styles.heroIconContainer, { backgroundColor: colors.primary + '15' }]}>
-          <Ionicons name="heart-circle" size={80} color={colors.primary} />
-        </View>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {t("landingTitle")} <Text style={{ color: colors.primary }}>ElderConnect</Text>
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-          {t("landingSubtitle")}
-        </Text>
-      </Animated.View>
+    <ResponsiveView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section */}
+        <Animated.View style={[styles.heroSection, heroStyle]}>
+          <View style={[styles.heroIconContainer, { backgroundColor: colors.primary + '15' }]}>
+            <Ionicons name="heart-circle" size={80} color={colors.primary} />
+          </View>
+          <Text style={[styles.title, { color: colors.text, fontSize: getFontSize(32, fontSize) }]}>
+            {t("landingTitle")} <Text style={{ color: colors.primary }}>ElderConnect</Text>
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.mutedText, fontSize: getFontSize(16, fontSize) }]}>
+            {t("landingSubtitle")}
+          </Text>
+        </Animated.View>
 
-      {/* Features Grid */}
-      <View style={styles.featuresContainer}>
-        {features.map((feature, index) => (
-          <AnimatedFeatureCard
-            key={feature.title}
-            feature={feature}
-            index={index}
-            colors={colors}
-          />
-        ))}
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.buttonsContainer}>
-        {buttons.map((btn, index) => (
-          <Animated.View
-            key={btn.title}
-            entering={FadeInDown.delay(600 + (index * 100)).springify()}
-            style={{ width: '100%', alignItems: 'center' }}
-          >
-            <TouchableOpacity
+        {/* Features Grid */}
+        <View style={[styles.featuresContainer, isWeb && styles.webFeaturesContainer]}>
+          {features.map((feature, index) => (
+            <Animated.View
+              key={feature.title}
+              entering={FadeInDown.delay(index * 100).springify()}
               style={[
-                styles.button,
-                btn.primary
-                  ? { backgroundColor: colors.primary, shadowColor: colors.primary }
-                  : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
+                styles.card,
+                isWeb && { width: `${(100 / gridColumns) - 2}%` },
+                { backgroundColor: colors.card, shadowColor: colors.text }
               ]}
-              onPress={async () => {
-                const accepted = await AsyncStorage.getItem("privacyAccepted");
-
-                if (!accepted) {
-                  router.push("/home");
-                  return;
-                }
-
-                if (btn.actionType === "login") {
-                  setShowLogin(true);
-                } else if (btn.actionType === "route" && btn.route) {
-                  router.push(btn.route as any);
-                }
-              }}
             >
-              <Text style={[
-                styles.buttonText,
-                btn.primary ? { color: "#fff" } : { color: colors.text }
-              ]}>
-                {btn.title}
-              </Text>
-              {btn.primary && <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />}
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
-      </View>
+              <View style={[styles.iconCircle, { backgroundColor: feature.color + '20' }]}>
+                <Ionicons name={feature.icon as any} size={28} color={feature.color} />
+              </View>
+              <Text style={[styles.cardTitle, { color: colors.text, fontSize: getFontSize(isWeb ? 18 : 16, fontSize) }]}>{feature.title}</Text>
+              <Text style={[styles.cardDesc, { color: colors.mutedText, fontSize: getFontSize(isWeb ? 14 : 12, fontSize) }]}>{feature.description}</Text>
+            </Animated.View>
+          ))}
+        </View>
 
-      {/* Login Modal */}
-      <Modal visible={showLogin} animationType="slide" transparent>
-        <LoginModal onClose={() => setShowLogin(false)} />
-      </Modal>
+        {/* Action Buttons */}
+        <View style={[styles.buttonsContainer, isWeb && styles.webButtonsContainer]}>
+          {buttons.map((btn, index) => (
+            <Animated.View
+              key={btn.title}
+              entering={FadeInDown.delay(600 + (index * 100)).springify()}
+              style={{ width: isWeb ? 'auto' : '100%', minWidth: isWeb ? 240 : '90%', alignItems: 'center' }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  btn.primary
+                    ? { backgroundColor: colors.primary, shadowColor: colors.primary }
+                    : { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
+                ]}
+                onPress={async () => {
+                  const accepted = await AsyncStorage.getItem("privacyAccepted");
 
-    </ScrollView>
+                  if (!accepted) {
+                    router.push("/home");
+                    return;
+                  }
+
+                  if (btn.actionType === "login") {
+                    setShowLogin(true);
+                  } else if (btn.actionType === "route" && btn.route) {
+                    router.push(btn.route as any);
+                  }
+                }}
+              >
+                <Text style={[
+                  styles.buttonText,
+                  { fontSize: getFontSize(18, fontSize) },
+                  btn.primary ? { color: colors.buttonText } : { color: colors.text }
+                ]}>
+                  {btn.title}
+                </Text>
+                {btn.primary && <Ionicons name="arrow-forward" size={20} color={colors.buttonText} style={{ marginLeft: 8 }} />}
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
+
+        {/* Login Modal */}
+        <Modal visible={showLogin} animationType="slide" transparent>
+          <LoginModal onClose={() => setShowLogin(false)} />
+        </Modal>
+
+      </ScrollView>
+    </ResponsiveView>
   );
 }
 
@@ -231,7 +247,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: "#6b7280", // gray-500
     textAlign: "center",
     marginTop: 8,
   },
@@ -239,7 +254,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#9ca3af",
     marginHorizontal: 4,
   },
   heroSection: {
@@ -256,8 +270,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
   },
   title: {
     fontSize: 32,
@@ -278,6 +290,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 30
   },
+  webFeaturesContainer: {
+    justifyContent: 'center',
+    gap: 20,
+  },
   card: {
     width: "48%",
     padding: 20,
@@ -295,21 +311,23 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   cardTitle: {
-    fontSize: 16,
     fontWeight: "bold",
     marginBottom: 6,
     textAlign: "center",
   },
   cardDesc: {
-    fontSize: 12,
     textAlign: "center",
-    lineHeight: 16
+    lineHeight: 18
   },
   buttonsContainer: {
     width: "100%",
     marginTop: 10,
     alignItems: "center",
     gap: 16
+  },
+  webButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   button: {
     flexDirection: 'row',

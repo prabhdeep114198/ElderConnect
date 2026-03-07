@@ -16,7 +16,9 @@ import {
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useResponsive } from "../../hooks/useResponsive";
 import { getProfileKey } from "../../utils/userStorageKeys";
+import { getFontSize } from "../../utils/typography";
 
 const INTERESTS = ["Gardening", "Reading", "Music", "Walking", "Technology", "Cooking", "Art", "Photography", "Knitting", "Traveling", "Sports", "Puzzles", "Bird Watching"];
 const CONDITIONS = ["Diabetes", "Hypertension", "Mobility Issues", "Vision Impairment", "Hearing Impairment", "Arthritis", "Heart Disease", "Asthma", "Memory Issues", "None"];
@@ -33,8 +35,10 @@ const GENDERS = ["Male", "Female", "Non-binary", "Other", "Prefer not to say"];
 
 export default function OnboardingScreen() {
     const router = useRouter();
-    const { colors, theme } = useTheme();
+    const { colors, theme, fontSize, uiMode } = useTheme();
     const { completeOnboarding, user } = useAuth();
+
+    const isSenior = uiMode === "senior";
 
     // Page navigation state
     const [currentPage, setCurrentPage] = useState(0);
@@ -188,15 +192,15 @@ export default function OnboardingScreen() {
             case 0:
                 return (
                     <>
-                        <Text style={[styles.heading, { color: colors.primary }]}>Welcome, {user?.name?.split(" ")[0]}!</Text>
-                        <Text style={[styles.subheading, { color: colors.mutedText }]}>
+                        <Text style={[styles.heading, { color: colors.primary, fontSize: getFontSize(isWeb ? 36 : 28) }]}>Welcome, {user?.name?.split(" ")[0]}!</Text>
+                        <Text style={[styles.subheading, { color: colors.mutedText, fontSize: getFontSize(isWeb ? 18 : 16) }]}>
                             Let's gather some information to personalize your experience and keep you safe.
                         </Text>
 
                         <View style={[styles.section, { backgroundColor: colors.card }]}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Basic Information</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Basic Information</Text>
 
-                            <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
+                            <Text style={[styles.label, { color: colors.text, fontSize: getFontSize(16) }]}>Full Name</Text>
                             <TextInput
                                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                                 value={name}
@@ -293,8 +297,8 @@ export default function OnboardingScreen() {
             case 1:
                 return (
                     <>
-                        <Text style={[styles.heading, { color: colors.primary }]}>Health Profile</Text>
-                        <Text style={[styles.subheading, { color: colors.mutedText }]}>
+                        <Text style={[styles.heading, { color: colors.primary, fontSize: getFontSize(isWeb ? 36 : 28) }]}>Health Profile</Text>
+                        <Text style={[styles.subheading, { color: colors.mutedText, fontSize: getFontSize(isWeb ? 18 : 16) }]}>
                             This helps us provide better care reminders and health tracking.
                         </Text>
 
@@ -421,14 +425,14 @@ export default function OnboardingScreen() {
             case 2:
                 return (
                     <>
-                        <Text style={[styles.heading, { color: colors.primary }]}>Lifestyle & Preferences</Text>
-                        <Text style={[styles.subheading, { color: colors.mutedText }]}>
+                        <Text style={[styles.heading, { color: colors.primary, fontSize: getFontSize(isWeb ? 36 : 28) }]}>Lifestyle & Preferences</Text>
+                        <Text style={[styles.subheading, { color: colors.mutedText, fontSize: getFontSize(isWeb ? 18 : 16) }]}>
                             Help us understand your daily life and interests.
                         </Text>
 
                         <View style={styles.sectionHeader}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Interests & Hobbies</Text>
-                            <Text style={[styles.sectionSubtitle, { color: colors.mutedText }]}>What do you enjoy?</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Interests & Hobbies</Text>
+                            <Text style={[styles.sectionSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>What do you enjoy?</Text>
                         </View>
                         <View style={styles.chipContainer}>
                             {INTERESTS.map((item) => (
@@ -541,15 +545,15 @@ export default function OnboardingScreen() {
             case 3:
                 return (
                     <>
-                        <Text style={[styles.heading, { color: colors.primary }]}>Emergency Contacts</Text>
-                        <Text style={[styles.subheading, { color: colors.mutedText }]}>
+                        <Text style={[styles.heading, { color: colors.primary, fontSize: getFontSize(isWeb ? 36 : 28) }]}>Emergency Contacts</Text>
+                        <Text style={[styles.subheading, { color: colors.mutedText, fontSize: getFontSize(18) }]}>
                             Who should we contact in case of emergency?
                         </Text>
 
                         <View style={[styles.section, { backgroundColor: colors.card }]}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Primary Contact</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Primary Contact</Text>
 
-                            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+                            <Text style={[styles.label, { color: colors.text, fontSize: getFontSize(16) }]}>Name</Text>
                             <TextInput
                                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                                 value={emergencyName1}
@@ -579,9 +583,9 @@ export default function OnboardingScreen() {
                         </View>
 
                         <View style={[styles.section, { backgroundColor: colors.card, marginTop: 24 }]}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Secondary Contact (Optional)</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Secondary Contact (Optional)</Text>
 
-                            <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+                            <Text style={[styles.label, { color: colors.text, fontSize: getFontSize(16) }]}>Name</Text>
                             <TextInput
                                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                                 value={emergencyName2}
@@ -647,13 +651,13 @@ export default function OnboardingScreen() {
             case 4:
                 return (
                     <>
-                        <Text style={[styles.heading, { color: colors.primary }]}>Daily Routine & Goals</Text>
-                        <Text style={[styles.subheading, { color: colors.mutedText }]}>
+                        <Text style={[styles.heading, { color: colors.primary, fontSize: getFontSize(isWeb ? 36 : 28) }]}>Daily Routine & Goals</Text>
+                        <Text style={[styles.subheading, { color: colors.mutedText, fontSize: getFontSize(18) }]}>
                             Help us understand your schedule and aspirations.
                         </Text>
 
                         <View style={[styles.section, { backgroundColor: colors.card }]}>
-                            <Text style={[styles.label, { color: colors.text }]}>Typical Wake-Up Time</Text>
+                            <Text style={[styles.label, { color: colors.text, fontSize: getFontSize(16) }]}>Typical Wake-Up Time</Text>
                             <TouchableOpacity
                                 style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }]}
                                 onPress={() => setShowWakeUpPicker(true)}
@@ -675,7 +679,7 @@ export default function OnboardingScreen() {
                                 />
                             )}
 
-                            <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Typical Bedtime</Text>
+                            <Text style={[styles.label, { color: colors.text, marginTop: 16, fontSize: getFontSize(16) }]}>Typical Bedtime</Text>
                             <TouchableOpacity
                                 style={[styles.input, { borderColor: colors.border, backgroundColor: colors.background, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }]}
                                 onPress={() => setShowBedTimePicker(true)}
@@ -697,7 +701,7 @@ export default function OnboardingScreen() {
                                 />
                             )}
 
-                            <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>Health & Wellness Goals</Text>
+                            <Text style={[styles.label, { color: colors.text, marginTop: 16, fontSize: getFontSize(16) }]}>Health & Wellness Goals</Text>
                             <TextInput
                                 style={[styles.input, styles.multilineInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
                                 value={goals}
@@ -736,13 +740,15 @@ export default function OnboardingScreen() {
         }
     };
 
+    const { isWeb, isDesktop } = useResponsive();
+
     return (
         <ResponsiveView maxWidth={800} style={{ flex: 1, backgroundColor: colors.background }}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
-                <ScrollView contentContainerStyle={{ padding: 16 }}>
+                <ScrollView contentContainerStyle={isWeb ? styles.webScrollContent : styles.scrollContent}>
                     {renderProgressBar()}
                     {renderPage()}
 
@@ -779,28 +785,34 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+    scrollContent: {
+        padding: 16,
+    },
+    webScrollContent: {
+        padding: 40,
+        maxWidth: 800,
+        alignSelf: 'center',
+        width: '100%',
+    },
     heading: {
-        fontSize: Platform.OS === 'web' ? 36 : 28,
+        fontSize: 28,
         fontWeight: "bold",
         marginBottom: 12,
-        textAlign: Platform.OS === 'web' ? 'center' : 'left',
     },
     subheading: {
-        fontSize: Platform.OS === 'web' ? 18 : 16,
+        fontSize: 16,
         marginBottom: 30,
-        textAlign: Platform.OS === 'web' ? 'center' : 'left',
         opacity: 0.8,
     },
     section: {
-        padding: Platform.OS === 'web' ? 32 : 20,
+        padding: 20,
         borderRadius: 20,
         marginBottom: 30,
-        backgroundColor: '#FFFFFF', // Fallback, will be overridden by colors.card in render
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
     },
     sectionHeader: {
         marginBottom: 8,

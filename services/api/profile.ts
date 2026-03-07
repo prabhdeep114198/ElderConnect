@@ -54,4 +54,9 @@ export const profileService = {
     // Gamification
     getStreaks: (userId: string) => api.get(`/v1/users/${userId}/gamification/streaks`),
     getAchievements: (userId: string) => api.get(`/v1/users/${userId}/gamification/achievements`),
+
+    // Caregiver
+    getMonitoredElders: (caregiverId: string) => api.get(`/v1/users/${caregiverId}/monitored-elders`),
+    linkElder: (caregiverId: string, elderId: string) => api.post(`/v1/users/${caregiverId}/link-elder/${elderId}`, {}),
+    seedDemoData: () => api.get('/v1/users/any/seed/demo'), // userId param is ignored by this specific controller route but required by prefix
 };
