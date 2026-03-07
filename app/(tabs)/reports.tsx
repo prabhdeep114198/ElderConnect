@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { Alert, Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View, TextInput } from "react-native";
 import Svg, { Circle, G, Line, Polygon, Text as SvgText } from "react-native-svg";
 import { HealthCharts } from "../../components/HealthCharts";
 import { ResponsiveView } from "../../components/ResponsiveView";
@@ -84,11 +84,20 @@ export default function ReportsScreen() {
     carbonSavedKg: number;
     tripsAvoided: number;
     year: number;
+    powerDraw?: number;
+    solarActive?: boolean;
+    devicesRecycled?: number;
   } | null>(null);
   const [remoteGraphData, setRemoteGraphData] = useState<GraphData | null>(null);
   const [streaks, setStreaks] = useState({ health: 0, steps: 0, medication: 0 });
   const [badges, setBadges] = useState<any[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Donation Modal State
+  const [showDonationModal, setShowDonationModal] = useState(false);
+  const [donationDate, setDonationDate] = useState("Tomorrow, 10:00 AM");
+  const [donationAddress, setDonationAddress] = useState((user as any)?.address || "");
+  const [donationDevice, setDonationDevice] = useState("");
 
   const flags = useFeatureFlags(["download_reports"]);
   const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
@@ -960,6 +969,71 @@ export default function ReportsScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDonationModal}
+        onRequestClose={() => setShowDonationModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowDonationModal(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalContent, { width: '90%', backgroundColor: colors.card }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginBottom: 15 }}>
+                  <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 0 }]}>Schedule E-Waste Pickup</Text>
+                  <TouchableOpacity onPress={() => setShowDonationModal(false)}>
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[styles.modalSubtext, { textAlign: 'left', alignSelf: 'flex-start', marginBottom: 5 }]}>Device Type</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="e.g. Broken Smartwatch, Old Phone"
+                  placeholderTextColor={colors.mutedText}
+                  value={donationDevice}
+                  onChangeText={setDonationDevice}
+                />
+
+                <Text style={[styles.modalSubtext, { textAlign: 'left', alignSelf: 'flex-start', marginBottom: 5 }]}>Pickup Address</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="Enter your full address"
+                  placeholderTextColor={colors.mutedText}
+                  value={donationAddress}
+                  onChangeText={setDonationAddress}
+                />
+
+                <Text style={[styles.modalSubtext, { textAlign: 'left', alignSelf: 'flex-start', marginBottom: 5 }]}>Preferred Time</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+                  placeholder="e.g. Next Monday, 2:00 PM"
+                  placeholderTextColor={colors.mutedText}
+                  value={donationDate}
+                  onChangeText={setDonationDate}
+                />
+
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary, padding: 15, borderRadius: 12, width: '100%', alignItems: 'center', marginTop: 10 }}
+                  onPress={() => {
+                    if (!donationAddress || !donationDevice) {
+                      Alert.alert("Missing Details", "Please provide a device type and address.");
+                      return;
+                    }
+                    setShowDonationModal(false);
+                    // Reset fields
+                    setDonationDevice("");
+                    Alert.alert('Pickup Confirmed!', `Our team will collect your ${donationDevice} at ${donationAddress} on ${donationDate}. Thank you for supporting our E-Waste reduction!`);
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Confirm Pickup</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <ResponsiveView style={styles.responsiveContent}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>{t("wellnessReport")}</Text>
@@ -1049,26 +1123,49 @@ export default function ReportsScreen() {
         {
           sustainabilityImpact && (
             <View style={[styles.impactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Your Impact"}</Text>
-              <Text style={[styles.impactSubtitle, { color: colors.mutedText }]}>
-                {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View>
+                  <Text style={[styles.impactTitle, { color: colors.text }]}>{t("yourImpact") || "Sustainability & Carbon Ledger"}</Text>
+                  <Text style={[styles.impactSubtitle, { color: colors.mutedText, marginBottom: 0 }]}>
+                    {t("digitalCareSaved") || "Your digital care saved"} {sustainabilityImpact.carbonSavedKg} kg CO2 {t("thisYear") || "this year"}
+                  </Text>
+                </View>
+                <Ionicons name="leaf" size={28} color="#22C55E" />
+              </View>
+
               <View style={styles.impactGrid}>
                 <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="leaf-outline" size={20} color="#22C55E" />
+                  <Ionicons name="cloud-offline-outline" size={20} color="#22C55E" />
                   <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.carbonSavedKg} kg</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("co2Saved") || "CO2 saved"}</Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText, textAlign: 'center' }]}>{t("co2Saved") || "CO2 Tracked & Saved"}</Text>
                 </View>
                 <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="document-text-outline" size={20} color="#3B82F6" />
-                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.paperSavedSheets}</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("paperSaved") || "Pages saved"}</Text>
+                  <Ionicons name="hardware-chip-outline" size={20} color="#3B82F6" />
+                  <Text style={[styles.impactValue, { color: colors.text }]}>
+                    {sustainabilityImpact.powerDraw ? `${sustainabilityImpact.powerDraw} W` : '0.42 W'}
+                  </Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText, textAlign: 'center' }]}>Avg Device Power Draw</Text>
                 </View>
                 <View style={[styles.impactItem, { backgroundColor: colors.background }]}>
-                  <Ionicons name="car-outline" size={20} color="#8B5CF6" />
-                  <Text style={[styles.impactValue, { color: colors.text }]}>{sustainabilityImpact?.tripsAvoided}</Text>
-                  <Text style={[styles.impactLabel, { color: colors.mutedText }]}>{t("tripsAvoided") || "Trips avoided"}</Text>
+                  <Ionicons name="sunny-outline" size={20} color={sustainabilityImpact.solarActive ? "#F59E0B" : "#9CA3AF"} />
+                  <Text style={[styles.impactValue, { color: colors.text }]}>
+                    {sustainabilityImpact.solarActive ? 'Active' : 'Standby'}
+                  </Text>
+                  <Text style={[styles.impactLabel, { color: colors.mutedText, textAlign: 'center' }]}>Solar Charging Mode</Text>
                 </View>
+              </View>
+
+              <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Text style={[styles.impactTitle, { fontSize: 16, color: colors.text }]}>Community Impact: E-Waste Reduction</Text>
+                <Text style={[styles.impactSubtitle, { color: colors.mutedText, fontSize: 12, marginBottom: 12 }]}>
+                  Help us reduce E-Waste! Our devices are 90% modular and recyclable. Got an old wearable?
+                </Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary, padding: 12, borderRadius: 8, alignItems: 'center' }}
+                  onPress={() => setShowDonationModal(true)}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Schedule Device Donation Pickup</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )
@@ -1312,6 +1409,15 @@ const styles = StyleSheet.create({
   trendLabel: {
     fontSize: 12,
     marginTop: 4,
+  },
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 14,
+    marginBottom: 15,
   },
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },

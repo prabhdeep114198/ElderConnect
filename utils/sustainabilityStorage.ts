@@ -18,6 +18,9 @@ export interface SustainabilityImpactResult {
   carbonSavedKg: number;
   tripsAvoided: number;
   year: number;
+  powerDraw?: number;
+  solarActive?: boolean;
+  devicesRecycled?: number;
 }
 
 async function getStorageKey(userId: string): Promise<string> {
