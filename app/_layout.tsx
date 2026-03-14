@@ -22,6 +22,7 @@ import { Image } from 'expo-image';
 import { VoiceAssistant } from "../components/VoiceAssistant";
 import "../i18n";
 import { fallDetectionEngine } from "../services/fallDetection/FallDetectionEngine";
+import { useNotificationScheduler } from "../hooks/useNotificationScheduler";
 
 // NOTIFICATION HANDLER CONFIG
 Notifications.setNotificationHandler({
@@ -36,11 +37,28 @@ Notifications.setNotificationHandler({
 
 function InitialLayout() {
   const { user, loading, logout, updateProfile } = useAuth();
-  const { theme, colors, toggleTheme, uiMode } = useTheme();
+  const { theme, colors, toggleTheme, uiMode, presentationMode } = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = Platform.OS === 'web' && windowWidth > 1024;
+  
+  // Activate Notification Engine mapped to user existance logic 
+  const { triggerSafetyAlert, triggerDeviceBattery } = useNotificationScheduler({
+     enabled: !!user,
+     maxDaily: 5
+  });
+
+  const PresentationOverlay = () => {
+    if (!presentationMode) return null;
+    return (
+      <View style={{position: 'absolute', top: Platform.OS === 'ios' ? 60 : 40, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none', zIndex: 9999}}>
+        <View style={{backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5}}>
+          <Text style={{color: '#FFF', fontWeight: 'bold', fontSize: 13}}>Aligned with UN SDG 3, 10, 11, and 12</Text>
+        </View>
+      </View>
+    );
+  };
 
   useEffect(() => {
     const setupNotifications = async () => {
@@ -352,6 +370,7 @@ function InitialLayout() {
         <Drawer.Screen name="auth/login" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="onboarding/index" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="fall-detected" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
+        <Drawer.Screen name="sdg-dashboard" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
 
         {/* HIDE THE ROOM SCREEN FROM SIDEBAR */}
         <Drawer.Screen
@@ -367,6 +386,7 @@ function InitialLayout() {
 
       </Drawer>
       <VoiceAssistant />
+      <PresentationOverlay />
     </>
   );
 }

@@ -113,6 +113,43 @@ export default function ProfileScreen() {
                         Your email is locked and used for account security. It cannot be changed.
                     </Text>
 
+                    {/* SDG Badges & Impact Dashboard Section */}
+                    <Text style={[styles.sectionLabel, { color: colors.mutedText, marginTop: 24 }]}>SUSTAINABILITY IMPACT</Text>
+                    <View style={[styles.card, { backgroundColor: colors.card, marginBottom: 24 }]}>
+                        <TouchableOpacity style={styles.fieldRow} onPress={() => router.push('/sdg-dashboard' as any)}>
+                            <View style={[styles.fieldIcon, { backgroundColor: '#4CAF5018' }]}>
+                                <Ionicons name="globe" size={18} color="#4CAF50" />
+                            </View>
+                            <View style={styles.fieldContent}>
+                                <Text style={[styles.fieldValue, { color: colors.text }]}>UN SDG Impact Dashboard</Text>
+                                <Text style={[{ color: colors.mutedText, fontSize: 13, marginTop: 2 }]}>View how you contribute to global goals.</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={colors.border} />
+                        </TouchableOpacity>
+
+                        {/* Badges */}
+                        <View style={[styles.badgesContainer, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                            <Text style={[styles.fieldLabel, { color: colors.mutedText, marginLeft: 16, marginTop: 12, marginBottom: 8 }]}>EARNED BADGES</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll}>
+                                <View style={[styles.badgeItem, { backgroundColor: colors.background }]}>
+                                    <Ionicons name="shield-checkmark" size={28} color="#FF9800" />
+                                    <Text style={[styles.badgeTitle, { color: colors.text }]}>Health Guardian</Text>
+                                    <Text style={[styles.badgeSub, { color: colors.mutedText }]} numberOfLines={2}>Logged vitals for 7 days</Text>
+                                </View>
+                                <View style={[styles.badgeItem, { backgroundColor: colors.background }]}>
+                                    <Ionicons name="home" size={28} color="#4CAF50" />
+                                    <Text style={[styles.badgeTitle, { color: colors.text }]}>Independent Champ</Text>
+                                    <Text style={[styles.badgeSub, { color: colors.mutedText }]} numberOfLines={2}>No falls for 30 days</Text>
+                                </View>
+                                <View style={[styles.badgeItem, { backgroundColor: colors.background }]}>
+                                    <Ionicons name="leaf" size={28} color="#00BCD4" />
+                                    <Text style={[styles.badgeTitle, { color: colors.text }]}>Eco Saver</Text>
+                                    <Text style={[styles.badgeSub, { color: colors.mutedText }]} numberOfLines={2}>Eco mode active 24h+</Text>
+                                </View>
+                            </ScrollView>
+                        </View>
+                    </View>
+
                     {/* Save Button */}
                     <TouchableOpacity
                         style={[styles.saveBtn, { backgroundColor: accentColor, opacity: loading ? 0.7 : 1 }]}
@@ -159,4 +196,11 @@ const styles = StyleSheet.create({
     hint: { fontSize: 12, lineHeight: 18, marginTop: 10, marginLeft: 4, marginBottom: 32 },
     saveBtn: { flexDirection: "row", height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
     saveBtnText: { color: "#FFF", fontSize: 17, fontWeight: "700" },
+    
+    // Badges
+    badgesContainer: { paddingBottom: 16 },
+    badgesScroll: { paddingHorizontal: 16 },
+    badgeItem: { width: 110, padding: 12, borderRadius: 12, alignItems: 'center', marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+    badgeTitle: { fontSize: 13, fontWeight: 'bold', marginTop: 8, textAlign: 'center' },
+    badgeSub: { fontSize: 11, textAlign: 'center', marginTop: 4 },
 });

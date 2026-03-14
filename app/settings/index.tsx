@@ -87,6 +87,8 @@ const getSections = (t: any): { title: string; data: SettingItem[] }[] => [
       { type: "item", icon: "color-palette", iconColor: "#AF52DE", title: t("accentColor") || "Theme Color", subtitle: t("accentColorSubtitle") || "Pick your accent color", action: "accentColor" },
       { type: "toggle", icon: "notifications", iconColor: "#FF9500", title: t("notifications"), key: "notifications", subtitle: t("notificationsSubtitle") },
       { type: "toggle", icon: "moon", iconColor: "#5856D6", title: t("darkMode"), key: "darkMode", subtitle: t("darkModeSubtitle") },
+      { type: "toggle", icon: "leaf", iconColor: "#34C759", title: "Eco Mode", key: "ecoMode", subtitle: "Battery Saver & Reduced Telemetry" },
+      { type: "toggle", icon: "easel", iconColor: "#AF52DE", title: "Presentation Mode", key: "presentationMode", subtitle: "Highlight UN SDG impacts for judges" },
       { type: "item", icon: "globe", iconColor: "#34C759", title: t("language"), action: "language" },
     ],
   },
@@ -147,7 +149,7 @@ function IconBadge({ name, color }: { name: string; color: string }) {
 // ─── Main Screen ─────────────────────────────────────────────
 export default function SettingsScreen() {
   const router = useRouter();
-  const { theme, colors, toggleTheme, uiMode, setUIMode, fontSize, setFontSize, accentColor, setAccentColor } = useTheme();
+  const { theme, colors, toggleTheme, uiMode, setUIMode, fontSize, setFontSize, accentColor, setAccentColor, ecoMode, setEcoMode, presentationMode, setPresentationMode } = useTheme();
   const { user, logout, requireAuth } = useAuth();
   const { t, i18n } = useTranslation();
 
@@ -253,7 +255,16 @@ export default function SettingsScreen() {
                 const isLast = iIdx === section.data.length - 1;
 
                 if (item.type === "toggle") {
-                  const val = item.key === "darkMode" ? theme === "dark" : (item.key ? toggles[item.key] : false);
+                  const isDarkMode = item.key === "darkMode";
+                  const isEcoMode = item.key === "ecoMode";
+                  const isPresentationMode = item.key === "presentationMode";
+                  
+                  let val = false;
+                  if (isDarkMode) val = theme === "dark";
+                  else if (isEcoMode) val = ecoMode;
+                  else if (isPresentationMode) val = presentationMode;
+                  else val = item.key ? toggles[item.key] : false;
+
                   return (
                     <View key={iIdx} style={[styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
                       <IconBadge name={item.icon} color={item.iconColor} />
@@ -264,7 +275,9 @@ export default function SettingsScreen() {
                       <Switch
                         value={val}
                         onValueChange={(v) => {
-                          if (item.key === "darkMode") toggleTheme();
+                          if (isDarkMode) toggleTheme();
+                          else if (isEcoMode) setEcoMode(v);
+                          else if (isPresentationMode) setPresentationMode(v);
                           else setToggles((p) => ({ ...p, [item.key!]: v }));
                         }}
                         trackColor={{ false: colors.border, true: accentColor }}

@@ -623,17 +623,17 @@ export default function HomeScreen() {
                       ]}
                       onPress={() => setSelectedElder(elder)}
                     >
-                      <View style={[styles.statusPoint, { 
-                        backgroundColor: elder.statusType === 'critical' ? colors.error : elder.statusType === 'warning' ? colors.warning : colors.success 
+                      <View style={[styles.statusPoint, {
+                        backgroundColor: elder.statusType === 'critical' ? colors.error : elder.statusType === 'warning' ? colors.warning : colors.success
                       }]} />
-                      
+
                       <Text style={[styles.elderName, { color: colors.text }]} numberOfLines={1}>{elder.name}</Text>
-                      
+
                       <View style={styles.elderMetricRow}>
                         <Ionicons name="walk" size={14} color={colors.primary} />
                         <Text style={[styles.elderMetricText, { color: colors.text }]}>{elder.metrics?.steps || 0}</Text>
                       </View>
-                      
+
                       <View style={styles.elderMetricRow}>
                         <Ionicons name="heart" size={14} color={colors.error} />
                         <Text style={[styles.elderMetricText, { color: colors.text }]}>{elder.metrics?.heartRate || 0} bpm</Text>
@@ -653,7 +653,7 @@ export default function HomeScreen() {
                 </ScrollView>
 
                 {selectedElder && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.viewReportButton, { backgroundColor: colors.primary }]}
                     onPress={() => router.push({
                       pathname: "/(tabs)/reports" as any,
@@ -947,7 +947,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   dismissButton: {
-    padding: 2,
+    minHeight: 48,
+    minWidth: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   recIconBadge: {
     width: 44,
@@ -963,8 +966,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   recDesc: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     marginBottom: 8,
   },
   recReasonRow: {
@@ -973,7 +976,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   recReason: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
     marginLeft: 4,
     textTransform: 'uppercase',
@@ -1030,7 +1033,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   elderStatus: {
-    fontSize: 12,
+    fontSize: 14,
     marginLeft: 4,
   },
   elderMetricRow: {
@@ -1039,7 +1042,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   elderMetricText: {
-    fontSize: 13,
+    fontSize: 15,
     marginLeft: 6,
     fontWeight: '500',
   },

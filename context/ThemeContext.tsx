@@ -16,6 +16,10 @@ interface ThemeContextType {
     setUIMode: (mode: UIMode) => void;
     setFontSize: (scale: FontSizeScale) => void;
     setAccentColor: (color: string) => void;
+    ecoMode: boolean;
+    presentationMode: boolean;
+    setEcoMode: (val: boolean) => void;
+    setPresentationMode: (val: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -28,6 +32,10 @@ const ThemeContext = createContext<ThemeContextType>({
     setUIMode: () => { },
     setFontSize: () => { },
     setAccentColor: () => { },
+    ecoMode: false,
+    presentationMode: false,
+    setEcoMode: () => { },
+    setPresentationMode: () => { },
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,21 +43,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [uiMode, setUIModeState] = useState<UIMode>("senior");
     const [fontSize, setFontSizeState] = useState<FontSizeScale>("medium");
     const [accentColor, setAccentColorState] = useState<string>(LightColors.primary);
+    const [ecoMode, setEcoModeState] = useState<boolean>(false);
+    const [presentationMode, setPresentationModeState] = useState<boolean>(false);
 
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const [storedTheme, storedMode, storedSize, storedAccent] = await Promise.all([
+                const [storedTheme, storedMode, storedSize, storedAccent, storedEcoMode, storedPresentationMode] = await Promise.all([
                     AsyncStorage.getItem("theme"),
                     AsyncStorage.getItem("uiMode"),
                     AsyncStorage.getItem("fontSize"),
                     AsyncStorage.getItem("accentColor"),
+                    AsyncStorage.getItem("ecoMode"),
+                    AsyncStorage.getItem("presentationMode"),
                 ]);
 
                 if (storedTheme === "dark") setTheme("dark");
                 if (storedMode) setUIModeState(storedMode as UIMode);
                 if (storedSize) setFontSizeState(storedSize as FontSizeScale);
                 if (storedAccent) setAccentColorState(storedAccent);
+                if (storedEcoMode === "true") setEcoModeState(true);
+                if (storedPresentationMode === "true") setPresentationModeState(true);
             } catch (error) {
                 console.error("Failed to load theme settings", error);
             }
@@ -78,6 +92,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await AsyncStorage.setItem("accentColor", color);
     };
 
+    const setEcoMode = async (val: boolean) => {
+        setEcoModeState(val);
+        await AsyncStorage.setItem("ecoMode", String(val));
+    };
+
+    const setPresentationMode = async (val: boolean) => {
+        setPresentationModeState(val);
+        await AsyncStorage.setItem("presentationMode", String(val));
+    };
+
     const baseColors = theme === "light" ? LightColors : DarkColors;
     const colors = {
         ...baseColors,
@@ -94,7 +118,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             toggleTheme,
             setUIMode,
             setFontSize,
-            setAccentColor
+            setAccentColor,
+            ecoMode,
+            presentationMode,
+            setEcoMode,
+            setPresentationMode
         }}>
             {children}
         </ThemeContext.Provider>
