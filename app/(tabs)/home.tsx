@@ -773,6 +773,27 @@ export default function HomeScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={24} color={colors.primary} />
               </TouchableOpacity>
+
+              {/* NEW: NOSTALGIA AI MEMORY JOURNAL */}
+              <TouchableOpacity
+                style={[styles.wellnessCard, { backgroundColor: colors.warning + '15', borderColor: colors.warning, marginTop: 15 }]}
+                onPress={() => router.push("/nostalgia-recording" as any)}
+              >
+                <LinearGradient
+                  colors={[colors.warning + '20', 'transparent']}
+                  style={styles.wellnessGradient}
+                />
+                <View style={styles.wellnessIcon}>
+                  <Ionicons name="journal" size={32} color={colors.warning} />
+                </View>
+                <View style={styles.wellnessContent}>
+                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Memory Journal</Text>
+                  <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
+                    Record your life stories
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.warning} />
+              </TouchableOpacity>
             </View>
 
             {/* HEALTH METRICS */}

@@ -6,13 +6,14 @@ import { useAuth } from '../../../context/AuthContext';
 import { getCheckoutHtml } from '../../../services/PaymentService';
 import { API_BASE_URL } from '../../../services/api/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function UpgradePlanScreen() {
     const { colors } = useTheme();
     const { refreshSubscription } = useAuth();
     const [htmlContent, setHtmlContent] = useState<string | null>(null);
     const router = useRouter();
+    const { tier } = useLocalSearchParams();
 
     useEffect(() => {
         prepareCheckout();
@@ -22,7 +23,7 @@ export default function UpgradePlanScreen() {
         try {
             const token = await AsyncStorage.getItem('auth_token');
             if (token) {
-                const html = await getCheckoutHtml(999, token);
+                const html = await getCheckoutHtml(tier as string || 'PREMIUM', token);
                 setHtmlContent(html);
             } else {
                 Alert.alert('Error', 'Please login again to upgrade.');

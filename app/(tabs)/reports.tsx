@@ -1093,6 +1093,21 @@ export default function ReportsScreen() {
           </View>
         </View>
 
+        {/* DIGITAL LEGACY TIMELINE */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Digital Legacy</Text>
+          <TouchableOpacity
+            style={[styles.impactCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary, alignItems: 'center', paddingVertical: 25 }]}
+            onPress={() => router.push({ pathname: "/memory-timeline" as any, params: { userId: targetUserId } })}
+          >
+            <Ionicons name="library" size={40} color={colors.primary} style={{ marginBottom: 10 }} />
+            <Text style={[styles.impactTitle, { color: colors.text, fontSize: 18 }]}>View Memory Archive</Text>
+            <Text style={[styles.impactSubtitle, { color: colors.mutedText, textAlign: 'center', marginTop: 5 }]}>
+              Listen to the life stories and memories recorded by {userData?.name?.split(" ")[0] || "this elder"}.
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
           {scores.physical < 60 && (

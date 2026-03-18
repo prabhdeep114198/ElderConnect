@@ -1,41 +1,54 @@
 import React, { useEffect, useState } from "react";
-import { 
-    View, 
-    Text, 
-    TouchableOpacity, 
-    TextInput, 
-    StyleSheet, 
-    StatusBar, 
-    Platform 
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    TextInput,
+    StyleSheet,
+    StatusBar,
+    Platform,
+    Alert,
+    ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getSocket } from "../../services/socket";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../services/api/client";
 
 export default function LobbyScreen() {
     const router = useRouter();
-    const { colors, theme } = useTheme(); // Use global theme state
+    const { colors, theme } = useTheme();
+    const { user } = useAuth();
     const [connected, setConnected] = useState(false);
-    const [roomNo, setRoomNo] = useState("");
+    const [calleeId, setCalleeId] = useState(""); // Enter the other user's ID
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const socket = getSocket();
         if (!socket) return;
         const handleConnect = () => setConnected(true);
         socket.on("connect", handleConnect);
-        
-        // Check initial state
         if (socket.connected) setConnected(true);
-
-        return () => {
-            socket.off("connect", handleConnect);
-        };
+        return () => { socket.off("connect", handleConnect); };
     }, []);
 
-    const joinRoom = () => {
-        if (!roomNo) return alert("Please enter a room number");
-        router.push(`/videocall/room?roomId=${roomNo}`);
+    const startCall = async () => {
+        if (!calleeId.trim()) return Alert.alert("Missing", "Enter the User ID of the person you want to call.");
+        if (!user?.id) return Alert.alert("Not logged in", "Please log in first.");
+        setLoading(true);
+        try {
+            const res = await api.post<{ call_id: string; room_id: string }>(
+                '/v1/videocalls/initiate',
+                { callee_id: calleeId.trim(), call_type: 'video' }
+            );
+            router.push(`/videocall/room?callId=${res.call_id}&isCaller=true&userId=${user.id}`);
+        } catch (err: any) {
+            Alert.alert('Call failed', err?.message || 'Could not reach server');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const isDark = theme === 'dark';
@@ -52,23 +65,22 @@ export default function LobbyScreen() {
             </View>
 
             <View style={styles.section}>
-                {/* Theme toggle removed from here as it is controlled by the sidebar */}
-                
-                <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>JOIN MEETING</Text>
+                <Text style={[styles.sectionHeader, { color: colors.mutedText }]}>START A CALL</Text>
                 <View style={[styles.card, { backgroundColor: isDark ? '#1C1C1E' : colors.card }]}>
                     <View style={styles.inputContainer}>
                         <TextInput
                             style={[styles.input, { color: colors.text }]}
-                            placeholder="Enter Room Number"
+                            placeholder="Enter Callee User ID"
                             placeholderTextColor={colors.mutedText}
-                            value={roomNo}
-                            onChangeText={setRoomNo}
-                            keyboardType="number-pad"
+                            value={calleeId}
+                            onChangeText={setCalleeId}
+                            autoCapitalize="none"
+                            autoCorrect={false}
                         />
                     </View>
                     
                     <View style={[styles.statusRow, { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
-                        <Text style={[styles.statusText, { color: colors.mutedText }]}>Status</Text>
+                        <Text style={[styles.statusText, { color: colors.mutedText }]}>Socket</Text>
                         <View style={styles.statusIndicator}>
                             <Text style={[styles.statusLabel, { color: colors.text }]}>
                                 {connected ? "Connected" : "Connecting..."}
@@ -79,14 +91,18 @@ export default function LobbyScreen() {
                 </View>
 
                 <TouchableOpacity 
-                    style={[styles.joinBtn, { backgroundColor: colors.primary }]} 
-                    onPress={joinRoom}
+                    style={[styles.joinBtn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]} 
+                    onPress={startCall}
+                    disabled={loading}
                 >
-                    <Text style={styles.joinBtnText}>Join Room</Text>
+                    {loading
+                        ? <ActivityIndicator color="#FFF" />
+                        : <Text style={styles.joinBtnText}>📞 Start Call</Text>
+                    }
                 </TouchableOpacity>
                 
                 <Text style={[styles.footerText, { color: colors.mutedText }]}>
-                    Enter the unique room ID to start a secure encrypted video session.
+                    Enter the User ID of the person you want to call. They will receive an incoming call notification.
                 </Text>
             </View>
         </View>

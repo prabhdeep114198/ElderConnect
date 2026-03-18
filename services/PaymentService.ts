@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { API_BASE_URL } from './api/config';
 
-export const getCheckoutHtml = async (amount: number, token: string) => {
+export const getCheckoutHtml = async (tier: string, token: string) => {
     try {
         const response = await axios.get(`${API_BASE_URL}/subscriptions/checkout-html`, {
-            params: { amount },
+            params: { tier },
             headers: { Authorization: `Bearer ${token}` }
         });
         return response.data;

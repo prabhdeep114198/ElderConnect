@@ -21,6 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useResponsive } from "../../hooks/useResponsive";
 import { getFontSize } from "../../utils/typography";
+import { api } from "../../services/api/client";
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -63,6 +64,19 @@ export default function LoginScreen() {
             }
         } catch (error: any) {
             Alert.alert(t("authFailed"), error.message || t("errorOccurred"));
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!email.trim()) {
+            Alert.alert(t("emailRequired", "Email Required"), t("enterEmailFirst", "Please enter your email address to reset your password."));
+            return;
+        }
+        try {
+            await api.post('/v1/auth/forgot-password', { email: email.trim() }, { requiresAuth: false });
+            Alert.alert(t("checkEmail", "Check Your Email"), t("resetLinkSent", "If an account exists, a password reset link has been sent."));
+        } catch (error: any) {
+            Alert.alert(t("errorOccurred"), error.message || "Something went wrong. Please try again.");
         }
     };
 
@@ -164,7 +178,7 @@ export default function LoginScreen() {
                                 />
                             </View>
 
-                            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <View style={[styles.inputContainer, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: isLogin ? 6 : 16 }]}>
                                 <Ionicons name="lock-closed-outline" size={20} color={colors.mutedText} style={styles.inputIcon} />
                                 <TextInput
                                     placeholder={t("password")}
@@ -175,6 +189,16 @@ export default function LoginScreen() {
                                     secureTextEntry
                                 />
                             </View>
+
+                            {isLogin && (
+                                <View style={{ width: '100%', alignItems: 'flex-end', marginBottom: 16 }}>
+                                    <TouchableOpacity onPress={handleForgotPassword}>
+                                        <Text style={{ color: colors.primary, fontSize: getFontSize(13, fontSize), fontWeight: "600" }}>
+                                            {t("forgotPassword", "Forgot Password?")}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
 
                             <TouchableOpacity
                                 style={[styles.mainButton, { backgroundColor: colors.primary }]}

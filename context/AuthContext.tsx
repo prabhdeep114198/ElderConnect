@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               name: resolvedName,
               email: apiUser.email || parsedUser.email,
               isOnboarded: apiUser.isOnboarded || parsedUser.isOnboarded || false,
-              plan_level: apiUser.isSubscribed ? "premium" : "free",
+              plan_level: apiUser.subscriptionTier ? apiUser.subscriptionTier.toLowerCase() : (apiUser.isSubscribed ? "premium" : "free"),
               isSubscribed: apiUser.isSubscribed || false,
               avatar: apiUser.avatar || parsedUser.avatar,
               roles: apiUser.roles || parsedUser.roles || ["elder"],
@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: apiUser.email,
           isOnboarded: apiUser.isOnboarded || false,
           isSubscribed: apiUser.isSubscribed || false,
-          plan_level: apiUser.isSubscribed ? "premium" : "free",
+          plan_level: apiUser.subscriptionTier ? apiUser.subscriptionTier.toLowerCase() : (apiUser.isSubscribed ? "premium" : "free"),
           avatar: apiUser.avatar || null,
           roles: apiUser.roles || ["elder"],
         };
@@ -192,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: apiUser.email,
           isOnboarded: apiUser.isOnboarded || false,
           isSubscribed: apiUser.isSubscribed || false,
-          plan_level: apiUser.isSubscribed ? "premium" : "free",
+          plan_level: apiUser.subscriptionTier ? apiUser.subscriptionTier.toLowerCase() : (apiUser.isSubscribed ? "premium" : "free"),
           avatar: apiUser.avatar || null,
           roles: apiUser.roles || roles,
         };

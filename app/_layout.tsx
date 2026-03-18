@@ -124,16 +124,17 @@ function InitialLayout() {
     const segment = segments[0];
     const inAuthGroup = segment === "auth";
     const inOnboarding = segment === "onboarding";
+    const inPublicRoute = segment === "reset-password" || segment === "verify-email";
 
     if (!user) {
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !inPublicRoute) {
         router.replace("/auth/login");
       }
       return;
     }
 
     if (!user.isOnboarded) {
-      if (!inOnboarding) {
+      if (!inOnboarding && !inPublicRoute) {
         router.replace("/onboarding");
       }
       return;
@@ -371,6 +372,8 @@ function InitialLayout() {
         <Drawer.Screen name="onboarding/index" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="fall-detected" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
         <Drawer.Screen name="sdg-dashboard" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
+        <Drawer.Screen name="reset-password" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
+        <Drawer.Screen name="verify-email" options={{ drawerItemStyle: { display: "none" }, headerShown: false }} />
 
         {/* HIDE THE ROOM SCREEN FROM SIDEBAR */}
         <Drawer.Screen
