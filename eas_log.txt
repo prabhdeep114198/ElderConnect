@@ -1,0 +1,16 @@
+
+ID                       0fa3ce32-8b63-4698-b875-5f75444cce72
+Platform                 Android
+Status                   errored
+Profile                  preview
+Distribution             internal
+SDK Version              54.0.0
+Version                  1.0.0
+Version code             1
+Commit                   c9067ea174e034d078638f5879c90b9a84edaf4e
+Logs                     https://expo.dev/accounts/sprabhdeep960/projects/elderconnect/builds/0fa3ce32-8b63-4698-b875-5f75444cce72
+Application Archive URL  null
+Build Artifacts URL      null
+Started at               3/19/2026, 2:05:25 AM
+Finished at              3/19/2026, 2:09:04 AM
+Started by               sprabhdeep960

@@ -33,10 +33,8 @@ const getDevUrl = () => {
 
 const DEV_API_URL = getDevUrl();
 
-// You can replace this with your production URL when ready
-const PROD_API_URL = process.env.EXPO_PUBLIC_PROD_API_URL || 'https://elderconnect-be.onrender.com/api';
-
-export const API_BASE_URL = __DEV__ ? DEV_API_URL : PROD_API_URL;
+// Load API URL centrally from .env
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
 
 export const API_TIMEOUT = 10000; // 10 seconds
 
