@@ -1,7 +1,13 @@
 import { Platform } from 'react-native';
 import { API_BASE_URL } from './api/config';
 
-const HF_API_URL = `https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3`;
+// Groq: blazing fast Whisper inference (~1-2s), completely free tier
+// Get your key at: https://console.groq.com
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+// Hugging Face fallback
+const HF_API_URL = 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3';
+
 export interface TranscriptionResult {
     success: boolean;
     text?: string;
@@ -10,66 +16,147 @@ export interface TranscriptionResult {
 
 export const SpeechToTextService = {
     /**
-     * Transcribes audio from a URI directly via Hugging Face Inference API.
-     * This moves the STT logic to the frontend as requested.
+     * PRIMARY: Groq Whisper (~1-2 seconds, no cold starts, free)
+     * FALLBACK: Hugging Face → Backend
      */
     async transcribe(audioUri: string): Promise<TranscriptionResult> {
-        console.log(`[STT Service] Starting frontend transcription for URI: ${audioUri}`);
+        console.log(`[STT Service] Transcribing: ${audioUri}`);
 
-        try {
-            const hfToken = process.env.EXPO_PUBLIC_HUGGINGFACE_API_KEY;
-            if (!hfToken) {
-                console.warn("[STT Service] No HF token found, falling back to backend");
-                return SpeechToTextService.transcribeViaBackend(audioUri);
+        const groqToken = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+        if (groqToken && groqToken !== 'YOUR_GROQ_API_KEY_HERE') {
+            try {
+                const result = await SpeechToTextService.transcribeViaGroq(audioUri, groqToken);
+                if (result.success) return result;
+                console.warn('[STT Service] Groq failed, trying HF...', result.error);
+            } catch (err) {
+                console.warn('[STT Service] Groq error, trying HF...', err);
             }
-
-            // 1. Get the audio data as a Blob
-            // On mobile, fetch(uri) works for local file URIs in many Expo versions
-            const response = await fetch(audioUri);
-            const audioBlob = await response.blob();
-
-            // 2. Call Hugging Face
-            console.log(`[STT Service] Calling Hugging Face: ${HF_API_URL}`);
-            const hfResponse = await fetch(HF_API_URL, {
-                headers: {
-                    Authorization: `Bearer ${hfToken}`,
-                    "Content-Type": audioBlob.type || "audio/m4a",
-                },
-                method: "POST",
-                body: audioBlob,
-            });
-
-            if (!hfResponse.ok) {
-                const errorData = await hfResponse.json().catch(() => ({}));
-                console.error("[STT Service] HF API Error:", hfResponse.status, errorData);
-
-                // If HF is warming up (503), we might want to tell the user
-                if (hfResponse.status === 503) {
-                    return { success: false, error: "AI model is warming up. Please try again in 20 seconds." };
-                }
-
-                throw new Error(errorData.error || `HF API Error ${hfResponse.status}`);
-            }
-
-            const result = await hfResponse.json();
-            console.log("[STT Service] HF Result:", result);
-
-            if (result && result.text) {
-                return { success: true, text: result.text };
-            }
-
-            return { success: false, error: "No text returned from transcription service." };
-
-        } catch (error) {
-            console.error('[STT Service] Frontend STT Error:', error);
-            // Fallback to backend if frontend fails
-            console.log("[STT Service] Falling back to backend transcription...");
-            return SpeechToTextService.transcribeViaBackend(audioUri);
+        } else {
+            console.warn('[STT Service] No Groq key — add EXPO_PUBLIC_GROQ_API_KEY to .env from console.groq.com');
         }
+
+        // Fallback: Hugging Face
+        const hfToken = process.env.EXPO_PUBLIC_HUGGINGFACE_API_KEY;
+        if (hfToken) {
+            try {
+                const result = await SpeechToTextService.transcribeViaHuggingFace(audioUri, hfToken);
+                if (result.success) return result;
+                console.warn('[STT Service] HF failed, trying backend...', result.error);
+            } catch (err) {
+                console.warn('[STT Service] HF error, trying backend...', err);
+            }
+        }
+
+        // Final fallback: backend
+        return SpeechToTextService.transcribeViaBackend(audioUri);
     },
 
     /**
-     * Sends audio to the backend Whisper endpoint (Fallback).
+     * Groq Whisper — uses multipart/form-data (works natively on iOS without blob issues)
+     * Typical response time: 1-3 seconds even on first call. Zero cold starts.
+     */
+    async transcribeViaGroq(audioUri: string, token: string): Promise<TranscriptionResult> {
+        console.log('[STT Service] Using Groq Whisper...');
+
+        const formData = new FormData();
+        const filePayload: any = Platform.OS === 'web' && audioUri.startsWith('blob:')
+            ? await (async () => {
+                const r = await fetch(audioUri);
+                const blob = await r.blob();
+                return new File([blob], 'audio.m4a', { type: 'audio/m4a' });
+            })()
+            : { uri: audioUri, name: 'audio.m4a', type: 'audio/m4a' };
+
+        // @ts-ignore
+        formData.append('file', filePayload);
+        formData.append('model', 'whisper-large-v3');
+        formData.append('response_format', 'json');
+        formData.append('language', 'en');
+
+        const response = await fetch(GROQ_API_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                // Do NOT set Content-Type manually — React Native sets it with boundary automatically
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            console.error('[STT Service] Groq error:', response.status, errText);
+            return { success: false, error: `Groq error ${response.status}` };
+        }
+
+        const data = await response.json();
+        const text = data?.text?.trim();
+        if (text) {
+            console.log('[STT Service] Groq result:', text);
+            return { success: true, text };
+        }
+
+        return { success: false, error: 'No text from Groq' };
+    },
+
+    /**
+     * HuggingFace Whisper — binary upload via FileSystem (avoids iOS blob freeze).
+     * Has cold start of 30-45s on free tier.
+     */
+    async transcribeViaHuggingFace(audioUri: string, token: string): Promise<TranscriptionResult> {
+        console.log('[STT Service] Using Hugging Face Whisper...');
+
+        let hfResponseStatus: number;
+        let resultData: any;
+
+        if (Platform.OS === 'web') {
+            const response = await fetch(audioUri);
+            const audioBlob = await response.blob();
+            const hfResponse = await fetch(HF_API_URL, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': audioBlob.type || 'audio/m4a',
+                },
+                body: audioBlob,
+            });
+            hfResponseStatus = hfResponse.status;
+            resultData = hfResponse.ok
+                ? await hfResponse.json()
+                : await hfResponse.json().catch(() => ({}));
+        } else {
+            const FileSystem = require('expo-file-system/legacy');
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('HF_TIMEOUT')), 45000)
+            );
+            const uploadResult = await Promise.race([
+                FileSystem.uploadAsync(HF_API_URL, audioUri, {
+                    httpMethod: 'POST',
+                    uploadType: 0,
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'audio/m4a',
+                    },
+                }),
+                timeoutPromise,
+            ]) as any;
+
+            hfResponseStatus = uploadResult.status;
+            try { resultData = JSON.parse(uploadResult.body); } catch { resultData = uploadResult.body; }
+        }
+
+        if (hfResponseStatus === 503) return { success: false, error: 'HF model is loading' };
+        if (hfResponseStatus !== 200) {
+            return { success: false, error: `HF error ${hfResponseStatus}` };
+        }
+
+        const text = resultData?.text || resultData?.transcript;
+        if (text) return { success: true, text };
+        if (typeof resultData === 'string' && resultData) return { success: true, text: resultData };
+        return { success: false, error: 'No text from HuggingFace' };
+    },
+
+    /**
+     * Backend fallback — Azure NestJS → Hugging Face
      */
     async transcribeViaBackend(audioUri: string): Promise<TranscriptionResult> {
         try {
@@ -77,20 +164,13 @@ export const SpeechToTextService = {
             console.log(`[STT Service] Calling backend: ${backendUrl}`);
 
             const formData = new FormData();
-
-            // Handle Web blob URLs
-            let fileToUpload: any;
-            if (Platform.OS === 'web' && audioUri.startsWith('blob:')) {
-                const response = await fetch(audioUri);
-                const blob = await response.blob();
-                fileToUpload = new File([blob], 'voice.m4a', { type: 'audio/m4a' });
-            } else {
-                fileToUpload = {
-                    uri: audioUri,
-                    name: 'voice_command.m4a',
-                    type: 'audio/m4a',
-                };
-            }
+            const fileToUpload: any = Platform.OS === 'web' && audioUri.startsWith('blob:')
+                ? await (async () => {
+                    const r = await fetch(audioUri);
+                    const blob = await r.blob();
+                    return new File([blob], 'voice.m4a', { type: 'audio/m4a' });
+                })()
+                : { uri: audioUri, name: 'voice_command.m4a', type: 'audio/m4a' };
 
             // @ts-ignore
             formData.append('file', fileToUpload);
@@ -98,9 +178,7 @@ export const SpeechToTextService = {
             const response = await fetch(backendUrl, {
                 method: 'POST',
                 body: formData,
-                headers: {
-                    'Accept': 'application/json',
-                },
+                headers: { Accept: 'application/json' },
             });
 
             if (!response.ok) {
@@ -116,12 +194,11 @@ export const SpeechToTextService = {
             const data = await response.json();
             return { success: true, text: data.text };
         } catch (error) {
-            console.error('[STT Service] Backend Fallback Error:', error);
+            console.error('[STT Service] Backend Error:', error);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : "Voice processing failed."
+                error: error instanceof Error ? error.message : 'Voice processing failed.',
             };
         }
-    }
+    },
 };
-

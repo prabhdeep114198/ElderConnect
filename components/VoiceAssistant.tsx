@@ -85,7 +85,6 @@ export const VoiceAssistant = () => {
 
     async function startRecording() {
         try {
-            // Stop any ongoing speech before recording
             Speech.stop();
 
             const { status } = await requestRecordingPermissionsAsync();
@@ -149,7 +148,7 @@ export const VoiceAssistant = () => {
                 return;
             }
 
-            setMessage("Understanding your request...");
+            setMessage("Converting speech to text... ⏳");
             const sttResult = await SpeechToTextService.transcribe(uri);
 
             if (!sttResult.success || !sttResult.text) {
@@ -186,7 +185,6 @@ export const VoiceAssistant = () => {
             });
 
             if (response?.requiresConfirmation) {
-                // State-changing action: show confirmation before executing
                 const confirmMsg = response.message;
                 setMessage(confirmMsg);
                 setPendingIntent(response.pendingIntent);
@@ -195,7 +193,6 @@ export const VoiceAssistant = () => {
                 return;
             }
 
-            // Handle navigation and other instant intents
             const displayMessage = handleVoiceResponse(response);
             showMessage(displayMessage);
 
@@ -279,7 +276,6 @@ export const VoiceAssistant = () => {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    // Show for ALL signed-in users (not just subscribers)
     if (!user) return null;
 
     const micBgColor = isRecording

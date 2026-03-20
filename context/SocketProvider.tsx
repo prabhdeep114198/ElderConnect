@@ -13,7 +13,7 @@ export const SocketProvider = ({
   children: React.ReactNode;
 }) => {
   const socket = useMemo(() => {
-    const url = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
+    const url = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net';
     return io(url);
   }, []);
 

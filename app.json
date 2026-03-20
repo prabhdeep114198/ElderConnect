@@ -8,7 +8,12 @@
     "scheme": "elderconnect",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.elderconnect.app"
+      "bundleIdentifier": "com.elderconnect.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.elderconnect.app",
@@ -59,7 +64,8 @@
           "bluetoothAlwaysPermission": "Allow ElderConnect to connect to your health devices."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,

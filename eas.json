@@ -11,6 +11,15 @@
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_FLAGSMITH_ENV_ID": "SrEYpsqwW9nBRK7YReARMS",
+                "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "694c4f0000100f1d926a",
+                "EXPO_PUBLIC_APPWRITE_PROJECT_NAME": "ElderConnect",
+                "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+                "EXPO_PUBLIC_SOCKET_URL": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net",
+                "EXPO_PUBLIC_API_BASE_URL": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api",
+                "EXPO_PUBLIC_N8N_VOICE_WEBHOOK": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api/v1/voice-assistant/process-public"
             }
         },
         "production": {}
