@@ -56,6 +56,9 @@ export default function ManageSubscriptionScreen() {
     return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 12 }}>
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
                 <Text style={[styles.title, { color: colors.text }]}>Subscription Plans</Text>
                 <Text style={[styles.subtitle, { color: colors.mutedText }]}>Select a plan that fits your needs</Text>
             </View>

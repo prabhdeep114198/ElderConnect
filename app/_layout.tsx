@@ -23,6 +23,7 @@ import { VoiceAssistant } from "../components/VoiceAssistant";
 import "../i18n";
 import { fallDetectionEngine } from "../services/fallDetection/FallDetectionEngine";
 import { useNotificationScheduler } from "../hooks/useNotificationScheduler";
+import { getSocket } from "../services/socket";
 
 // NOTIFICATION HANDLER CONFIG
 Notifications.setNotificationHandler({
@@ -96,6 +97,9 @@ function InitialLayout() {
     };
   }, []);
 
+  const { usePremiumFeature } = require("../hooks/useFeatureFlags");
+  const hasValidSubscription = usePremiumFeature();
+
   useEffect(() => {
     if (loading) return;
 
@@ -104,9 +108,6 @@ function InitialLayout() {
       flagsmith.logout();
       return;
     }
-
-    const hasValidSubscription = user?.isSubscribed === true ||
-      (user?.plan_level && user.plan_level !== "free");
 
     if (user && hasValidSubscription) {
       flagsmith.identify(user.id, {
@@ -146,7 +147,7 @@ function InitialLayout() {
   }, [user, loading, segments, router]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !hasValidSubscription) {
       fallDetectionEngine.stop();
       return;
     }
@@ -156,6 +157,24 @@ function InitialLayout() {
     };
 
     fallDetectionEngine.start(onFallDetected);
+
+    // Also connect to WebSockets to listen for HARDWARE fall detections globally!
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('room:join_user', { userId: user.id });
+      
+      const onHardwareFall = (data: any) => {
+        console.log("Hardware SOS alert received via WebSockets:", data);
+        router.push(`/fall-detected?mode=hardware&alertId=${data.alertId}`);
+      };
+      
+      socket.on('hardware:sos_alert', onHardwareFall);
+      
+      return () => {
+        fallDetectionEngine.stop();
+        socket.off('hardware:sos_alert', onHardwareFall);
+      };
+    }
 
     return () => {
       fallDetectionEngine.stop();

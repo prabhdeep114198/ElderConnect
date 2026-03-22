@@ -5,7 +5,7 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { Pedometer } from "expo-sensors";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
@@ -81,9 +81,9 @@ export default function HomeScreen() {
 
   // Health tracking states
   const [steps, setSteps] = useState(0);
-  const [heartRate, setHeartRate] = useState(72);
-  const [sleepHours, setSleepHours] = useState(7.5);
-  const [waterIntake, setWaterIntake] = useState(6);
+  const [heartRate, setHeartRate] = useState(0);
+  const [sleepHours, setSleepHours] = useState(0);
+  const [waterIntake, setWaterIntake] = useState(0);
 
   const [healthMetrics, setHealthMetrics] = useState<any[]>([]);
 
@@ -125,10 +125,15 @@ export default function HomeScreen() {
         setHealthMetrics(response.data.metrics);
         const raw = response.data.raw;
         if (raw) {
-          if (raw.heartRate) setHeartRate(raw.heartRate);
-          if (raw.sleepHours) setSleepHours(raw.sleepHours);
-          if (raw.waterIntake) setWaterIntake(raw.waterIntake);
-          if (raw.steps) setSteps(raw.steps);
+          if (raw.heartRate !== undefined && raw.heartRate !== null) setHeartRate(raw.heartRate);
+          if (raw.sleepHours !== undefined && raw.sleepHours !== null) setSleepHours(raw.sleepHours);
+          if (raw.waterIntake !== undefined && raw.waterIntake !== null) setWaterIntake(raw.waterIntake);
+          if (raw.steps !== undefined && raw.steps !== null) {
+            // Guard against corrupted database numbers returning millions of lifetime steps
+            const safeDailySteps = raw.steps > 100000 ? 0 : raw.steps;
+            setSteps(safeDailySteps);
+            baseStepsRef.current = safeDailySteps;
+          }
         }
       }
     } catch (error) {
@@ -255,44 +260,83 @@ export default function HomeScreen() {
     }
   };
 
+  // Store the actual daily total fetched from the DB (e.g. 2800 steps).
+  // This allows the Expo step tracker to just add "fresh" steps to this base locally.
+  const baseStepsRef = useRef(0);
+
   // ============================================
   // STEP TRACKING
   // ============================================
   const startStepTracking = async () => {
     const isAvailable = await Pedometer.isAvailableAsync();
-    if (isAvailable) {
-      const end = new Date();
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+    if (!isAvailable) return;
 
-      try {
-        const result = await Pedometer.getStepCountAsync(start, end);
-        if (result) {
-          setSteps(result.steps);
-          updateHealthMetrics();
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+
+    let validTodaySteps = baseStepsRef.current;
+    
+    try {
+      const result = await Pedometer.getStepCountAsync(start, end);
+      // Because Expo's getStepCountAsync often returns lifetime steps instead of date-filtered steps,
+      // we store today's initial lifetime tally in AsyncStorage to subtract it going forward.
+      if (result && typeof result.steps === 'number') {
+        const todayDateKey = `pedometer_daily_baseline_${start.toISOString().split('T')[0]}`;
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        
+        const cachedBaseline = await AsyncStorage.getItem(todayDateKey);
+        if (!cachedBaseline) {
+          // First time opening app today: save current lifetime steps as 0-point baseline.
+          await AsyncStorage.setItem(todayDateKey, result.steps.toString());
+          validTodaySteps = Math.max(validTodaySteps, 0); // Start at 0 + DB steps
+        } else {
+          // Opened app previously today: subtract today's baseline from current lifetime steps.
+          const baselineSteps = parseInt(cachedBaseline, 10);
+          const pureTodaySteps = Math.max(0, result.steps - baselineSteps);
+          // We use the higher value to ensure DB doesn't drag us down if DB failed to sync 
+          validTodaySteps = Math.max(validTodaySteps, pureTodaySteps);
         }
-      } catch (e) {
-        console.log("Pedometer search not supported on this device/range", e);
       }
-
-      // Subscribe to updates
-      interface StepCountResult {
-        steps: number;
-      }
-
-      const pedometerSubscription = Pedometer.watchStepCount((result: StepCountResult) => {
-        setSteps(result.steps);
-        updateHealthMetrics();
-      });
+    } catch (e) {
+      console.log("Could not read local pedometer history.", e);
     }
+
+    setSteps(validTodaySteps);
+    baseStepsRef.current = validTodaySteps;
+
+    // Send the synced valid steps back to Azure DB to permanently fix the anomaly
+    if (user && validTodaySteps >= 0) {
+      try {
+        await profileService.updateHealthMetric(user.id, {
+          type: "steps",
+          value: validTodaySteps,
+          timestamp: new Date().toISOString()
+        });
+      } catch (err) {
+        console.log("Failed to sync reset steps to backend.");
+      }
+    }
+
+    setHealthMetrics(prev => prev.map(m =>
+      m.icon === "walk" ? { ...m, value: validTodaySteps.toLocaleString() } : m
+    ));
+
+    Pedometer.watchStepCount((result) => {
+      const liveSteps = baseStepsRef.current + result.steps;
+      setSteps(liveSteps);
+      setHealthMetrics(prev => prev.map(m =>
+        m.icon === "walk" ? { ...m, value: liveSteps.toLocaleString() } : m
+      ));
+    });
   };
 
   const updateHealthMetrics = () => {
-    setHealthMetrics([
-      { label: t("stepsToday"), value: steps.toLocaleString(), icon: "walk", trend: steps > 5000 ? "up" : "down" },
-      { label: t("heartRate"), value: `${heartRate} ${t("bpm")}`, icon: "heart", trend: "stable" },
-      { label: t("sleepQuality"), value: `${Number(sleepHours).toFixed(1)} ${t("hrs")}`, icon: "moon", trend: sleepHours >= 7 ? "up" : "down" },
-      { label: t("hydration"), value: `${waterIntake}/8 ${t("cups")}`, icon: "water", trend: waterIntake >= 6 ? "up" : "down" },
+    setHealthMetrics(prev => [
+      { label: t("stepsToday"), value: steps.toLocaleString(), icon: "walk", trend: prev.find(m => m.icon === 'walk')?.trend || (steps > 5000 ? "up" : "down") },
+      { label: t("heartRate"), value: `${heartRate} ${t("bpm")}`, icon: "heart", trend: prev.find(m => m.icon === 'heart')?.trend || "stable" },
+      { label: t("sleepQuality"), value: `${Number(sleepHours).toFixed(1)} ${t("hrs")}`, icon: "moon", trend: prev.find(m => m.icon === 'moon')?.trend || (sleepHours >= 7 ? "up" : "down") },
+      { label: t("hydration"), value: `${waterIntake}/8 ${t("cups")}`, icon: "water", trend: prev.find(m => m.icon === 'water')?.trend || (waterIntake >= 6 ? "up" : "down") },
     ]);
   };
 
@@ -398,11 +442,16 @@ export default function HomeScreen() {
   const handleHealthCheck = async () => {
     Alert.alert("Health Check", "Refreshing your health data...");
 
-    // Update health metrics
-    await updateHealthData('steps', steps);
-    await updateHealthData('heartRate', heartRate);
-    await updateHealthData('sleep', sleepHours);
-    await updateHealthData('water', waterIntake);
+    // Permanently prevent any 3-million-steps bug from being pushed up from stale memory
+    const safeSteps = steps > 100000 ? 0 : steps;
+
+    // Securely update ONLY steps tracking directly from pedometer to the backend
+    if (safeSteps > 0) {
+        await updateHealthData('steps', safeSteps);
+    }
+    
+    // We intentionally DO NOT update heartRate, sleep, and water here since they are logged manually
+    // via the tracker.tsx modal. Pushing local state here would wipe out cross-tab valid metric logs.
 
     // Fetch latest from API
     await fetchHealthMetrics();

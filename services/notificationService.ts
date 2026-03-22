@@ -46,7 +46,7 @@ export class NotificationService {
       content: {
         title,
         body,
-        categoryIdentifier,
+        ...(categoryIdentifier ? { categoryIdentifier } : {}),
         data,
         sound: true,
       },

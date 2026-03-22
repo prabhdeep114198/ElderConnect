@@ -252,10 +252,10 @@ export default function AppointmentsScreen() {
 
                   <View style={styles.doctorInfo}>
                     <View style={styles.avatarMini}>
-                      <Text style={styles.avatarText}>{appt.doctor.charAt(0)}</Text>
+                      <Text style={styles.avatarText}>{(appt.doctor || 'D').charAt(0)}</Text>
                     </View>
                     <View>
-                      <Text style={[styles.doctorName, { color: colors.text }]}>{appt.doctor}</Text>
+                      <Text style={[styles.doctorName, { color: colors.text }]}>{appt.doctor || 'Unknown Doctor'}</Text>
                       <Text style={[styles.specialty, { color: colors.mutedText }]}>{appt.specialty}</Text>
                     </View>
                   </View>

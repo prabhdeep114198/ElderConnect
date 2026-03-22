@@ -110,7 +110,8 @@ export default function ReportsScreen() {
   });
 
   const flags = useFeatureFlags(["download_reports"]);
-  const hasSubscription = user?.isSubscribed || (user?.plan_level && user.plan_level !== "free");
+  const { usePremiumFeature } = require("../../hooks/useFeatureFlags");
+  const hasSubscription = usePremiumFeature();
   const canDownload = hasSubscription || false;
 
   useFocusEffect(

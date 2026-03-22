@@ -12,12 +12,12 @@ export const useFeatureFlags = (flagKeys: string[]) => {
   const { user } = useAuth();
   const flags = useFlags(flagKeys);
 
-  // Check if user has valid subscription
-  const hasValidSubscription = user?.isSubscribed === true || 
-                               (user?.plan_level && user.plan_level !== "free");
+  // Check if user has a premium or enterprise subscription
+  const planLevel = user?.plan_level || "core";
+  const hasPremiumSubs = planLevel === "premium" || planLevel === "enterprise" || user?.isSubscribed === true;
 
   // If no subscription, return all flags as false
-  if (!hasValidSubscription) {
+  if (!hasPremiumSubs) {
     const defaultFlags: Record<string, { enabled: boolean; value: any }> = {};
     flagKeys.forEach(key => {
       defaultFlags[key] = { enabled: false, value: null };
@@ -40,3 +40,15 @@ export const useFeatureFlag = (flagKey: string): boolean => {
   const flags = useFeatureFlags([flagKey]);
   return flags[flagKey]?.enabled ?? false;
 };
+
+export const usePremiumFeature = () => {
+    const { user } = useAuth();
+    const planLevel = user?.plan_level || "core";
+    return planLevel === "premium" || planLevel === "enterprise" || user?.isSubscribed === true;
+}
+
+export const useEnterpriseFeature = () => {
+    const { user } = useAuth();
+    const planLevel = user?.plan_level || "core";
+    return planLevel === "enterprise";
+}

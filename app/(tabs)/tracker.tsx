@@ -78,21 +78,29 @@ export default function HealthTrackerScreen() {
     else setLoading(true);
 
     try {
+      // 1. Fetch Aggregated Daily Metrics (Source of Truth for Steps, HR, Sleep, Water)
+      let dailyMetricsData: any[] = [];
       const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999); // Securely extend endDate to the exact end of local day
+      
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 6); // Last 7 days inclusive
+      startDate.setHours(0, 0, 0, 0); // Include full first day
 
       const startStr = startDate.toISOString();
       const endStr = endDate.toISOString();
 
-      // 1. Fetch Aggregated Daily Metrics (Source of Truth for Steps, HR, Sleep, Water)
-      let dailyMetricsData: any[] = [];
       try {
         const metricsRes: any = await profileService.getMetricsRange(user.id, startStr, endStr);
         dailyMetricsData = metricsRes?.data?.metrics || [];
       } catch (e) {
         console.log("Error fetching daily metrics range:", e);
       }
+
+      const getLocalDateString = (dateObj: Date | string | number) => {
+        const d = new Date(dateObj);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
 
       // Helper to get history from daily metrics
       const getHistoryFromDaily = (key: string) => {
@@ -106,19 +114,28 @@ export default function HealthTrackerScreen() {
         for (let i = 0; i < 7; i++) {
           const d = new Date(startDate);
           d.setDate(d.getDate() + i);
-          const dateStr = d.toISOString().split('T')[0];
-          const found = historyMap.find(h => new Date(h.date).toISOString().split('T')[0] === dateStr);
+          const dateStr = getLocalDateString(d);
+          const found = historyMap.find(h => getLocalDateString(h.date) === dateStr);
           fullHistory.push({ date: d.toISOString(), value: found ? found.value : 0 });
         }
         return fullHistory;
       };
 
-      // Helper to get latest value from daily metrics
+      // Helper to get latest value from daily metrics (prioritize today)
       const getLatestFromDaily = (key: string) => {
         if (dailyMetricsData.length === 0) return 0;
-        // Sort by date descending
+        const todayStr = getLocalDateString(new Date());
+        
+        // First: check today's row
+        const todayRow = dailyMetricsData.find(row => getLocalDateString(row.date) === todayStr);
+        if (todayRow && todayRow[key] !== undefined && todayRow[key] !== null && Number(todayRow[key]) > 0) {
+          return Number(todayRow[key]);
+        }
+        
+        // Fallback: most recent day with a real value
         const sorted = [...dailyMetricsData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        return Number(sorted[0][key]) || 0;
+        const validRow = sorted.find(row => row[key] && Number(row[key]) > 0);
+        return validRow ? Number(validRow[key]) : 0;
       };
 
       // 2. Define Fetch Logic for Other Metrics (Exercise, Weight) via Telemetry/Vitals
@@ -138,16 +155,17 @@ export default function HealthTrackerScreen() {
 
         // Process raw items into daily history
         const dailyMap = new Map<string, number>();
+
         // Initialize 0s
         for (let i = 0; i < 7; i++) {
           const d = new Date(startDate);
           d.setDate(d.getDate() + i);
-          dailyMap.set(d.toISOString().split('T')[0], 0);
+          dailyMap.set(getLocalDateString(d), 0);
         }
 
         if (items && Array.isArray(items)) {
           items.forEach((item: any) => {
-            const dKey = new Date(item.timestamp || item.recordedAt).toISOString().split('T')[0];
+            const dKey = getLocalDateString(item.timestamp || item.recordedAt);
             if (dailyMap.has(dKey)) {
               const val = extractor(item);
               const curr = dailyMap.get(dKey) || 0;
@@ -164,12 +182,20 @@ export default function HealthTrackerScreen() {
           .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
           .map(([date, value]) => ({ date, value }));
 
-        const latest = history[history.length - 1]?.value || 0;
+        // Get today's value specifically
+        const todayKey = getLocalDateString(new Date());
+        const latest = dailyMap.get(todayKey) || 0;
         return { history, latest };
       };
 
-      const exerciseData = await fetchRawMetric('Exercise', 'telemetry', 'exercise', (i) => i.value?.minutes || i.reading?.minutes || 0);
-      const weightData = await fetchRawMetric('Weight', 'vital', 'weight', (i) => i.value?.kg || i.reading?.kg || 0);
+      const exerciseData = await fetchRawMetric('Exercise', 'vital', 'exercise', (i) => {
+        const r = i.reading || i.value || {};
+        return r.minutes || r.value || (typeof r === 'number' ? r : 0);
+      });
+      const weightData = await fetchRawMetric('Weight', 'vital', 'weight', (i) => {
+        const r = i.reading || i.value || {};
+        return r.kg || r.value || (typeof r === 'number' ? r : 0);
+      });
 
       // 3. Construct the HealthMetrics State
       const metricsMap = [
@@ -428,10 +454,30 @@ export default function HealthTrackerScreen() {
             payload.reading = { percentage: parseInt(newVital.value) };
             payload.unit = '%';
             break;
+          case 'sleep':
+            payload.reading = { hours: parseFloat(newVital.value) };
+            payload.unit = 'hours';
+            break;
+          case 'weight':
+            payload.reading = { kg: parseFloat(newVital.value) };
+            payload.unit = 'kg';
+            break;
         }
       }
 
       await deviceService.recordVitals(user.id, payload);
+
+      // --- SYNC TO DASHBOARD METRICS IMMEDIATELY ---
+      const nowString = new Date().toISOString();
+      if (newVital.type === 'heart_rate') {
+          await profileService.updateHealthMetric(user.id, { 
+              type: 'heartRate', value: parseInt(newVital.value), timestamp: nowString 
+          });
+      } else if (newVital.type === 'sleep') {
+          await profileService.updateHealthMetric(user.id, { 
+              type: 'sleep', value: parseFloat(newVital.value), timestamp: nowString 
+          });
+      }
 
       Alert.alert('Success', 'Vital sign recorded successfully!');
       setShowVitalModal(false);
@@ -514,12 +560,21 @@ export default function HealthTrackerScreen() {
     const waterMetric = healthMetrics.find(m => m.name === 'Water Intake');
     if (waterMetric && user?.id) {
       try {
+        const newValue = typeof waterMetric.value === 'number' ? waterMetric.value + 1 : 1;
         await deviceService.recordVitals(user.id, {
           vitalType: 'water',
           recordedAt: new Date().toISOString(),
           recordedBy: 'manual',
-          reading: { value: waterMetric.value + 1 }
+          reading: { value: newValue }
         });
+
+        // --- DASHBOARD SYNC ---
+        await profileService.updateHealthMetric(user.id, {
+           type: 'water', 
+           value: newValue,
+           timestamp: new Date().toISOString()
+        });
+
         loadHealthData();
         Alert.alert('Water Logged', 'Added 1 glass of water to your daily intake!');
       } catch (e) {
@@ -536,13 +591,12 @@ export default function HealthTrackerScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: '15 min', onPress: async () => {
-            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric && user?.id) {
+            if (user?.id) {
               await deviceService.recordVitals(user.id, {
                 vitalType: 'exercise',
                 recordedAt: new Date().toISOString(),
                 recordedBy: 'manual',
-                reading: { value: exerciseMetric.value + 15 }
+                reading: { minutes: 15 }
               });
               loadHealthData();
             }
@@ -550,13 +604,12 @@ export default function HealthTrackerScreen() {
         },
         {
           text: '30 min', onPress: async () => {
-            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric && user?.id) {
+            if (user?.id) {
               await deviceService.recordVitals(user.id, {
                 vitalType: 'exercise',
                 recordedAt: new Date().toISOString(),
                 recordedBy: 'manual',
-                reading: { value: exerciseMetric.value + 30 }
+                reading: { minutes: 30 }
               });
               loadHealthData();
             }
@@ -564,13 +617,12 @@ export default function HealthTrackerScreen() {
         },
         {
           text: '60 min', onPress: async () => {
-            const exerciseMetric = healthMetrics.find(m => m.name === 'Exercise');
-            if (exerciseMetric && user?.id) {
+            if (user?.id) {
               await deviceService.recordVitals(user.id, {
                 vitalType: 'exercise',
                 recordedAt: new Date().toISOString(),
                 recordedBy: 'manual',
-                reading: { value: exerciseMetric.value + 60 }
+                reading: { minutes: 60 }
               });
               loadHealthData();
             }
@@ -912,7 +964,10 @@ export default function HealthTrackerScreen() {
                   { key: 'blood_pressure', label: 'Blood Pressure' },
                   { key: 'blood_sugar', label: 'Blood Sugar' },
                   { key: 'temperature', label: 'Temperature' },
-                  { key: 'oxygen', label: 'Oxygen Saturation' }
+                  { key: 'oxygen', label: 'Oxygen Saturation' },
+                  { key: 'heart_rate', label: 'Heart Rate' },
+                  { key: 'sleep', label: 'Sleep (Hours)' },
+                  { key: 'weight', label: 'Weight' }
                 ].map((type) => (
                   <TouchableOpacity
                     key={type.key}
@@ -973,7 +1028,9 @@ export default function HealthTrackerScreen() {
                   placeholder={
                     newVital.type === 'blood_sugar' ? '95' :
                       newVital.type === 'temperature' ? '98.6' :
-                        newVital.type === 'oxygen' ? '98' : ''
+                        newVital.type === 'oxygen' ? '98' : 
+                          newVital.type === 'heart_rate' ? '72' :
+                            newVital.type === 'sleep' ? '8.0' : ''
                   }
                   keyboardType="numeric"
                   placeholderTextColor={colors.mutedText}

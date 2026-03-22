@@ -3,13 +3,14 @@ import { useAudioPlayer } from 'expo-audio';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 import { deviceService } from '../services/api/device';
 
 export default function FallDetectedScreen() {
     const router = useRouter();
-    const { type = 'fall' } = useLocalSearchParams<{ type: 'fall' | 'manual' }>();
+    const { type = 'fall', mode = 'local', alertId } = useLocalSearchParams<{ type: 'fall' | 'manual', mode?: string, alertId?: string }>();
     const { user } = useAuth();
     const [countdown, setCountdown] = useState(30);
     const isProcessingRef = useRef(false);
@@ -67,6 +68,21 @@ export default function FallDetectedScreen() {
         player.pause();
         Vibration.cancel();
 
+        // If this is a hardware fall, we need to cancel it on the backend
+        if (mode === 'hardware' && alertId && user) {
+            try {
+                // Just use the API directly without modifying deviceService if it lacks this method
+                const token = await AsyncStorage.getItem('auth_token');
+                await fetch(`https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api/v1/users/${user.id}/sos/${alertId}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'false_alarm', resolution: 'Cancelled by user on phone' })
+                });
+            } catch (error) {
+                console.error("Failed to cancel hardware SOS", error);
+            }
+        }
+
         // Go back without notifying
         console.log('User confirmed they are OK. No notification sent.');
         router.back();
@@ -78,7 +94,17 @@ export default function FallDetectedScreen() {
         isProcessingRef.current = true;
 
         const alertType = isManual ? 'manual' : 'fall_detection';
-        console.log(`EMERGENCY: ${alertType} Confirmed. Notifying backend...`);
+        console.log(`EMERGENCY: ${alertType} Confirmed.`);
+
+        // If it's a hardware fall, the backend automatically sends it after 30s! We just notify the user.
+        if (mode === 'hardware') {
+            Alert.alert(
+                "Emergency Alert Sent",
+                "Your hardware device's SOS alert has been broadcast to your emergency contacts.",
+                [{ text: "OK", onPress: () => router.back() }]
+            );
+            return;
+        }
 
         try {
             if (user) {

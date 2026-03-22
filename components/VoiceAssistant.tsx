@@ -23,6 +23,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useVoiceNavigation, detectLocalIntent } from '../hooks/useVoiceNavigation';
 import { SpeechToTextService } from '../services/SpeechToTextService';
 import { VoiceAssistantService } from '../services/VoiceAssistantService';
+import { profileService } from '../services/api/profile';
 
 const { width } = Dimensions.get('window');
 
@@ -253,6 +254,20 @@ export const VoiceAssistant = () => {
                 true,
                 pendingIntent
             );
+
+            // Synchronize voice vitals to Analytics Dashboard
+            if (response?.action === 'LOG_VITAL' && response.data?.vitalType && user?.id) {
+                const vt = response.data.vitalType;
+                const reading = response.data.reading;
+                if (vt === 'heart_rate' && reading?.bpm) {
+                    await profileService.updateHealthMetric(user.id, { 
+                        type: 'heartRate', 
+                        value: parseInt(reading.bpm), 
+                        timestamp: new Date().toISOString() 
+                    }).catch(err => console.error("Voice Sync DB Failed", err));
+                }
+            }
+
             const displayMsg = handleVoiceResponse(response);
             showMessage(displayMsg);
         } catch (error) {
@@ -276,11 +291,14 @@ export const VoiceAssistant = () => {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    if (!user) return null;
-
     const micBgColor = isRecording
         ? (isCancelZone ? colors.error : '#FF3B30')
         : colors.primary;
+
+    const { usePremiumFeature } = require('../hooks/useFeatureFlags');
+    const isPremium = usePremiumFeature();
+
+    if (!isPremium) return null;
 
     return (
         <View style={[styles.container, { right: 20 }]}>
