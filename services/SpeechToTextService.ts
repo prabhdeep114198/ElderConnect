@@ -5,8 +5,6 @@ import { API_BASE_URL } from './api/config';
 // Get your key at: https://console.groq.com
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
-// Hugging Face fallback
-const HF_API_URL = 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3';
 
 export interface TranscriptionResult {
     success: boolean;
@@ -35,17 +33,7 @@ export const SpeechToTextService = {
             console.warn('[STT Service] No Groq key — add EXPO_PUBLIC_GROQ_API_KEY to .env from console.groq.com');
         }
 
-        // Fallback: Hugging Face
-        const hfToken = process.env.EXPO_PUBLIC_HUGGINGFACE_API_KEY;
-        if (hfToken) {
-            try {
-                const result = await SpeechToTextService.transcribeViaHuggingFace(audioUri, hfToken);
-                if (result.success) return result;
-                console.warn('[STT Service] HF failed, trying backend...', result.error);
-            } catch (err) {
-                console.warn('[STT Service] HF error, trying backend...', err);
-            }
-        }
+
 
         // Final fallback: backend
         return SpeechToTextService.transcribeViaBackend(audioUri);
@@ -98,62 +86,7 @@ export const SpeechToTextService = {
         return { success: false, error: 'No text from Groq' };
     },
 
-    /**
-     * HuggingFace Whisper — binary upload via FileSystem (avoids iOS blob freeze).
-     * Has cold start of 30-45s on free tier.
-     */
-    async transcribeViaHuggingFace(audioUri: string, token: string): Promise<TranscriptionResult> {
-        console.log('[STT Service] Using Hugging Face Whisper...');
 
-        let hfResponseStatus: number;
-        let resultData: any;
-
-        if (Platform.OS === 'web') {
-            const response = await fetch(audioUri);
-            const audioBlob = await response.blob();
-            const hfResponse = await fetch(HF_API_URL, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': audioBlob.type || 'audio/m4a',
-                },
-                body: audioBlob,
-            });
-            hfResponseStatus = hfResponse.status;
-            resultData = hfResponse.ok
-                ? await hfResponse.json()
-                : await hfResponse.json().catch(() => ({}));
-        } else {
-            const FileSystem = require('expo-file-system/legacy');
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('HF_TIMEOUT')), 45000)
-            );
-            const uploadResult = await Promise.race([
-                FileSystem.uploadAsync(HF_API_URL, audioUri, {
-                    httpMethod: 'POST',
-                    uploadType: 0,
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'audio/m4a',
-                    },
-                }),
-                timeoutPromise,
-            ]) as any;
-
-            hfResponseStatus = uploadResult.status;
-            try { resultData = JSON.parse(uploadResult.body); } catch { resultData = uploadResult.body; }
-        }
-
-        if (hfResponseStatus === 503) return { success: false, error: 'HF model is loading' };
-        if (hfResponseStatus !== 200) {
-            return { success: false, error: `HF error ${hfResponseStatus}` };
-        }
-
-        const text = resultData?.text || resultData?.transcript;
-        if (text) return { success: true, text };
-        if (typeof resultData === 'string' && resultData) return { success: true, text: resultData };
-        return { success: false, error: 'No text from HuggingFace' };
-    },
 
     /**
      * Backend fallback — Azure NestJS → Hugging Face
