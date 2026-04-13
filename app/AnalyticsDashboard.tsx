@@ -72,7 +72,7 @@ const AnalyticsDashboard = () => {
                         <Text style={styles.aiButtonText}>Ask AI Why?</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.aiButton, { backgroundColor: colors.accent || '#10B981', marginLeft: 10 }]}
+                        style={[styles.aiButton, { backgroundColor: colors.success, marginLeft: 10 }]}
                         onPress={() => router.push('/health-trends' as any)}
                     >
                         <Ionicons name="trending-up" size={18} color="#FFF" />
