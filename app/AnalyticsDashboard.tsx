@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,6 +22,7 @@ import { TimeGranularity, analyticsService } from '../services/api/analytics';
 const AnalyticsDashboard = () => {
     const { colors } = useTheme();
     const { t } = useTranslation();
+    const router = useRouter();
     const { user } = useAuth();
     const [granularity, setGranularity] = useState<TimeGranularity>(TimeGranularity.DAY);
     const [isSeeding, setIsSeeding] = useState(false);
@@ -61,12 +63,28 @@ const AnalyticsDashboard = () => {
                         Long-term trends and wellness analysis
                     </Text>
                 </View>
-                <TouchableOpacity
-                    style={[styles.refreshButton, { backgroundColor: colors.primary + '20' }]}
-                    onPress={refetch}
-                >
-                    <Ionicons name="refresh" size={20} color={colors.primary} />
-                </TouchableOpacity>
+                <View style={styles.headerButtons}>
+                    <TouchableOpacity
+                        style={[styles.aiButton, { backgroundColor: colors.primary }]}
+                        onPress={() => router.push('/ai-report' as any)}
+                    >
+                        <Ionicons name="sparkles" size={18} color="#FFF" />
+                        <Text style={styles.aiButtonText}>Ask AI Why?</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.aiButton, { backgroundColor: colors.accent || '#10B981', marginLeft: 10 }]}
+                        onPress={() => router.push('/health-trends' as any)}
+                    >
+                        <Ionicons name="trending-up" size={18} color="#FFF" />
+                        <Text style={styles.aiButtonText}>Trajectory</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.refreshButton, { backgroundColor: colors.primary + '20' }]}
+                        onPress={refetch}
+                    >
+                        <Ionicons name="refresh" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={[styles.granularityContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -252,6 +270,29 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        marginLeft: 10,
+    },
+    headerButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    aiButtonText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginLeft: 6,
     },
     granularityContainer: {
         flexDirection: 'row',

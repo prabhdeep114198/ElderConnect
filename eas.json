@@ -19,7 +19,13 @@
                 "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
                 "EXPO_PUBLIC_SOCKET_URL": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net",
                 "EXPO_PUBLIC_API_BASE_URL": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api",
-                "EXPO_PUBLIC_N8N_VOICE_WEBHOOK": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api/v1/voice-assistant/process-public"
+                "EXPO_PUBLIC_INTERNAL_API_KEY": "REPLACE_WITH_YOUR_KEY",
+                "EXPO_PUBLIC_DEVICE_API_KEY": "REPLACE_WITH_YOUR_KEY",
+                "EXPO_PUBLIC_GROQ_API_KEY": "REPLACE_WITH_YOUR_KEY",
+                "EXPO_PUBLIC_RAZORPAY_KEY_ID": "REPLACE_WITH_YOUR_KEY",
+                "EXPO_PUBLIC_FREESOUND_API_KEY": "REPLACE_WITH_YOUR_KEY",
+                "EXPO_PUBLIC_N8N_VOICE_WEBHOOK": "https://elderconnect-api-esfdawb8drara7ge.centralindia-01.azurewebsites.net/api/v1/voice-assistant/process-public",
+                "EXPO_PUBLIC_N8N_REPORT_WEBHOOK": "REPLACE_WITH_YOUR_WEBHOOK"
             }
         },
         "production": {}
