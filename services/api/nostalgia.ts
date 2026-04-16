@@ -62,4 +62,14 @@ export const nostalgiaService = {
     const response = await api.get<{ data: { timeline: NostalgiaMemory[] } }>(`/v1/nostalgia/timeline/${userId}`);
     return response.data.timeline;
   },
+
+  getAssessments: async (userId: string): Promise<any[]> => {
+    const response = await api.get<{ data: { assessments: any[] } }>(`/v1/nostalgia/assessments/${userId}`);
+    return response.data.assessments;
+  },
+
+  evaluateCognitive: async (userId: string): Promise<any> => {
+    const response = await api.post<{ data: { result: any } }>(`/v1/nostalgia/evaluate-cognitive/${userId}`, {});
+    return response.data.result;
+  },
 };

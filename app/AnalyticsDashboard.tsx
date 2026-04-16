@@ -79,6 +79,13 @@ const AnalyticsDashboard = () => {
                         <Text style={styles.aiButtonText}>Trajectory</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
+                        style={[styles.aiButton, { backgroundColor: '#8B5CF6', marginLeft: 10 }]}
+                        onPress={() => router.push('/mental-wellness' as any)}
+                    >
+                        <Ionicons name="heart" size={18} color="#FFF" />
+                        <Text style={styles.aiButtonText}>Wellness</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                         style={[styles.refreshButton, { backgroundColor: colors.primary + '20' }]}
                         onPress={refetch}
                     >
