@@ -112,16 +112,11 @@ function InitialLayout() {
   useEffect(() => {
     if (loading) return;
 
-    const flagsmithEnvId = process.env.EXPO_PUBLIC_FLAGSMITH_ENV_ID;
-    if (!flagsmithEnvId) {
-      flagsmith.logout();
-      return;
-    }
-
-    if (user && hasValidSubscription) {
+    if (user) {
       flagsmith.identify(user.id, {
-        plan_level: user.plan_level ?? "premium",
-        is_subscribed: true,
+        plan_level: user.plan_level || "core",
+        is_subscribed: user.isSubscribed || false,
+        role: user.roles?.[0] || "elder"
       });
     } else {
       flagsmith.logout();

@@ -216,101 +216,93 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ userId }) => {
             <Text style={[styles.title, { color: colors.text }]}>Weekly Health Trends</Text>
 
             <View style={[isWeb && styles.chartsGridWeb]}>
-                {/* Steps - Bar Chart */}
-                {hasData(data.steps) && (
-                    <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>Steps</Text>
-                        <ResponsiveChartWrapper gridItem={isWeb}>
-                            {({ width, height }) => (
-                                <BarChart
-                                    data={{
-                                        labels: data.steps.labels,
-                                        datasets: [{ data: data.steps.data }]
-                                    }}
-                                    width={width}
-                                    height={height}
-                                    yAxisLabel=""
-                                    yAxisSuffix=""
-                                    chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})` }}
-                                    style={styles.chart}
-                                    showValuesOnTopOfBars
-                                />
-                            )}
-                        </ResponsiveChartWrapper>
-                    </View>
-                )}
+                {/* Steps - Bar Chart (ALWAYS SHOW) */}
+                <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
+                    <Text style={[styles.chartTitle, { color: colors.text }]}>Steps</Text>
+                    <ResponsiveChartWrapper gridItem={isWeb}>
+                        {({ width, height }) => (
+                            <BarChart
+                                data={{
+                                    labels: data.steps.labels,
+                                    datasets: [{ data: data.steps.data.length ? data.steps.data : Array(7).fill(0) }]
+                                }}
+                                width={width}
+                                height={height}
+                                yAxisLabel=""
+                                yAxisSuffix=""
+                                chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})` }}
+                                style={styles.chart}
+                                showValuesOnTopOfBars
+                            />
+                        )}
+                    </ResponsiveChartWrapper>
+                </View>
 
-                {/* Heart Rate - Line Chart */}
-                {hasData(data.heartRate) && (
-                    <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>Heart Rate (BPM)</Text>
-                        <ResponsiveChartWrapper gridItem={isWeb}>
-                            {({ width, height }) => (
-                                <LineChart
-                                    data={{
-                                        labels: data.heartRate.labels,
-                                        datasets: [{ data: data.heartRate.data }]
-                                    }}
-                                    width={width}
-                                    height={height}
-                                    chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(233, 30, 99, ${opacity})` }}
-                                    bezier
-                                    style={styles.chart}
-                                />
-                            )}
-                        </ResponsiveChartWrapper>
-                    </View>
-                )}
+                {/* Heart Rate - Line Chart (ALWAYS SHOW) */}
+                <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
+                    <Text style={[styles.chartTitle, { color: colors.text }]}>Heart Rate (BPM)</Text>
+                    <ResponsiveChartWrapper gridItem={isWeb}>
+                        {({ width, height }) => (
+                            <LineChart
+                                data={{
+                                    labels: data.heartRate.labels,
+                                    datasets: [{ data: data.heartRate.data.length ? data.heartRate.data : Array(7).fill(0) }]
+                                }}
+                                width={width}
+                                height={height}
+                                chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(233, 30, 99, ${opacity})` }}
+                                bezier
+                                style={styles.chart}
+                            />
+                        )}
+                    </ResponsiveChartWrapper>
+                </View>
 
-                {/* Water - Bar Chart */}
-                {hasData(data.water) && (
-                    <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>Water Intake (Glasses)</Text>
-                        <ResponsiveChartWrapper gridItem={isWeb}>
-                            {({ width, height }) => (
-                                <BarChart
-                                    data={{
-                                        labels: data.water.labels,
-                                        datasets: [{ data: data.water.data }]
-                                    }}
-                                    width={width}
-                                    height={height}
-                                    yAxisLabel=""
-                                    yAxisSuffix=""
-                                    chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})` }}
-                                    style={styles.chart}
-                                    showValuesOnTopOfBars
-                                />
-                            )}
-                        </ResponsiveChartWrapper>
-                    </View>
-                )}
+                {/* Water - Bar Chart (ALWAYS SHOW) */}
+                <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
+                    <Text style={[styles.chartTitle, { color: colors.text }]}>Water Intake (Glasses)</Text>
+                    <ResponsiveChartWrapper gridItem={isWeb}>
+                        {({ width, height }) => (
+                            <BarChart
+                                data={{
+                                    labels: data.water.labels,
+                                    datasets: [{ data: data.water.data.length ? data.water.data : Array(7).fill(0) }]
+                                }}
+                                width={width}
+                                height={height}
+                                yAxisLabel=""
+                                yAxisSuffix=""
+                                chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})` }}
+                                style={styles.chart}
+                                showValuesOnTopOfBars
+                            />
+                        )}
+                    </ResponsiveChartWrapper>
+                </View>
 
-                {/* Sleep - Bar Chart */}
-                {hasData(data.sleep) && (
-                    <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>Sleep (Hours)</Text>
-                        <ResponsiveChartWrapper gridItem={isWeb}>
-                            {({ width, height }) => (
-                                <BarChart
-                                    data={{
-                                        labels: data.sleep.labels,
-                                        datasets: [{ data: data.sleep.data }]
-                                    }}
-                                    width={width}
-                                    height={height}
-                                    yAxisLabel=""
-                                    yAxisSuffix="h"
-                                    chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(103, 58, 183, ${opacity})` }}
-                                    style={styles.chart}
-                                    showValuesOnTopOfBars
-                                />
-                            )}
-                        </ResponsiveChartWrapper>
-                    </View>
-                )}
+                {/* Sleep - Bar Chart (ALWAYS SHOW) */}
+                <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
+                    <Text style={[styles.chartTitle, { color: colors.text }]}>Sleep (Hours)</Text>
+                    <ResponsiveChartWrapper gridItem={isWeb}>
+                        {({ width, height }) => (
+                            <BarChart
+                                data={{
+                                    labels: data.sleep.labels,
+                                    datasets: [{ data: data.sleep.data.length ? data.sleep.data : Array(7).fill(0) }]
+                                }}
+                                width={width}
+                                height={height}
+                                yAxisLabel=""
+                                yAxisSuffix="h"
+                                chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(103, 58, 183, ${opacity})` }}
+                                style={styles.chart}
+                                showValuesOnTopOfBars
+                            />
+                        )}
+                    </ResponsiveChartWrapper>
+                </View>
 
-                {/* Weight - Line Chart */}
+                {/* Weight - Line Chart (Conditional) */}
                 {hasData(data.weight) && (
                     <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
                         <Text style={[styles.chartTitle, { color: colors.text }]}>Weight (kg)</Text>
@@ -332,7 +324,7 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ userId }) => {
                     </View>
                 )}
 
-                {/* Exercise - Bar Chart */}
+                {/* Exercise - Bar Chart (Conditional) */}
                 {hasData(data.exercise) && (
                     <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
                         <Text style={[styles.chartTitle, { color: colors.text }]}>Exercise (Minutes)</Text>
@@ -356,7 +348,7 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ userId }) => {
                     </View>
                 )}
 
-                {/* BP Chart - Line Chart */}
+                {/* BP Chart - Line Chart (Conditional) */}
                 {hasData(data.bp) && (
                     <View style={[styles.chartContainer, isWeb && styles.chartContainerWeb]}>
                         <Text style={[styles.chartTitle, { color: colors.text }]}>Blood Pressure</Text>
@@ -383,7 +375,7 @@ export const HealthCharts: React.FC<HealthChartsProps> = ({ userId }) => {
                 )}
 
                 {!hasData(data.steps) && !hasData(data.sleep) && !hasData(data.heartRate) && !hasData(data.water) &&
-                    <Text style={{ textAlign: 'center', color: colors.mutedText, marginTop: 20 }}>No data recorded this week.</Text>
+                    <Text style={{ textAlign: 'center', color: colors.mutedText, marginTop: 20, width: '100%' }}>No daily activity recorded yet. Use the Log button to add data!</Text>
                 }
             </View>
         </View>

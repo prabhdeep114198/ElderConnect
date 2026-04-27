@@ -19,6 +19,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { profileService } from "../../services/api/profile";
 import { ReminderService } from "../../utils/reminderService";
+import { useNotificationScheduler } from "../../hooks/useNotificationScheduler";
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +42,7 @@ export default function MedicationsScreen() {
   const { colors, theme } = useTheme();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { resyncMedications } = useNotificationScheduler({ enabled: !!user, maxDaily: 5 });
 
   const [medications, setMedications] = useState<Medication[]>([]);
   const [stats, setStats] = useState({
@@ -219,6 +221,8 @@ export default function MedicationsScreen() {
       });
 
       fetchData();
+      // Re-sync notification alerts to include the new medication
+      await resyncMedications();
       setNewMedication({ name: '', dosage: '', frequency: 'Once daily', frequencyCount: '1', timing: 'After Breakfast', instructions: '' });
       setShowAddModal(false);
       Alert.alert(t('success'), t('medicationAdded') || 'Medication added!');

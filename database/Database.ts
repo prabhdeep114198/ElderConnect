@@ -45,9 +45,27 @@ class AppDatabase {
         score REAL,
         gait_var REAL,
         activity_level REAL,
+        cluster_sedentary REAL,
+        cluster_moderate REAL,
+        cluster_vigorous REAL,
         timestamp INTEGER
       );
     `);
+
+    // Migration: Add missing cluster columns to existing tables
+    const migrations = [
+      'ALTER TABLE fall_risk_scores ADD COLUMN cluster_sedentary REAL;',
+      'ALTER TABLE fall_risk_scores ADD COLUMN cluster_moderate REAL;',
+      'ALTER TABLE fall_risk_scores ADD COLUMN cluster_vigorous REAL;'
+    ];
+
+    for (const sql of migrations) {
+      try {
+        await this.db.execAsync(sql);
+      } catch (e) {
+        // Column probably already exists
+      }
+    }
   }
 
   // Generic CRUD helpers could go here

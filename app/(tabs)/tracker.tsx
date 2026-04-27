@@ -636,26 +636,19 @@ export default function HealthTrackerScreen() {
     if (!user?.id) return;
 
     try {
-      Alert.alert('Seed Data', 'Generating 7 days of sample health data...');
-      const response: any = await profileService.updateHealthMetric(user.id, {
-        type: 'steps',
-        value: 0
-      });
-
-      // Call the seed endpoint via a POST request
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/v1/users/${user.id}/health/seed?days=7`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await AsyncStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      Alert.alert('Success', 'Sample data created! Pull down to refresh.');
-      loadHealthData();
+      setLoading(true);
+      const response = await analyticsService.seedData(user.id);
+      
+      Alert.alert(
+        'Success', 
+        '7 days of personalized health data have been generated and synced with your profile.',
+        [{ text: 'Great', onPress: () => loadHealthData(true) }]
+      );
     } catch (error) {
-      console.error('Failed to seed data', error);
-      Alert.alert('Error', 'Failed to create sample data');
+      console.error('Failed to seed health data:', error);
+      Alert.alert('Error', 'Failed to generate sample data. Please check your connection.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -714,7 +707,7 @@ export default function HealthTrackerScreen() {
             </View>
           </View>
 
-          {/* View Trends Button */}
+          {/* View Trends & Seed Data Section */}
           <View style={styles.section}>
             <TouchableOpacity
               style={[styles.trendsButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
@@ -729,6 +722,22 @@ export default function HealthTrackerScreen() {
                   <Text style={[styles.trendsSubtitle, { color: colors.mutedText }]}>Check your health progress charts</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.trendsButton, { backgroundColor: colors.info + '15', borderColor: colors.info, marginTop: 12 }]}
+              onPress={seedSampleData}
+            >
+              <View style={styles.trendsButtonContent}>
+                <View style={[styles.trendsIcon, { backgroundColor: colors.info }]}>
+                  <Ionicons name="flask" size={20} color="#fff" />
+                </View>
+                <View style={styles.trendsTextContainer}>
+                  <Text style={[styles.trendsTitle, { color: colors.text }]}>Generate Sample Data</Text>
+                  <Text style={[styles.trendsSubtitle, { color: colors.mutedText }]}>Populate graphs with demo activity</Text>
+                </View>
+                <Ionicons name="refresh" size={20} color={colors.info} />
               </View>
             </TouchableOpacity>
           </View>

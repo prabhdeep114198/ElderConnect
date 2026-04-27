@@ -295,10 +295,8 @@ export const VoiceAssistant = () => {
         ? (isCancelZone ? colors.error : '#FF3B30')
         : colors.primary;
 
-    const { usePremiumFeature } = require('../hooks/useFeatureFlags');
-    const isPremium = usePremiumFeature();
-
-    if (!isPremium) return null;
+    // Visibility is controlled by the voice_assistant_enabled flag in _layout.tsx
+    // Removing local isPremium check to allow 249 plan users to see it immediately.
 
     return (
         <View style={[styles.container, { right: 20 }]}>

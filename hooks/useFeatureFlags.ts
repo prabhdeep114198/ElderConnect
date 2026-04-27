@@ -12,20 +12,7 @@ export const useFeatureFlags = (flagKeys: string[]) => {
   const { user } = useAuth();
   const flags = useFlags(flagKeys);
 
-  // Check if user has a premium or enterprise subscription
-  const planLevel = user?.plan_level || "core";
-  const hasPremiumSubs = planLevel === "premium" || planLevel === "enterprise" || user?.isSubscribed === true;
-
-  // If no subscription, return all flags as false
-  if (!hasPremiumSubs) {
-    const defaultFlags: Record<string, { enabled: boolean; value: any }> = {};
-    flagKeys.forEach(key => {
-      defaultFlags[key] = { enabled: false, value: null };
-    });
-    return defaultFlags;
-  }
-
-  // User has subscription - return actual flags from Flagsmith
+  // Return actual flags from Flagsmith
   return flags;
 };
 
@@ -43,6 +30,7 @@ export const useFeatureFlag = (flagKey: string): boolean => {
 
 export const usePremiumFeature = () => {
     const { user } = useAuth();
+    // 249 plan maps to 'premium'
     const planLevel = user?.plan_level || "core";
     return planLevel === "premium" || planLevel === "enterprise" || user?.isSubscribed === true;
 }

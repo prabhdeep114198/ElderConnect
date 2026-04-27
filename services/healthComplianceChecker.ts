@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { notificationService } from './notificationService';
+import { notificationService, MedicationAlert } from './notificationService';
+
+const MED_TAKEN_PREFIX = 'med_taken_';
 
 class HealthComplianceChecker {
   /**
@@ -22,13 +24,58 @@ class HealthComplianceChecker {
    */
   async logVitals() {
     await AsyncStorage.setItem('last_vitals_logged', new Date().toISOString());
-    // Extremely crucial constraint:
-    // User already completed task. Kill the 8PM scheduled push notification natively.
+    // User already completed task. Kill the scheduled push notification natively.
     await notificationService.cancelDailyHealthReminder();
   }
 
   /**
-   * Detects extensive lack of interaction
+   * Check if a SPECIFIC medication has been marked as taken today.
+   */
+  async isMedicationTakenToday(medId: string): Promise<boolean> {
+    try {
+      const key = `${MED_TAKEN_PREFIX}${medId}`;
+      const lastTaken = await AsyncStorage.getItem(key);
+      if (!lastTaken) return false;
+      return new Date(lastTaken).toDateString() === new Date().toDateString();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Mark a specific medication as taken right now.
+   */
+  async logMedicationTaken(medId: string) {
+    const key = `${MED_TAKEN_PREFIX}${medId}`;
+    await AsyncStorage.setItem(key, new Date().toISOString());
+  }
+
+  /**
+   * Check all given medications and trigger missed notifications for any not taken
+   * past their scheduled time.
+   */
+  async checkMissedMedications(medications: MedicationAlert[]): Promise<string[]> {
+    const missed: string[] = [];
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (const med of medications) {
+      const schedMinutes = med.time.hour * 60 + med.time.minute;
+      // Grace period: 30 minutes past scheduled time
+      if (currentMinutes > schedMinutes + 30) {
+        const taken = await this.isMedicationTakenToday(med.id);
+        if (!taken) {
+          missed.push(med.name);
+          await notificationService.triggerMissedMedNotification(med);
+        }
+      }
+    }
+
+    return missed;
+  }
+
+  /**
+   * Detects extensive lack of interaction.
    */
   async checkInactivity(): Promise<boolean> {
     const lastActivity = await AsyncStorage.getItem('last_user_activity');
@@ -43,7 +90,7 @@ class HealthComplianceChecker {
   }
 
   /**
-   * Ensures seniors are interacting with Caregivers directly combating loneliness
+   * Ensures seniors are interacting with caregivers — combats loneliness.
    */
   async checkSocialInteraction(): Promise<boolean> {
     const lastSocial = await AsyncStorage.getItem('last_social_interaction');
@@ -54,7 +101,7 @@ class HealthComplianceChecker {
   }
 
   async logSocialInteraction() {
-     await AsyncStorage.setItem('last_social_interaction', new Date().toISOString());
+    await AsyncStorage.setItem('last_social_interaction', new Date().toISOString());
   }
 }
 
