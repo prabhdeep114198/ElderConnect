@@ -50,8 +50,20 @@ function InitialLayout() {
      maxDaily: 5
   });
 
+  // ── Feature Flags ────────────────────────────────────────────────────────
+  const { useFeatureFlag } = require("../hooks/useFeatureFlags");
+  const showChatbot = useFeatureFlag('show_chatbot');
+  const showVideoCalls = useFeatureFlag('video_calls');
+  const showAiCoaching = useFeatureFlag('ai_coaching');
+  const showMusicNostalgia = useFeatureFlag('nostalgia_service');
+  const showMentalWellness = useFeatureFlag('mental_wellness');
+  const showSdgDashboard = useFeatureFlag('show_sdg_dashboard');
+  const showVoiceAssistant = useFeatureFlag('voice_assistant_enabled');
+  const { usePremiumFeature } = require("../hooks/useFeatureFlags");
+  const hasValidSubscription = usePremiumFeature();
+
   const PresentationOverlay = () => {
-    if (!presentationMode) return null;
+    if (!presentationMode || !showSdgDashboard) return null;
     return (
       <View style={{position: 'absolute', top: Platform.OS === 'ios' ? 60 : 40, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none', zIndex: 9999}}>
         <View style={{backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5}}>
@@ -96,9 +108,6 @@ function InitialLayout() {
       responseListener.remove();
     };
   }, []);
-
-  const { usePremiumFeature } = require("../hooks/useFeatureFlags");
-  const hasValidSubscription = usePremiumFeature();
 
   useEffect(() => {
     if (loading) return;
@@ -347,6 +356,7 @@ function InitialLayout() {
         <Drawer.Screen
           name="fall-risk"
           options={{
+            drawerItemStyle: { display: showAiCoaching ? "flex" : "none" },
             title: "Fall Risk",
             drawerIcon: ({ color, size }) => <Ionicons name="analytics" size={size} color={color} />,
           }}
@@ -355,6 +365,7 @@ function InitialLayout() {
         <Drawer.Screen
           name="music"
           options={{
+            drawerItemStyle: { display: showMusicNostalgia ? "flex" : "none" },
             title: "Music",
             drawerIcon: ({ color, size }) => <Ionicons name="musical-notes" size={size} color={color} />,
           }}
@@ -363,6 +374,7 @@ function InitialLayout() {
         <Drawer.Screen
           name="chatbot"
           options={{
+            drawerItemStyle: { display: showChatbot ? "flex" : "none" },
             title: "Chatbot",
             drawerIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
           }}
@@ -372,6 +384,7 @@ function InitialLayout() {
         <Drawer.Screen
           name="videocall/index"
           options={{
+            drawerItemStyle: { display: showVideoCalls ? "flex" : "none" },
             title: "Video Call",
             drawerIcon: ({ color, size }) => <Ionicons name="videocam" size={size} color={color} />,
           }}
@@ -407,7 +420,7 @@ function InitialLayout() {
         {/* Ensure the group folder doesn't create a second entry */}
 
       </Drawer>
-      <VoiceAssistant />
+      {showVoiceAssistant && <VoiceAssistant />}
       <PresentationOverlay />
     </>
   );

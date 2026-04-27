@@ -22,6 +22,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useWellnessProfile } from "../hooks/useWellnessProfile";
 import { chatService } from "../services/api/chat";
 import { ChatbotContext, InteractionType, personalizationService } from "../services/api/personalization";
+import { useFeatureFlag } from "../hooks/useFeatureFlags";
 
 interface Message {
     id: string;
@@ -58,6 +59,8 @@ export default function ChatbotScreen() {
     const flatListRef = useRef<FlatList>(null);
 
     const STORAGE_KEY = user ? `elder_connect_chats_${user.id}` : null;
+
+    const showAdvancedFeatures = useFeatureFlag('advanced_chatbot');
 
     useEffect(() => {
         if (user) {
@@ -246,7 +249,7 @@ export default function ChatbotScreen() {
     };
 
     const renderWellnessPulse = () => {
-        if (!wellnessProfile) return null;
+        if (!wellnessProfile || !showAdvancedFeatures) return null;
 
         const scores = [
             { label: 'Physical', value: wellnessProfile.physicalScore, icon: 'fitness', color: '#4CAF50' },

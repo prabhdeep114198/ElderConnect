@@ -32,6 +32,7 @@ import { deviceService } from "../../services/api/device";
 import { InteractionType, personalizationService } from "../../services/api/personalization";
 import { profileService } from "../../services/api/profile";
 import { getRemindersKey } from "../../utils/userStorageKeys";
+import { useFeatureFlag, useFeatureFlags } from "../../hooks/useFeatureFlags";
 
 // NOTIFICATION HANDLER
 Notifications.setNotificationHandler({
@@ -60,6 +61,12 @@ export default function HomeScreen() {
   const { colors, theme, uiMode, fontSize } = useTheme();
   const { t, i18n } = useTranslation();
   const { user, requireAuth } = useAuth();
+
+  const flags = useFeatureFlags(['nostalgia_service', 'show_chatbot', 'premium_upgrade_prompts']);
+  const showNostalgia = flags.nostalgia_service?.enabled || false;
+  const showChatbot = flags.show_chatbot?.enabled || false;
+  const showUpgradePrompts = flags.premium_upgrade_prompts?.enabled || false;
+  const isPremium = user?.plan_level === 'premium' || user?.plan_level === 'enterprise';
 
   const isSenior = uiMode === "senior";
   const { width: windowWidth } = useWindowDimensions();
@@ -824,25 +831,27 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               {/* NEW: NOSTALGIA AI MEMORY JOURNAL */}
-              <TouchableOpacity
-                style={[styles.wellnessCard, { backgroundColor: colors.warning + '15', borderColor: colors.warning, marginTop: 15 }]}
-                onPress={() => router.push("/nostalgia-recording" as any)}
-              >
-                <LinearGradient
-                  colors={[colors.warning + '20', 'transparent']}
-                  style={styles.wellnessGradient}
-                />
-                <View style={styles.wellnessIcon}>
-                  <Ionicons name="journal" size={32} color={colors.warning} />
-                </View>
-                <View style={styles.wellnessContent}>
-                  <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Memory Journal</Text>
-                  <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
-                    Record your life stories
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.warning} />
-              </TouchableOpacity>
+              {showNostalgia && (
+                <TouchableOpacity
+                  style={[styles.wellnessCard, { backgroundColor: colors.warning + '15', borderColor: colors.warning, marginTop: 15 }]}
+                  onPress={() => router.push("/nostalgia-recording" as any)}
+                >
+                  <LinearGradient
+                    colors={[colors.warning + '20', 'transparent']}
+                    style={styles.wellnessGradient}
+                  />
+                  <View style={styles.wellnessIcon}>
+                    <Ionicons name="journal" size={32} color={colors.warning} />
+                  </View>
+                  <View style={styles.wellnessContent}>
+                    <Text style={[styles.wellnessTitle, { color: colors.text, fontSize: getFontSize(18) }]}>Memory Journal</Text>
+                    <Text style={[styles.wellnessSubtitle, { color: colors.mutedText, fontSize: getFontSize(14) }]}>
+                      Record your life stories
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={colors.warning} />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* HEALTH METRICS */}
@@ -932,19 +941,36 @@ export default function HomeScreen() {
 
           <View style={isDesktop ? styles.desktopRightColumn : null}>
             {/* AI COMPANION */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
-              <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
-                <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
-                <View style={styles.companionContent}>
-                  <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
-                  <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+            {showChatbot && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.text, fontSize: getFontSize(20) }]}>{t("yourAICompanion")}</Text>
+                <View style={[styles.companionCard, { backgroundColor: colors.card }, isSenior && { padding: 25 }]}>
+                  <Ionicons name="chatbubble-ellipses" size={isSenior ? 48 : 32} color={colors.primary} />
+                  <View style={styles.companionContent}>
+                    <Text style={[styles.companionTitle, { color: colors.text, fontSize: getFontSize(18) }]}>{t("elderBotHelp")}</Text>
+                    <Text style={[styles.companionMessage, { color: colors.mutedText, fontSize: getFontSize(16) }]}>"{aiMessage}"</Text>
+                  </View>
                 </View>
+                <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
+                  <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={[styles.chatButton, { backgroundColor: colors.primary, height: isSenior ? 70 : 56, justifyContent: 'center' }]} onPress={handleAIChat}>
-                <Text style={[styles.chatButtonText, { color: colors.buttonText, fontSize: getFontSize(18), fontWeight: 'bold' }]}>{t("startConversation")}</Text>
+            )}
+
+            {/* PREMIUM UPGRADE PROMPT */}
+            {showUpgradePrompts && !isPremium && user && (
+              <TouchableOpacity 
+                style={[styles.premiumBanner, { backgroundColor: '#FFD700', borderColor: '#DAA520' }]}
+                onPress={() => router.push("/settings/(internal)/upgrade-plan")}
+              >
+                <Ionicons name="star" size={24} color="#000" />
+                <View style={{ flex: 1, marginLeft: 15 }}>
+                  <Text style={{ fontWeight: 'bold', color: '#000' }}>Upgrade to Premium</Text>
+                  <Text style={{ fontSize: 12, color: '#000' }}>Unlock AI coaching, detailed reports, and memory journal.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#000" />
               </TouchableOpacity>
-            </View>
+            )}
           </View>
         </View>
 
@@ -1442,5 +1468,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginHorizontal: 12,
+  },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
 });

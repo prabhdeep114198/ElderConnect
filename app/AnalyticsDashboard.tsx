@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useHealthAnalytics } from '../hooks/useHealthAnalytics';
 import { useWellnessProfile } from '../hooks/useWellnessProfile';
 import { TimeGranularity, analyticsService } from '../services/api/analytics';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 
 const AnalyticsDashboard = () => {
     const { colors } = useTheme();
@@ -33,6 +34,10 @@ const AnalyticsDashboard = () => {
     });
 
     const { data: wellnessProfile, loading: wellnessLoading, refetch: refetchWellness } = useWellnessProfile();
+
+    const flags = useFeatureFlags(['ai_health_insights', 'advanced_trends']);
+    const showAiInsights = flags.ai_health_insights?.enabled || false;
+    const showAdvancedTrends = flags.advanced_trends?.enabled || false;
 
     const refetch = async () => {
         await Promise.all([refetchAnalytics(), refetchWellness()]);
@@ -64,27 +69,33 @@ const AnalyticsDashboard = () => {
                     </Text>
                 </View>
                 <View style={styles.headerButtons}>
-                    <TouchableOpacity
-                        style={[styles.aiButton, { backgroundColor: colors.primary }]}
-                        onPress={() => router.push('/ai-report' as any)}
-                    >
-                        <Ionicons name="sparkles" size={18} color="#FFF" />
-                        <Text style={styles.aiButtonText}>Ask AI Why?</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.aiButton, { backgroundColor: colors.success, marginLeft: 10 }]}
-                        onPress={() => router.push('/health-trends' as any)}
-                    >
-                        <Ionicons name="trending-up" size={18} color="#FFF" />
-                        <Text style={styles.aiButtonText}>Trajectory</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.aiButton, { backgroundColor: '#8B5CF6', marginLeft: 10 }]}
-                        onPress={() => router.push('/mental-wellness' as any)}
-                    >
-                        <Ionicons name="heart" size={18} color="#FFF" />
-                        <Text style={styles.aiButtonText}>Wellness</Text>
-                    </TouchableOpacity>
+                    {showAiInsights && (
+                        <TouchableOpacity
+                            style={[styles.aiButton, { backgroundColor: colors.primary }]}
+                            onPress={() => router.push('/ai-report' as any)}
+                        >
+                            <Ionicons name="sparkles" size={18} color="#FFF" />
+                            <Text style={styles.aiButtonText}>Ask AI Why?</Text>
+                        </TouchableOpacity>
+                    )}
+                    {showAdvancedTrends && (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.aiButton, { backgroundColor: colors.success, marginLeft: 10 }]}
+                                onPress={() => router.push('/health-trends' as any)}
+                            >
+                                <Ionicons name="trending-up" size={18} color="#FFF" />
+                                <Text style={styles.aiButtonText}>Trajectory</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.aiButton, { backgroundColor: '#8B5CF6', marginLeft: 10 }]}
+                                onPress={() => router.push('/mental-wellness' as any)}
+                            >
+                                <Ionicons name="heart" size={18} color="#FFF" />
+                                <Text style={styles.aiButtonText}>Wellness</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
                     <TouchableOpacity
                         style={[styles.refreshButton, { backgroundColor: colors.primary + '20' }]}
                         onPress={refetch}
@@ -239,8 +250,8 @@ const AnalyticsDashboard = () => {
                                 wellnessProfile={wellnessProfile}
                             />
                         )}
-                        {renderTrendAnalysis()}
-                        {renderInsights()}
+                        {showAdvancedTrends && renderTrendAnalysis()}
+                        {showAiInsights && renderInsights()}
                     </>
                 )}
             </View>

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
+import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, TouchableOpacity, Vibration, View } from 'react-native';
@@ -16,6 +17,25 @@ export default function FallDetectedScreen() {
     const isProcessingRef = useRef(false);
     const timerRef = useRef<any>(null);
     const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    // ── Live Location ────────────────────────────────────────────────────────
+    const getLiveLocation = async (): Promise<{ latitude: number; longitude: number } | null> => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                console.warn('[SOS] Location permission denied — sending without coords');
+                return null;
+            }
+            const pos = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+                timeInterval: 5000, // allow up to 5s for a fresh fix
+            });
+            return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        } catch (err) {
+            console.error('[SOS] Failed to get live location:', err);
+            return null;
+        }
+    };
 
     const player = useAudioPlayer(require('../assets/sounds/alarm.wav'));
 
@@ -94,7 +114,7 @@ export default function FallDetectedScreen() {
         isProcessingRef.current = true;
 
         const alertType = isManual ? 'manual' : 'fall_detection';
-        console.log(`EMERGENCY: ${alertType} Confirmed.`);
+        console.log(`EMERGENCY: ${alertType} Confirmed. Fetching live location from phone...`);
 
         // If it's a hardware fall, the backend automatically sends it after 30s! We just notify the user.
         if (mode === 'hardware') {
@@ -108,12 +128,27 @@ export default function FallDetectedScreen() {
 
         try {
             if (user) {
-                await deviceService.createSOS(user.id, {
+                // 1. Fetch live GPS from the phone before sending SOS
+                const liveLocation = await getLiveLocation();
+
+                // 2. Build the SOS payload with real coordinates
+                const sosPayload: any = {
                     type: alertType,
                     description: isManual ? 'User Triggered SOS' : 'Automated Fall Detection',
-                    priority: 'critical'
-                });
-                console.log('SOS Alert created successfully');
+                    priority: 'critical',
+                };
+
+                if (liveLocation) {
+                    sosPayload.latitude = liveLocation.latitude;
+                    sosPayload.longitude = liveLocation.longitude;
+                    console.log(`[SOS] Live location attached: ${liveLocation.latitude}, ${liveLocation.longitude}`);
+                } else {
+                    console.warn('[SOS] No location available — sending without coordinates');
+                }
+
+                // 3. Send SOS with location to backend
+                await deviceService.createSOS(user.id, sosPayload);
+                console.log('SOS Alert created successfully with live phone location');
             }
         } catch (error) {
             console.error('Failed to create SOS alert:', error);

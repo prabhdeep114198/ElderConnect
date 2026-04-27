@@ -109,10 +109,13 @@ export default function ReportsScreen() {
     avgCompliance: 92
   });
 
-  const flags = useFeatureFlags(["download_reports"]);
+  const flags = useFeatureFlags(["download_reports", "advanced_trends", "ai_health_insights", "nostalgia_service"]);
   const { usePremiumFeature } = require("../../hooks/useFeatureFlags");
   const hasSubscription = usePremiumFeature();
-  const canDownload = hasSubscription || false;
+  const canDownload = hasSubscription || flags.download_reports?.enabled;
+  const showAdvancedTrends = flags.advanced_trends?.enabled || false;
+  const showAiInsights = flags.ai_health_insights?.enabled || false;
+  const showNostalgia = flags.nostalgia_service?.enabled || false;
 
   useFocusEffect(
     useCallback(() => {
@@ -890,13 +893,15 @@ export default function ReportsScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
-          onPress={() => router.push("/AnalyticsDashboard")}
-        >
-          <Ionicons name="trending-up" size={24} color="#fff" />
-          <Text style={styles.pdfButtonText}>{t("viewTrends") || "View Trends Dashboard"}</Text>
-        </TouchableOpacity>
+        {showAdvancedTrends && (
+          <TouchableOpacity
+            style={[styles.pdfButton, { backgroundColor: colors.secondary || '#6366f1', marginTop: -10 }]}
+            onPress={() => router.push("/AnalyticsDashboard")}
+          >
+            <Ionicons name="trending-up" size={24} color="#fff" />
+            <Text style={styles.pdfButtonText}>{t("viewTrends") || "View Trends Dashboard"}</Text>
+          </TouchableOpacity>
+        )}
 
 
 
@@ -1095,41 +1100,45 @@ export default function ReportsScreen() {
         </View>
 
         {/* DIGITAL LEGACY TIMELINE */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Digital Legacy</Text>
-          <TouchableOpacity
-            style={[styles.impactCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary, alignItems: 'center', paddingVertical: 25 }]}
-            onPress={() => router.push({ pathname: "/memory-timeline" as any, params: { userId: targetUserId } })}
-          >
-            <Ionicons name="library" size={40} color={colors.primary} style={{ marginBottom: 10 }} />
-            <Text style={[styles.impactTitle, { color: colors.text, fontSize: 18 }]}>View Memory Archive</Text>
-            <Text style={[styles.impactSubtitle, { color: colors.mutedText, textAlign: 'center', marginTop: 5 }]}>
-              Listen to the life stories and memories recorded by {userData?.name?.split(" ")[0] || "this elder"}.
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {showNostalgia && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Digital Legacy</Text>
+            <TouchableOpacity
+              style={[styles.impactCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary, alignItems: 'center', paddingVertical: 25 }]}
+              onPress={() => router.push({ pathname: "/memory-timeline" as any, params: { userId: targetUserId } })}
+            >
+              <Ionicons name="library" size={40} color={colors.primary} style={{ marginBottom: 10 }} />
+              <Text style={[styles.impactTitle, { color: colors.text, fontSize: 18 }]}>View Memory Archive</Text>
+              <Text style={[styles.impactSubtitle, { color: colors.mutedText, textAlign: 'center', marginTop: 5 }]}>
+                Listen to the life stories and memories recorded by {userData?.name?.split(" ")[0] || "this elder"}.
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
-          {scores.physical < 60 && (
-            <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
-              <Ionicons name="walk-outline" size={24} color={colors.warning} />
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
-                <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
+        {showAiInsights && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("smartInsights")}</Text>
+            {scores.physical < 60 && (
+              <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.warning }]}>
+                <Ionicons name="walk-outline" size={24} color={colors.warning} />
+                <View style={styles.insightContent}>
+                  <Text style={[styles.insightTitle, { color: colors.text }]}>{t("mobilityFocus")}</Text>
+                  <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("mobilityInsight")}</Text>
+                </View>
               </View>
-            </View>
-          )}
-          {scores.social < 60 && (
-            <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
-              <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
-              <View style={styles.insightContent}>
-                <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
-                <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
+            )}
+            {scores.social < 60 && (
+              <View style={[styles.insightCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+                <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
+                <View style={styles.insightContent}>
+                  <Text style={[styles.insightTitle, { color: colors.text }]}>{t("socialActivity")}</Text>
+                  <Text style={[styles.insightText, { color: colors.mutedText }]}>{t("socialInsight")}</Text>
+                </View>
               </View>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
         <View style={{ height: 40 }} />
       </Animated.View>
     </ScrollView>
